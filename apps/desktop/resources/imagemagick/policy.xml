@@ -1,0 +1,16 @@
+<policymap>
+ <policy domain="resource" name="memory" value="256MiB"/>
+ <policy domain="resource" name="map" value="256MiB"/>
+ <policy domain="resource" name="disk" value="512MiB"/>
+ <policy domain="resource" name="width" value="20000"/>
+ <policy domain="resource" name="height" value="20000"/>
+ <policy domain="resource" name="list-length" value="16"/>
+ <policy domain="resource" name="time" value="45"/>
+ <policy domain="resource" name="thread" value="2"/>
+ <policy domain="delegate" rights="none" pattern="*"/>
+ <policy domain="filter" rights="none" pattern="*"/>
+ <policy domain="path" rights="none" pattern="@*"/>
+ <policy domain="coder" rights="none" pattern="*"/>
+ <policy domain="coder" rights="read" pattern="{JPEG,PNG,WEBP,GIF,AVIF,HEIC,HEIF,BMP,BMP2,BMP3,TIFF,TIFF64,DNG,RAW,DCRAW,CR2,CR3,CRW,NEF,NRW,ARW,SR2,SRF,RAF,ORF,RW2,PEF,3FR,ERF,KDC,X3F}"/>
+ <policy domain="coder" rights="read|write" pattern="{PNG,JPEG,WEBP}"/>
+</policymap>

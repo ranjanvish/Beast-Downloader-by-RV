@@ -1,0 +1,7 @@
+Beast Downloader by RV 1.3.3
+Based on nexmoe/VidBee. Modified source included.
+First build the browser companion: pnpm --filter vidbee-extension build. Run the desktop regression suite with node --test apps/desktop/scripts/test-beast-regressions.cjs. Use Node 24 and pnpm 11.1.2. Install workspace dependencies, then run pnpm --filter beast-downloader check and pnpm --filter beast-downloader build:win.
+Windows x64 installer: Electron 43.4.1. Bundled yt-dlp, Node, FFmpeg are downloaded by the setup scripts.
+This build environment used hoisted dependencies because workspace symlinks were unavailable. The two Vite resolution files use root node_modules. Use pnpm install --node-linker=hoisted.
+NSIS 64-bit compiler: negrutiu/nsis v3.13.7507.353, release artifact nsis-3.13.7507.353-negrutiu-amd64.exe SHA256 22da08f172a757c7e3bce05273250d535876487da2d96c4bb0767672a003fd75. Normal Windows builds can use the configured electron-builder NSIS toolset.
+No signing certificate is included. No repository was published by this build.

@@ -1,0 +1,40 @@
+Beast Downloader by RV
+Free to use and share. Based on VidBee by nexmoe.
+
+VidBee MIT license:
+MIT License
+
+Copyright (c) 2025 VidBee
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+Includes yt-dlp and FFmpeg. Third-party components retain their licenses.
+yt-dlp: https://github.com/yt-dlp/yt-dlp
+FFmpeg: https://github.com/yt-dlp/FFmpeg-Builds
+FFmpeg GPL source and build recipes: https://github.com/yt-dlp/FFmpeg-Builds
+Additional notices are in the installed resources and Electron LICENSE files.
+
+Image conversion runtime: ImageMagick 7.1.2-32 portable Q8 x64 (official build).
+Copyright ImageMagick Studio LLC and its contributors.
+See resources/licenses/ImageMagick-LICENSE.txt and ImageMagick-NOTICE.txt.
+Upstream source: https://github.com/ImageMagick/ImageMagick/tree/7.1.2-32
+Windows build sources/dependencies: https://github.com/ImageMagick/ImageMagick-Windows
+Binary: https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-32
+The bundled policy disables external delegates and non-image coders.

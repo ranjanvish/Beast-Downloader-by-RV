@@ -1,0 +1,165 @@
+:root {
+  font: 14px / 1.5 system-ui;
+  color: #f3f3f5;
+  background: #101116;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 580px;
+}
+main {
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+}
+header,
+.row,
+nav {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+header {
+  justify-content: space-between;
+}
+h1 {
+  margin: 0;
+  color: #ff3757;
+  font-size: 30px;
+}
+h2 {
+  font-size: 18px;
+}
+header p {
+  margin: 0;
+  color: #b5b5c1;
+}
+nav {
+  margin: 20px 0;
+}
+nav button {
+  flex: 1;
+}
+button,
+input,
+select {
+  font: inherit;
+  border: 1px solid #3a3b47;
+  border-radius: 8px;
+  padding: 9px;
+  color: inherit;
+  background: #20222c;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+button[aria-pressed="true"],
+.primary {
+  background: #e92449;
+  border-color: #e92449;
+  color: white;
+}
+.primary {
+  margin: 14px 0;
+  width: 100%;
+  font-weight: 600;
+}
+label {
+  display: block;
+  margin: 10px 0;
+}
+label > input:not([type="checkbox"]),
+label > select,
+section > select {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+}
+input[type="checkbox"] {
+  accent-color: #f52d53;
+}
+section {
+  border: 1px solid #343640;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+details {
+  margin: 14px 0;
+}
+.hint,
+footer {
+  font-size: 12px;
+  color: #afb0bc;
+}
+.status {
+  padding: 12px;
+  background: #29212a;
+  border-left: 3px solid #ff3757;
+  overflow-wrap: anywhere;
+}
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+.image {
+  border: 1px solid #393b46;
+  padding: 8px;
+  border-radius: 8px;
+}
+.image img {
+  width: 100%;
+  height: 90px;
+  object-fit: contain;
+}
+.image span {
+  display: block;
+  font-size: 11px;
+}
+footer {
+  margin-top: 24px;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #ff7c90;
+  outline-offset: 2px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    background: #fafafa;
+    color: #15151b;
+    color-scheme: light;
+  }
+  button,
+  input,
+  select {
+    background: #fff;
+    border-color: #ccc;
+  }
+  .hint,
+  footer,
+  header p {
+    color: #555;
+  }
+  .status {
+    background: #fff0f3;
+  }
+  button[aria-pressed="true"],
+  .primary {
+    background: #e92449;
+  }
+}
+progress { width: 100%; height: 12px; accent-color: #ef244e; }

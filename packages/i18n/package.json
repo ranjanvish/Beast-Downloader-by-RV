@@ -1,0 +1,24 @@
+{
+  "name": "@vidbee/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./languages": "./src/languages.ts",
+    "./system-locale": "./src/system-locale.ts",
+    "./locales/*": "./src/locales/*.json"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react-i18next": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "i18next": "^25.5.3",
+    "typescript": "^7.0.2"
+  }
+}

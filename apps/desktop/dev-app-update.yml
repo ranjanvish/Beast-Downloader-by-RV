@@ -1,0 +1,4 @@
+provider: github
+owner: ranjanvish
+repo: VidBee
+updaterCacheDirName: vidbee-updater
