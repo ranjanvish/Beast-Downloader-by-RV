@@ -78,7 +78,7 @@ const ensureDirectoryExists = (dir?: string): void => {
 
 /** Fill missing title/thumbnail metadata from yt-dlp before a task is queued. */
 const hydrateDownloadMetadata = async (options: DownloadOptions): Promise<DownloadOptions> => {
-  if (hasDisplayMetadata(options)) {
+  if (hasDisplayMetadata(options) || (options.title?.trim() && options.selectedFormat)) {
     return options
   }
 

@@ -12,6 +12,7 @@ import { validateTranscriptTabSearch } from './lib/transcript-tab-search'
 import { transcriptRouteTransitionTypes } from './lib/transcript-view-transition'
 import { About } from './pages/BeastAbout'
 import { BeastExtensions } from './pages/BeastExtensions'
+import { Downloads } from './pages/Downloads'
 import { Home } from './pages/Home'
 import { Settings } from './pages/Settings'
 import { Subscriptions } from './pages/Subscriptions'
@@ -83,6 +84,12 @@ const indexRoute = createRoute({
   component: HomeRoute
 })
 
+const downloadsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/downloads',
+  component: Downloads
+})
+
 const subscriptionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/subscriptions',
@@ -133,6 +140,7 @@ const notFoundRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  downloadsRoute,
   subscriptionsRoute,
   settingsRoute,
   aboutRoute,

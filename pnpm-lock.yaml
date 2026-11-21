@@ -373,6 +373,9 @@ importers:
       katex:
         specifier: ^0.16.47
         version: 0.16.47
+      linkedom:
+        specifier: 0.18.12
+        version: 0.18.12
       lucide-react:
         specifier: ^0.545.0
         version: 0.545.0(react@19.2.8)

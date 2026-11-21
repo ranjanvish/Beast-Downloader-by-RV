@@ -249,6 +249,7 @@ export class YtDlpExecutor implements Executor {
     const subtitleLanguagesSeen = new Set<string>()
     let progressAggregator = new DownloadProgressAggregator()
     let subtitleFallbackAttempted = false
+    let impersonationFallbackAttempted = false
     const canRetryWithoutSubtitles = !(ctx.input.rawArgs?.length || this.opts.buildArgs)
 
     const captureProcessing = (text: string, stream: 'stdout' | 'stderr'): void => {
@@ -590,6 +591,20 @@ export class YtDlpExecutor implements Executor {
           ) {
             stderrTail.append(`\n${THUMBNAIL_EMBED_UNSUPPORTED_LOG}\n`)
             finishSuccessfulProcess(closedAt)
+            return
+          }
+          if (
+            !impersonationFallbackAttempted &&
+            /cloudflare anti-bot challenge/i.test(processStderr)
+          ) {
+            impersonationFallbackAttempted = true
+            const fallbackArgs = [...processArgs, '--extractor-args', 'generic:impersonate']
+            try {
+              proc = spawnProcess(fallbackArgs)
+              bindProcess(proc, fallbackArgs)
+            } catch (err) {
+              finishProcessError(err instanceof Error ? err : new Error(String(err)))
+            }
             return
           }
           if (

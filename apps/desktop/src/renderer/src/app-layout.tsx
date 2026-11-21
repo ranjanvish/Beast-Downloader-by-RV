@@ -51,14 +51,15 @@ import {
 } from './store/transcripts'
 import { updateAvailableAtom, updateReadyAtom } from './store/update'
 
-type Page = 'extensions' | 'about' | 'home' | 'settings' | 'subscriptions'
+type Page = 'extensions' | 'about' | 'home' | 'settings' | 'subscriptions' | 'downloads'
 
 const pageToPath: Record<Page, string> = {
   extensions: '/extensions',
   about: '/about',
   home: '/',
   settings: '/settings',
-  subscriptions: '/subscriptions'
+  subscriptions: '/subscriptions',
+  downloads: '/downloads'
 }
 
 /**
@@ -90,6 +91,8 @@ const pathToPage = (pathname: string): Page => {
       return 'about'
     case '/settings':
       return 'settings'
+    case '/downloads':
+      return 'downloads'
     case '/subscriptions':
       return 'subscriptions'
     default:
@@ -123,6 +126,22 @@ export function AppLayout() {
   const updateDownloadInProgressRef = useRef(false)
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  useEffect(() => {
+    const subscription = ipcEvents.on('beast:images-imported', () => {
+      if (pathname !== '/') {
+        void navigate({ to: '/' })
+      }
+    })
+    const batchSubscription = ipcEvents.on('beast:batch-imported', () => {
+      if (pathname !== '/') {
+        void navigate({ to: '/' })
+      }
+    })
+    return () => {
+      ipcEvents.removeListener('beast:images-imported', subscription)
+      ipcEvents.removeListener('beast:batch-imported', batchSubscription)
+    }
+  }, [navigate, pathname])
   const playbackSession = useAtomValue(playbackSessionAtom)
   const playbackPlaylist = useAtomValue(playbackPlaylistAtom)
   const playbackBarVisible = shouldShowPlaybackBar({

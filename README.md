@@ -1,10 +1,10 @@
-# 🚀 Beast Downloader by RV (v1.3.3)
+# 🚀 Beast Downloader by RV (v3.1.9 Latest)
 
 <div align="center">
-  <img src="apps/desktop/build/icon.png" alt="Beast Downloader by RV Logo" width="110" height="110">
+  <img src="apps/desktop/build/icon.png" alt="Beast Downloader by RV Logo" width="115" height="115">
   <br />
   <h3><b>Beast Downloader by RV</b></h3>
-  <p><b>Next-Generation High-Speed Video/Audio Downloader & Local AI Transcription Workstation</b></p>
+  <p><b>Next-Generation High-Speed Video/Audio/Image Downloader, Local AI Transcription & Media Workspace</b></p>
 
   <p>
     <a href="https://github.com/ranjanvish/Beast-Downloader-by-RV/releases/latest"><img src="https://img.shields.io/github/v/release/ranjanvish/Beast-Downloader-by-RV?color=00c853&labelColor=202124&logo=github&label=Release" alt="Latest Release" /></a>
@@ -14,8 +14,8 @@
   </p>
 
   <p>
-    <a href="https://github.com/ranjanvish/Beast-Downloader-by-RV/releases/download/v1.3.3/Beast-Downloader-by-RV-1.3.3-Setup.exe">
-      <img src="https://img.shields.io/badge/📥%20Download%20Installer-v1.3.3%20Windows%20x64%20(Setup.exe)-success?style=for-the-badge" alt="Download Windows Installer" />
+    <a href="https://github.com/ranjanvish/Beast-Downloader-by-RV/releases/download/v3.1.9/Beast-Downloader-by-RV-3.1.9-Setup.exe">
+      <img src="https://img.shields.io/badge/📥%20Download%20Installer-v3.1.9%20Windows%20x64%20(Setup.exe)-success?style=for-the-badge" alt="Download Windows Installer" />
     </a>
   </p>
 </div>
@@ -24,9 +24,9 @@
 
 ## ⚡ Overview
 
-**Beast Downloader by RV** is an advanced, production-grade desktop application engineered for creators, video editors, and archivists. It combines raw multi-threaded downloading from 1000+ streaming and social platforms with on-device local AI speech recognition, precise multi-language audio selection, loss-free video trimming, and batch queues.
+**Beast Downloader by RV (v3.1.9)** is a powerful, production-grade media downloader and workstation built specifically for content creators, video editors, and archivists. It integrates multi-threaded downloading from 1000+ video, audio, and image platforms with on-device local AI speech recognition, precise multi-language audio selection, loss-free video trimming, and a high-speed local updates development loop.
 
-Built on modern **Electron 43**, **React 19**, **Tailwind CSS**, and **Drizzle SQLite**, Beast Downloader brings complete control over media extraction and analysis right to your desktop.
+Built with **Electron 43**, **React 19**, **Tailwind CSS**, and **Drizzle SQLite**, Beast Downloader brings full studio-grade media processing directly onto your local machine.
 
 <div align="center">
   <img src="screenshots/downloads-framed.webp" alt="Beast Downloader Queue" width="48%" />
@@ -35,45 +35,44 @@ Built on modern **Electron 43**, **React 19**, **Tailwind CSS**, and **Drizzle S
 
 ---
 
-## 🌟 Key Highlights & Beast Features
+## 🌟 What's New & Upgraded in v3.1.9
 
-### 🎯 1. High-Speed Multi-Platform Downloads (1000+ Sites)
-- Built on top of customized `yt-dlp` and `FFmpeg` engines with intelligent chunking.
-- Full support for **YouTube (up to 4K/8K 60fps), Instagram Reels/Stories, Facebook, TikTok, X (Twitter), Twitch, Vimeo, Bilibili**, and over a thousand other media sites.
-- Complete download queue management: pause, resume, reorder, auto-retry, and batch imports.
+### 🔥 1. Instant Local Updates Engine
+- **FastBuild & Hot Reloading** (`FastBuild.cmd`, `WatchUpdates.ps1`): Replaces compiled application code (`app.asar`) in seconds without reinstalling the entire Electron runtime or terminating running background downloads.
+- **Fail-safe Rollback**: Automatically verifies builds, updates patch versions, and preserves installed working code if any validation check fails.
 
-### 🌐 2. Multi-Language Audio Stream Selection (Indic & Global)
-- Accurately captures separate dub tracks (Hindi, English, Spanish, Japanese, etc.) and correctly muxes them into MP4/MKV.
-- Special UTF-8 preservation layer ensures international title characters and metadata never get corrupted during heavy batch processing.
+### 🎬 2. Unified Beast Download Workspace
+- **SingleVideoBeast**: Dedicated precision inspector for high-resolution video streams (4K/8K 60fps), audio dub tracks, and metadata.
+- **BeastClip**: Precision interactive timeline trimming. Download only the exact seconds/minutes you need without fetching multi-gigabyte source files.
+- **AllInOneDownloads**: Unified multi-tab queue orchestrating video, audio, and image tasks in parallel.
 
-### 🤖 3. Local AI Speech Transcription (No Cloud Required)
-- Run speech-to-text models directly on your hardware with zero upload latency or subscription costs:
+### 🖼️ 3. Batch Image Downloader & Converter
+- Built-in crawler extracting high-resolution images from supported galleries, web pages, and social media.
+- Integrated **ImageMagick** conversion engine allowing instant WebP, PNG, and JPG optimization and format conversions.
+
+### 🌐 4. Zero-Loss Multi-Language Audio Stream Selection
+- Accurately captures separate audio dub tracks (Hindi, English, Spanish, Japanese, etc.) and muxes them seamlessly into MP4 or MKV containers.
+- Enhanced UTF-8 preservation layer keeps international and Indic characters intact without filename corruption.
+
+### 🤖 5. On-Device Local AI Speech Transcription
+- Integrated speech-to-text models that run 100% locally with zero subscription costs or cloud latency:
   - **Whisper** (tiny, base, small, medium, large-v3)
   - **SenseVoice** & **Parakeet**
   - **Qwen3-ASR**
-- Automatic speaker diarization (speaker separation), clickable timestamps, and instant playback syncing.
-- Export transcripts to SRT, VTT, Markdown, or burn them directly into the exported video.
+- Automatic speaker diarization, clickable timestamp jump, and SRT/VTT/Markdown export.
 
-### ✂️ 4. Precision Trimming & Lossless Merging
-- Clip only the exact section you need before downloading, avoiding gigantic raw files.
-- Smart re-muxing ensures zero quality loss when exporting MP4, MKV, or WebM formats.
-
-### 📡 5. Creator RSS Automation & Subscriptions
-- Follow your favorite YouTube channels, podcasts, and creator feeds.
-- Automatically monitor new uploads, apply custom filters/tags, and fetch media automatically into organized folders.
-
-### 🧩 6. Browser Extension Companion
-- One-click browser integration for Chrome, Brave, and Edge via WebExtension (WXT).
-- Detects media directly from your active browser tab and passes it instantly to Beast Downloader.
+### 🧩 6. Browser Extension Companion (Chrome / Brave / Edge)
+- Built on modern Manifest V3 (WXT) with instant media overlay detection.
+- Send active video, audio, or image galleries from your browser into Beast Downloader in a single click.
 
 ---
 
 ## 📥 Installation
 
 ### Option A: One-Click Windows Setup (Recommended)
-1. Head over to the [Latest Release](https://github.com/ranjanvish/Beast-Downloader-by-RV/releases/latest).
-2. Download **`Beast-Downloader-by-RV-1.3.3-Setup.exe`**.
-3. Run the installer and launch **Beast Downloader by RV** from your Desktop or Start Menu.
+1. Go to the [Latest Release (v3.1.9)](https://github.com/ranjanvish/Beast-Downloader-by-RV/releases/tag/v3.1.9).
+2. Download **`Beast-Downloader-by-RV-3.1.9-Setup.exe`**.
+3. Run the installer to install or upgrade Beast Downloader.
 
 ### Option B: Build from Source
 
@@ -88,44 +87,44 @@ Built on modern **Electron 43**, **React 19**, **Tailwind CSS**, and **Drizzle S
 git clone https://github.com/ranjanvish/Beast-Downloader-by-RV.git
 cd Beast-Downloader-by-RV
 
-# 2. Install workspace dependencies (using hoisted linker for native compatibility)
+# 2. Install workspace dependencies
 pnpm install --node-linker=hoisted
 
-# 3. Build the browser companion extension
+# 3. Build the browser extension companion
 pnpm --filter vidbee-extension build
 
 # 4. Run the regression test suite
 node --test apps/desktop/scripts/test-beast-regressions.cjs
 
-# 5. Launch in development mode
+# 5. Build & Launch in development mode
 pnpm --filter beast-downloader dev
 
 # 6. Package Windows NSIS x64 Installer
 pnpm --filter beast-downloader build:win
 ```
 
-The compiled installer will be located in `apps/desktop/dist/Beast-Downloader-by-RV-1.3.3-Setup.exe`.
-
 ---
 
-## 🏛️ Monorepo Structure
+## 🏛️ Monorepo Architecture
 
 ```text
 Beast-Downloader-by-RV/
 ├── apps/
-│   ├── desktop/          # Electron 43 + React 19 desktop application
-│   ├── extension/        # Browser companion extension (Chrome / Brave / Edge)
+│   ├── desktop/          # Electron 43 + React 19 desktop workstation (v3.1.9)
+│   ├── extension/        # Browser companion extension (Chrome / Brave / Edge MV3)
 │   ├── api/              # Fastify headless API server with oRPC & SSE
 │   ├── web/              # TanStack Start web interface
 │   └── cli/              # Command-line interface tool
 ├── packages/
-│   ├── downloader-core/  # yt-dlp & FFmpeg execution wrapper
+│   ├── downloader-core/  # yt-dlp & FFmpeg execution wrapper + editor-video pipeline
 │   ├── transcription/    # Local AI ASR engine (Whisper, SenseVoice, sherpa-onnx)
 │   ├── task-queue/       # Robust job classifier & priority queue
 │   ├── subscriptions-core/# RSS parser and feed coordinator
 │   ├── db/               # Drizzle ORM schema & SQLite migration layer
 │   ├── logger/           # Structured logging
 │   └── ui/               # Shared Radix UI & Tailwind component library
+├── FastBuild.cmd         # Quick 1-click local development build & hot-update
+├── WatchUpdates.ps1      # Background source watcher for seamless updates
 └── screenshots/          # Application previews and UI captures
 ```
 
@@ -133,12 +132,12 @@ Beast-Downloader-by-RV/
 
 ## 🛠️ Technology Stack
 
-- **Runtime & Desktop Framework**: Electron 43, Node.js 24
+- **Desktop Framework**: Electron 43, Node.js 24
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Lucide Icons, Shadcn UI
-- **Local Database**: SQLite with Drizzle ORM
+- **Database**: SQLite with Drizzle ORM
 - **Media Engine**: yt-dlp, FFmpeg, ImageMagick
-- **AI / Speech Engine**: sherpa-onnx, whisper.cpp, fast-whisper
-- **Packager**: electron-builder, NSIS 3.13
+- **ASR AI Engine**: sherpa-onnx, whisper.cpp, fast-whisper
+- **Packager**: electron-builder 26, NSIS 3.12
 
 ---
 

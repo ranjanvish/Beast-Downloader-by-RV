@@ -262,30 +262,59 @@ div[data-streamdown="table-wrapper"] > :has(> table) {
   content-visibility: visible !important;
 }
 
-/* Beast brand: restrained red accents, clear surfaces, both themes. */
+/* RAVIX palette. Semantic tokens keep every existing control on the same theme. */
 :root {
-  --primary: #d52240;
+  --background: #f7f9f7;
+  --foreground: #17221e;
+  --card: #ffffff;
+  --card-foreground: #17221e;
+  --popover: #ffffff;
+  --popover-foreground: #17221e;
+  --primary: #174f39;
   --primary-foreground: #ffffff;
-  --ring: #dc2947;
-  --sidebar-primary: #d52240;
-  --sidebar-accent-foreground: #b51c35;
+  --secondary: #edf4ef;
+  --secondary-foreground: #174f39;
+  --muted: #f0f3f1;
+  --muted-foreground: #697770;
+  --accent: #e9f3ec;
+  --accent-foreground: #174f39;
+  --border: #e5eae7;
+  --input: #ffffff;
+  --ring: #397c59;
+  --destructive: #dc3434;
+  --sidebar: #edf4ef;
+  --sidebar-foreground: #35443e;
+  --sidebar-primary: #174f39;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ddebdd;
+  --sidebar-accent-foreground: #174f39;
+  --sidebar-border: #e5eae7;
 }
 .dark {
-  --background: #111216;
-  --foreground: #f5f5f7;
-  --card: #191b21;
-  --popover: #1c1e25;
-  --muted: #242730;
-  --muted-foreground: #a6aab8;
-  --border: #30343e;
-  --input: #20232b;
-  --primary: #ef3655;
-  --primary-foreground: #ffffff;
-  --ring: #ef3655;
-  --sidebar: #16181d;
-  --sidebar-primary: #ef3655;
-  --sidebar-accent: #3c2029;
-  --sidebar-accent-foreground: #ff859a;
+  --background: #101b16;
+  --foreground: #edf4ef;
+  --card: #18281f;
+  --card-foreground: #edf4ef;
+  --popover: #1d3025;
+  --popover-foreground: #edf4ef;
+  --primary: #7bc199;
+  --primary-foreground: #102b1e;
+  --secondary: #223a2c;
+  --secondary-foreground: #ddebdd;
+  --muted: #23362b;
+  --muted-foreground: #a4b8ab;
+  --accent: #264332;
+  --accent-foreground: #ddebdd;
+  --border: #324b3c;
+  --input: #15251c;
+  --ring: #7bc199;
+  --destructive: #ff8585;
+  --sidebar: #132219;
+  --sidebar-foreground: #ddebdd;
+  --sidebar-primary: #7bc199;
+  --sidebar-accent: #264332;
+  --sidebar-accent-foreground: #ddebdd;
+  --sidebar-border: #324b3c;
 }
 .beast-hero {
   background: linear-gradient(
@@ -309,13 +338,19 @@ div[data-streamdown="table-wrapper"] > :has(> table) {
 .beast-field {
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--background);
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 9px 12px;
+  background: var(--input);
   color: var(--foreground);
   font-size: 13px;
 }
 .beast-range {
   accent-color: var(--primary);
   width: 100%;
+}
+
+.beast-field::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
 }

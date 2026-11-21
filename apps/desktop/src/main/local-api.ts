@@ -5,6 +5,8 @@ import type { Task, TaskQueueEvent } from '@vidbee/task-queue'
 import { projectTaskToLegacy } from '@vidbee/task-queue'
 import { app } from 'electron'
 import log from 'electron-log/main'
+import type { ImageSaveOptions } from '../shared/image-download'
+import type { MixedBatchAction } from '../shared/mixed-download'
 import {
   getAutomationDescriptorPath,
   initAutomationDescriptor,
@@ -14,6 +16,7 @@ import {
 import { companionSyncStatus } from './lib/beast-companion-sync'
 import { handleBeastRequest } from './lib/beast-extension'
 import { downloadEngine } from './lib/download-facade'
+import { downloadLibrary } from './lib/download-library'
 import {
   clearExtensionCookies,
   getExtensionCookieConnection,
@@ -32,11 +35,14 @@ import {
   handleExtensionTranscript,
   isExtensionTranscriptPath
 } from './lib/extension-transcript'
+import { importBrowserImages, previewImage, saveImages, scanImages } from './lib/image-downloads'
 import {
   classifyLocalApiCaller,
   LOCAL_API_PORT_END,
   LOCAL_API_PORT_START
 } from './lib/local-api-guard'
+import { executeMixedBatch, mixedBatchSnapshot } from './lib/mixed-batch-host'
+import { mixedPreview } from './lib/mixed-preview'
 import { getDesktopSubscriptions, removeDesktopSubscription } from './lib/subscriptions-host'
 import {
   getDesktopTaskQueue,
@@ -303,7 +309,49 @@ const handleAutomationRequest = async (
 
   const queue = getDesktopTaskQueue()
   try {
+    if (
+      op.startsWith('batch/') &&
+      op !== 'batch/snapshot' &&
+      op !== 'batch/preview' &&
+      op !== 'batch/library'
+    ) {
+      return writeJson(
+        res,
+        200,
+        await executeMixedBatch(op.slice('batch/'.length) as MixedBatchAction, body)
+      )
+    }
     switch (op) {
+      case 'batch/library':
+        return writeJson(
+          res,
+          200,
+          await downloadLibrary(
+            Number(body.page) || 0,
+            String(body.kind || 'all'),
+            String(body.query || '')
+          )
+        )
+      case 'batch/preview':
+        return writeJson(res, 200, await mixedPreview(String(body.id || ''), body.refresh === true))
+      case 'batch/snapshot':
+        return writeJson(
+          res,
+          200,
+          mixedBatchSnapshot(
+            Number(body.page) || 0,
+            String(body.query || ''),
+            String(body.status || 'all')
+          )
+        )
+      case 'images/scan':
+        return writeJson(res, 200, await scanImages(String(body.url || '')))
+      case 'images/save':
+        return writeJson(res, 200, await saveImages(body as unknown as ImageSaveOptions))
+      case 'images/import':
+        return writeJson(res, 200, { imported: importBrowserImages(body) })
+      case 'images/preview':
+        return writeJson(res, 200, { preview: await previewImage(String(body.url || '')) })
       case 'add': {
         const result = await queue.add({
           input: body.input as never,

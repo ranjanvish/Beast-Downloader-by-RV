@@ -14,13 +14,23 @@ const BASE_DIRECTIVES: Record<string, string[]> = {
     'file:',
     'vidbee:',
     'agent-artifact:',
+    'batch-media:',
     USER_IMAGE_SCHEME,
     'https://i.ytimg.com',
     'https://img.youtube.com',
     'https://favicon.im'
   ],
-  'media-src': ["'self'", 'blob:', 'file:', 'vidbee:', 'agent-artifact:', 'https:'],
-  'connect-src': ["'self'", 'data:', 'blob:', 'file:', 'vidbee:', 'agent-artifact:', RYBBIT_ORIGIN]
+  'media-src': ["'self'", 'blob:', 'file:', 'vidbee:', 'agent-artifact:', 'batch-media:', 'https:'],
+  'connect-src': [
+    "'self'",
+    'data:',
+    'blob:',
+    'file:',
+    'vidbee:',
+    'agent-artifact:',
+    'batch-media:',
+    RYBBIT_ORIGIN
+  ]
 }
 
 const appendUnique = (values: string[], extras: string[]): string[] => {
@@ -93,7 +103,12 @@ export function mergeRendererContentSecurityPolicy(
   const connectSrc = directives.get('connect-src')
   directives.set(
     'connect-src',
-    appendUnique(connectSrc ?? BASE_DIRECTIVES['connect-src'], ["'self'", origin, RYBBIT_ORIGIN])
+    appendUnique(connectSrc ?? BASE_DIRECTIVES['connect-src'], [
+      "'self'",
+      origin,
+      RYBBIT_ORIGIN,
+      'batch-media:'
+    ])
   )
 
   const scriptSrc = directives.get('script-src')
@@ -104,10 +119,15 @@ export function mergeRendererContentSecurityPolicy(
 
   const imgSrc = directives.get('img-src')
   if (imgSrc) {
-    directives.set('img-src', appendUnique(imgSrc, [USER_IMAGE_SCHEME]))
+    directives.set('img-src', appendUnique(imgSrc, [USER_IMAGE_SCHEME, 'batch-media:']))
   } else {
     directives.set('img-src', [...BASE_DIRECTIVES['img-src']])
   }
+
+  directives.set(
+    'media-src',
+    appendUnique(directives.get('media-src') ?? BASE_DIRECTIVES['media-src'], ['batch-media:'])
+  )
 
   return serializeCsp(directives)
 }

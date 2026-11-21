@@ -8,6 +8,7 @@ import { FileSystemIconLoader } from 'unplugin-icons/loaders'
 import Icons from 'unplugin-icons/vite'
 import { loadEnv } from 'vite'
 import { createRendererResolve } from './renderer-react-resolve'
+import { workspaceSourceAliases } from './workspace-source-resolve'
 
 const require = createRequire(import.meta.url)
 const lobeIconsDir = join(
@@ -169,6 +170,7 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@main': resolve(import.meta.dirname, 'src/main'),
+          ...workspaceSourceAliases(import.meta.dirname),
           '@shared': resolve(import.meta.dirname, 'src/shared')
         }
       },

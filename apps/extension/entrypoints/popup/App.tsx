@@ -334,6 +334,12 @@ export default function App() {
               }}
             />
           </label>
+          <button type="button" disabled={busy || !publicUrl(url)} onClick={async () => {
+            setBusy(true)
+            try { await appRequest('/beast/batch/import', { url, kind: mode }); setMessage('Link sent to Beast’s all-in-one list. Review its options there before downloading.') }
+            catch(error) { setMessage(error instanceof Error ? error.message : String(error)) }
+            finally { setBusy(false) }
+          }}>Send link to all-in-one list</button>
           <select
             aria-label="Detected media"
             value=""
@@ -464,6 +470,16 @@ export default function App() {
       ) : (
         <section>
           <h2>Images · {images.length} found</h2>
+          <button type="button" disabled={busy || !selected.length} onClick={async () => {
+            setBusy(true)
+            try {
+              const picked = images.filter(image => selected.includes(image.url)).slice(0, 100)
+              if (!picked.length) throw new Error('Select at least one image.')
+              await appRequest('/beast/images/import', { pageUrl: url, images: picked })
+              setMessage(`${picked.length} images sent to Beast’s all-in-one list. Choose sizes and save them there.`)
+            } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+            finally { setBusy(false) }
+          }}>Send selected to Beast app</button>
           <div className="row">{['png','jpeg','original','webp'].map(format=><label key={format}><input type="radio" name="image-output" checked={output===format} onChange={()=>setOutput(format)}/>{format.toUpperCase()}</label>)}</div>
           <label><input type="checkbox" checked={highest} onChange={e=>setHighest(e.target.checked)}/> Prefer highest size advertised by this page; fall back if unavailable</label>
           <div className="row">

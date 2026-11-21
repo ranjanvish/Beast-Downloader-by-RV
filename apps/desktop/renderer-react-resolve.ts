@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { workspaceSourceAliases } from './workspace-source-resolve'
 
 /**
  * Pin the renderer to the desktop React copy so workspace UI / Radix share one dispatcher.
@@ -14,6 +15,7 @@ export const createRendererResolve = (
 
   return {
     alias: {
+      ...workspaceSourceAliases(desktopRoot),
       '@main': resolve(desktopRoot, 'src/main'),
       '@renderer': resolve(desktopRoot, 'src/renderer/src'),
       '@shared': resolve(desktopRoot, 'src/shared'),

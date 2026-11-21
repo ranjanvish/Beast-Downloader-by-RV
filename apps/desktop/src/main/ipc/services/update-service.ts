@@ -1,8 +1,13 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { app } from 'electron'
 import { type IpcContext, IpcMethod, IpcService } from 'electron-ipc-decorator'
 import { autoUpdater } from 'electron-updater'
 import { allowAppQuit } from '../../lib/quit-confirmation-host'
 import { isPortableMode } from '../../portable'
+
+const usesLocalUpdates = (): boolean =>
+  isPortableMode || existsSync(join(process.resourcesPath, 'beast-local-updates.json'))
 
 const isNewerVersion = (latest: string, current: string): boolean => {
   const toSegments = (version: string) =>
@@ -38,7 +43,7 @@ class UpdateService extends IpcService {
   async checkForUpdates(
     _context: IpcContext
   ): Promise<{ available: boolean; version?: string; error?: string }> {
-    if (isPortableMode) {
+    if (usesLocalUpdates()) {
       return {
         available: false,
         version: app.getVersion()
@@ -71,10 +76,10 @@ class UpdateService extends IpcService {
 
   @IpcMethod()
   async downloadUpdate(_context: IpcContext): Promise<{ success: boolean; error?: string }> {
-    if (isPortableMode) {
+    if (usesLocalUpdates()) {
       return {
         success: false,
-        error: 'Auto-update is disabled in portable mode'
+        error: 'Installer updates are disabled while portable or local source updates are active'
       }
     }
 
@@ -91,7 +96,7 @@ class UpdateService extends IpcService {
 
   @IpcMethod()
   quitAndInstall(_context: IpcContext): void {
-    if (isPortableMode) {
+    if (usesLocalUpdates()) {
       return
     }
 
@@ -106,7 +111,7 @@ class UpdateService extends IpcService {
 
   @IpcMethod()
   isAutoUpdateEnabled(_context: IpcContext): boolean {
-    return !isPortableMode
+    return !usesLocalUpdates()
   }
 }
 

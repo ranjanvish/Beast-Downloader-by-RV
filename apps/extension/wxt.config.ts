@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'Beast Browser Companion',
     description: 'Choose videos, audio languages and images for Beast Downloader.',
     action: { default_title: 'Beast Browser Companion' },
-    version: '1.3.3',
+    version: '3.1.2',
     key: identity.key,
     incognito: 'not_allowed',
     host_permissions: ['http://127.0.0.1/*'],

@@ -220,7 +220,8 @@ const assertPackagedSherpa = (nodeModulesDir, keepName) => {
 
 const pruneSherpaNatives = (nodeModulesDir, keepName, logger = console) => {
   if (!existsSync(nodeModulesDir)) {
-    throw new Error(`Packaged node_modules not found: ${nodeModulesDir}`)
+    logger.info?.(`Packaged node_modules not found (${nodeModulesDir}), skipping sherpa prune.`)
+    return
   }
 
   const sherpaEntries = readdirSync(nodeModulesDir).filter((entry) =>

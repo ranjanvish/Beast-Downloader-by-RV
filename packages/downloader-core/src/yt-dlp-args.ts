@@ -582,17 +582,26 @@ export const buildDownloadArgs = (
     }
   } else if (options.type === 'audio') {
     args.push('-f', resolveAudioFormatSelector(options))
-    if (options.audioBitrate !== undefined) {
-      if (![64, 96, 128, 160, 192, 256, 320].includes(options.audioBitrate)) {
-        throw new Error('Choose an audio bitrate between 64 and 320 kbps')
+    const audioOutput = ['mp3', 'm4a', 'wav', 'flac', 'opus', 'ogg'].includes(
+      options.audioFormat || ''
+    )
+      ? options.audioFormat
+      : undefined
+    if (
+      options.audioBitrate !== undefined &&
+      ![64, 96, 128, 160, 192, 256, 320].includes(options.audioBitrate)
+    ) {
+      throw new Error('Choose an audio bitrate between 64 and 320 kbps')
+    }
+    if (audioOutput || options.audioBitrate !== undefined) {
+      const output = audioOutput === 'ogg' ? 'vorbis' : audioOutput || 'mp3'
+      args.push('--extract-audio', '--audio-format', output)
+      if (!['wav', 'flac'].includes(output)) {
+        args.push(
+          '--audio-quality',
+          options.audioBitrate === undefined ? '0' : `${String(options.audioBitrate)}K`
+        )
       }
-      args.push(
-        '--extract-audio',
-        '--audio-format',
-        'mp3',
-        '--audio-quality',
-        `${String(options.audioBitrate)}K`
-      )
     }
   }
 

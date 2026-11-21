@@ -41,6 +41,7 @@ import {
   initGlitchTipMain
 } from './lib/glitchtip'
 import { localMediaKind } from './lib/import-local-media'
+import { registerMixedPreviewProtocol } from './lib/mixed-preview'
 import { stopPlayerHost } from './lib/player-host'
 import {
   installPrivilegedSchemeCollector,
@@ -139,6 +140,10 @@ const CUSTOM_PROTOCOL_PRIVILEGES = {
 const flushPrivilegedSchemes = installPrivilegedSchemeCollector()
 
 protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'batch-media',
+    privileges: { ...CUSTOM_PROTOCOL_PRIVILEGES }
+  },
   {
     scheme: 'agent-artifact',
     privileges: { ...CUSTOM_PROTOCOL_PRIVILEGES }
@@ -1038,6 +1043,7 @@ function resolveVidbeeFilePath(requestUrl: URL, userDataPath: string): string | 
 
 function registerVidbeeProtocol(): void {
   registerAgentArtifactProtocol()
+  registerMixedPreviewProtocol()
   try {
     const userDataPath = app.getPath('userData')
     protocol.registerFileProtocol(APP_PROTOCOL, (request, callback) => {
@@ -1058,6 +1064,10 @@ function registerVidbeeProtocol(): void {
 }
 
 function initAutoUpdater(): void {
+  if (existsSync(join(process.resourcesPath, 'beast-local-updates.json'))) {
+    log.info('Local source updates are active; skipping remote installer updates')
+    return
+  }
   if (isPortableMode) {
     log.info('Portable mode is active, skipping auto-updater initialization')
     return

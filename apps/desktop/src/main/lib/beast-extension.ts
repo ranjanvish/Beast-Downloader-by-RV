@@ -2,12 +2,15 @@ import { randomUUID } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isIP } from 'node:net'
+import { BrowserWindow } from 'electron'
 import { beastFilenameVariant, beastVideoSelector } from '../../shared/beast-download'
 import { isExtensionSourceUrl } from '../../shared/extension-source-url'
 import type { VideoInfo } from '../../shared/types'
 import { convertBeastImage } from './beast-image-converter'
 import { downloadEngine } from './download-facade'
 import { replyExtensionJson } from './extension-origin'
+import { importBrowserImages } from './image-downloads'
+import { getMixedBatch } from './mixed-batch-host'
 import { fetchVideoInfo } from './yt-dlp-info'
 
 const tickets = new Map<string, { url: string; info: VideoInfo; expires: number; origin: string }>()
@@ -86,7 +89,30 @@ export async function handleBeastRequest(
         tickets.delete(key)
       }
     }
-    const body = await readBody(req, path === '/beast/image' ? 29_000_000 : 24_000)
+    const body = await readBody(
+      req,
+      path === '/beast/image' ? 29_000_000 : path === '/beast/images/import' ? 500_000 : 24_000
+    )
+    if (path === '/beast/images/import') {
+      replyExtensionJson(res, 200, { imported: importBrowserImages(body) })
+      return
+    }
+    if (path === '/beast/batch/import') {
+      const url = await assertBeastSource(body.url)
+      const batch = getMixedBatch()
+      const result = batch.add(url)
+      if (body.kind === 'audio' || body.kind === 'video') {
+        for (const id of result.ids) {
+          batch.patch(id, { kind: body.kind })
+        }
+      }
+      batch.fetch(result.ids)
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('beast:batch-imported')
+      }
+      replyExtensionJson(res, 200, { added: result.added, duplicates: result.duplicates })
+      return
+    }
     if (path === '/beast/image') {
       try {
         replyExtensionJson(res, 200, await convertBeastImage(body))

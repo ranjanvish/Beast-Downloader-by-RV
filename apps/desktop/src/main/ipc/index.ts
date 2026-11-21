@@ -7,6 +7,8 @@ import { BrowserCookiesService } from './services/browser-cookies-service'
 import { DownloadService } from './services/download-service'
 import { FileSystemService } from './services/file-system-service'
 import { HistoryService } from './services/history-service'
+import { ImageService } from './services/image-service'
+import { MixedBatchService } from './services/mixed-batch-service'
 import { PlayerService } from './services/player-service'
 import { SettingsService } from './services/settings-service'
 import { SubscriptionService } from './services/subscription-service'
@@ -51,6 +53,8 @@ export const services = createServices([
   DownloadService,
   FileSystemService,
   HistoryService,
+  ImageService,
+  MixedBatchService,
   PlayerService,
   SettingsService,
   SubscriptionService,

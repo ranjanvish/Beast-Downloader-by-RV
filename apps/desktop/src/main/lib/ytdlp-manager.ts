@@ -1,7 +1,10 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { resolveYtDlpWrapCtor } from '@vidbee/downloader-core/yt-dlp-wrap'
+import { app } from 'electron'
 import YTDlpWrap from 'yt-dlp-wrap-plus'
 import { scopedLoggers } from '../utils/logger'
+import pexelsExtractor from './yt-dlp-plugins/beast/yt_dlp_plugins/extractor/beast_pexels.py?raw'
 
 const YTDlpWrapCtor = resolveYtDlpWrapCtor<typeof YTDlpWrap>(YTDlpWrap)
 type YTDlpWrapInstance = InstanceType<typeof YTDlpWrapCtor>
@@ -21,6 +24,7 @@ interface YtDlpManagerLogger {
  */
 export class YtDlpManager {
   private jsRuntimeArgs: string[] = []
+  private pluginArgs: string[] = []
   private readonly logger: YtDlpManagerLogger
   private ytdlpInstance: YTDlpWrapInstance | null = null
   private ytdlpPath: string | null = null
@@ -36,6 +40,11 @@ export class YtDlpManager {
    * Atomically switch future commands to a verified kernel pair.
    */
   activate(paths: YtDlpActivation): void {
+    const pluginRoot = join(app.getPath('userData'), 'beast-extractors')
+    const extractorDir = join(pluginRoot, 'beast', 'yt_dlp_plugins', 'extractor')
+    mkdirSync(extractorDir, { recursive: true })
+    writeFileSync(join(extractorDir, 'beast_pexels.py'), pexelsExtractor, 'utf8')
+    this.pluginArgs = ['--plugin-dirs', pluginRoot]
     const ytdlpInstance = new YTDlpWrapCtor(paths.ytDlpPath)
     const jsRuntimeArgs = this.buildJsRuntimeArgs(paths.jsRuntimePath)
     this.ytdlpPath = paths.ytDlpPath
@@ -77,7 +86,7 @@ export class YtDlpManager {
    * Return a defensive copy of the active JavaScript runtime arguments.
    */
   getJsRuntimeArgs(): string[] {
-    return [...this.jsRuntimeArgs]
+    return [...this.jsRuntimeArgs, ...this.pluginArgs]
   }
 
   /**

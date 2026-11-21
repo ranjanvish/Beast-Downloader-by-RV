@@ -1,11 +1,12 @@
 import { AppSidebar, type AppSidebarItem } from '@vidbee/ui/components/ui/app-sidebar'
 import { appSidebarIcons } from '@vidbee/ui/components/ui/app-sidebar-icons'
 import { useAtomValue } from 'jotai'
+import { Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import '../../assets/title-bar.css'
 import { updateAvailableAtom } from '@renderer/store/update'
 
-type Page = 'extensions' | 'about' | 'home' | 'settings' | 'subscriptions'
+type Page = 'extensions' | 'about' | 'home' | 'settings' | 'subscriptions' | 'downloads'
 
 interface SidebarProps {
   currentPage: Page
@@ -48,6 +49,13 @@ export function Sidebar({
       icon: appSidebarIcons.subscriptions,
       label: t('menu.rss'),
       onClick: () => onPageChange('subscriptions')
+    },
+    {
+      id: 'downloads',
+      active: currentPage === 'downloads',
+      icon: { active: Download, inactive: Download },
+      label: t('library.title'),
+      onClick: () => onPageChange('downloads')
     }
   ]
 

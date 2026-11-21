@@ -26,7 +26,37 @@ const cookieAccessError = (): string | null =>
 
 const logger = scopedLoggers.download
 
+const retryCloudflare = async <T>(run: (impersonate: boolean) => Promise<T>): Promise<T> => {
+  try {
+    return await run(false)
+  } catch (error) {
+    if (!(error instanceof Error && /cloudflare anti-bot challenge/i.test(error.message))) {
+      throw error
+    }
+    return run(true)
+  }
+}
+
+const impersonationArgs = (args: string[], impersonate: boolean): string[] =>
+  impersonate ? [...args, '--extractor-args', 'generic:impersonate'] : args
+
 const inflateEstimatedSizes = (info: VideoInfo): VideoInfo => {
+  // Generic direct-file extractors put the single format at the top level.
+  if (!Array.isArray(info.formats)) {
+    const direct = info as VideoInfo & Partial<VideoInfo['formats'][number]>
+    info.formats =
+      direct.url && direct.ext
+        ? [
+            {
+              ...direct,
+              format_id: direct.format_id || '0',
+              ext: direct.ext,
+              vcodec: direct.vcodec || (direct.video_ext === 'none' ? 'none' : 'unknown'),
+              acodec: direct.acodec || (direct.audio_ext === 'none' ? 'none' : 'unknown')
+            }
+          ]
+        : []
+  }
   if (!(Array.isArray(info.formats) && info.duration) || info.duration <= 0) {
     return info
   }
@@ -125,7 +155,11 @@ export const fetchVideoInfo = async (url: string, signal?: AbortSignal): Promise
     }
   }
   const args = buildVideoInfoArgs(url, settings)
-  return retryTransientYtDlpNetworkError(() => execVideoInfo(url, args, signal))
+  return retryCloudflare((impersonate) =>
+    retryTransientYtDlpNetworkError(() =>
+      execVideoInfo(url, impersonationArgs(args, impersonate), signal)
+    )
+  )
 }
 
 export const fetchVideoInfoWithCommand = async (url: string): Promise<VideoInfoCommandResult> => {
@@ -139,7 +173,11 @@ export const fetchVideoInfoWithCommand = async (url: string): Promise<VideoInfoC
     }
   }
   try {
-    const info = await retryTransientYtDlpNetworkError(() => execVideoInfo(url, args))
+    const info = await retryCloudflare((impersonate) =>
+      retryTransientYtDlpNetworkError(() =>
+        execVideoInfo(url, impersonationArgs(args, impersonate))
+      )
+    )
     return { info, ytDlpCommand }
   } catch (error) {
     return {
@@ -261,5 +299,9 @@ export const fetchPlaylistInfo = async (
     }
   }
   const args = buildPlaylistInfoArgs(url, settings)
-  return retryTransientYtDlpNetworkError(() => execPlaylistInfo(url, args, signal))
+  return retryCloudflare((impersonate) =>
+    retryTransientYtDlpNetworkError(() =>
+      execPlaylistInfo(url, impersonationArgs(args, impersonate), signal)
+    )
+  )
 }

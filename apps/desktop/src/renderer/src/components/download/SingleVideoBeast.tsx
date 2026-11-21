@@ -53,11 +53,7 @@ export function SingleVideoDownload({
 }: Props) {
   const videos = useMemo(() => {
     const candidates = (videoInfo?.formats || []).filter(
-      (f) =>
-        f.vcodec &&
-        f.vcodec !== 'none' &&
-        (!f.height || f.height <= 2160) &&
-        !f.format_note?.includes('storyboard')
+      (f) => f.vcodec && f.vcodec !== 'none' && !f.format_note?.includes('storyboard')
     )
     return candidates.sort(
       (a, b) =>
@@ -155,8 +151,14 @@ export function SingleVideoDownload({
           >
             {videos.map((f) => (
               <option key={f.format_id} value={f.format_id}>
-                {f.height ? `${f.height}p` : 'Source'} · {f.ext.toUpperCase()} · {f.fps || 'Auto'}{' '}
-                fps · {f.vcodec?.split('.')[0]}
+                {f.width && f.height
+                  ? `${f.width}×${f.height} (${f.height}p)`
+                  : f.height
+                    ? `${f.height}p`
+                    : 'Original resolution'}{' '}
+                · {f.ext.toUpperCase()}
+                {f.fps ? ` · ${f.fps} fps` : ''}
+                {f.vcodec && f.vcodec !== 'unknown' ? ` · ${f.vcodec.split('.')[0]}` : ''}
                 {f.filesize ? ` · ${Math.round(f.filesize / 1e6)} MB` : ''}
               </option>
             ))}

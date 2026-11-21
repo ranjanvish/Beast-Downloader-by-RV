@@ -120,6 +120,7 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
 }
 
 interface UnifiedDownloadHistoryProps {
+  showAddAction?: boolean
   topContent?: ReactNode
   onOpenSupportedSites?: () => void
   onOpenSettings?: () => void
@@ -127,6 +128,7 @@ interface UnifiedDownloadHistoryProps {
 }
 
 export function UnifiedDownloadHistory({
+  showAddAction = true,
   topContent,
   onOpenSupportedSites,
   onOpenSettings,
@@ -623,10 +625,12 @@ export function UnifiedDownloadHistory({
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <DownloadDialog
-                onOpenSettings={onOpenSettings}
-                onOpenSupportedSites={onOpenSupportedSites}
-              />
+              {showAddAction && (
+                <DownloadDialog
+                  onOpenSettings={onOpenSettings}
+                  onOpenSupportedSites={onOpenSupportedSites}
+                />
+              )}
             </div>
           }
           activeFilter={platformFilter}
