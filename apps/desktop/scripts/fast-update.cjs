@@ -41,6 +41,9 @@ function sourceHash() {
     .map((item) => path.join(desktop, item))
     .concat(
       path.join(root, 'packages'),
+      ...['agent-bridge.mjs', 'beast-mcp.mjs', 'beast-agent.mjs', 'beast.cmd', 'BEAST-MCP.md', 'BEAST-AGENT.md'].map((item) =>
+        path.join(root, 'apps/cli', item)
+      ),
       ...['entrypoints', 'lib', 'public', 'wxt.config.ts'].map((item) =>
         path.join(root, 'apps/extension', item)
       )
@@ -133,6 +136,11 @@ async function buildUpdateUnlocked(asar, previous) {
     const companion = JSON.parse(fs.readFileSync(companionManifest, 'utf8'))
     companion.version = manifest.version
     fs.writeFileSync(companionManifest, JSON.stringify(companion, null, 2))
+    const agentDirectory = path.join(stage, 'beast-agent')
+    fs.mkdirSync(agentDirectory)
+    for (const name of ['agent-bridge.mjs', 'beast-mcp.mjs', 'beast-agent.mjs', 'BEAST-MCP.md', 'BEAST-AGENT.md']) {
+      fs.copyFileSync(path.join(root, 'apps/cli', name), path.join(agentDirectory, name))
+    }
     const baseHeader = asar.getRawHeader(base).header
     const reuseUnpacked = baseHeader.files.node_modules?.unpacked === true
     if (reuseUnpacked) {
@@ -204,6 +212,7 @@ async function buildUpdateUnlocked(asar, previous) {
       stage,
       archive,
       companionDirectory,
+      agentDirectory,
       reuseUnpacked,
       version: manifest.version,
       fingerprint,
@@ -231,6 +240,9 @@ async function applyUpdate(update) {
   const oldUnpacked = `${unpacked}.previous-${Date.now()}`
   const companionDirectory = path.join(resources, 'browser-extension')
   const companionBackup = path.join(backup, 'browser-extension')
+  const agentDirectory = path.join(resources, 'beast-agent')
+  const agentBackup = path.join(backup, 'beast-agent')
+  let agentInstalled = false
   fs.copyFileSync(update.archive, `${base}.incoming`)
   try {
     if (isRunning()) {
@@ -241,6 +253,13 @@ async function applyUpdate(update) {
         fs.renameSync(companionDirectory, companionBackup)
       }
       fs.cpSync(update.companionDirectory, companionDirectory, { recursive: true })
+    }
+    if (update.agentDirectory) {
+      if (fs.existsSync(agentDirectory)) {
+        fs.renameSync(agentDirectory, agentBackup)
+      }
+      agentInstalled = true
+      fs.cpSync(update.agentDirectory, agentDirectory, { recursive: true })
     }
     if (!update.reuseUnpacked) {
       if (fs.existsSync(unpacked)) {
@@ -274,6 +293,14 @@ async function applyUpdate(update) {
       }
       fs.renameSync(companionBackup, companionDirectory)
     }
+    if (agentInstalled) {
+      if (fs.existsSync(agentDirectory)) {
+        fs.renameSync(agentDirectory, `${agentDirectory}.failed-${Date.now()}`)
+      }
+      if (fs.existsSync(agentBackup)) {
+        fs.renameSync(agentBackup, agentDirectory)
+      }
+    }
     if (fs.existsSync(oldUnpacked)) {
       if (fs.existsSync(unpacked)) {
         fs.renameSync(unpacked, `${unpacked}.failed-${Date.now()}`)
@@ -306,10 +333,12 @@ async function main() {
       throw new Error('The prepared update does not match the installed native dependencies')
     }
     const companionDirectory = path.join(path.dirname(archive), 'browser-extension')
+    const agentDirectory = path.join(path.dirname(archive), 'beast-agent')
     await applyUpdate({
       archive,
       reuseUnpacked,
       companionDirectory: fs.existsSync(companionDirectory) ? companionDirectory : undefined,
+      agentDirectory: fs.existsSync(agentDirectory) ? agentDirectory : undefined,
       stage: path.dirname(archive),
       version: manifest.version,
       fingerprint: sourceHash(),

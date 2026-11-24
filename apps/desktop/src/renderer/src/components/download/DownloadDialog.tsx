@@ -1024,7 +1024,7 @@ export function DownloadDialog({
                     disabled={playlistBusy}
                     onValueChange={setPlaylistContainer}
                     options={ONE_CLICK_CONTAINER_OPTIONS}
-                    value={playlistContainer ?? settings.oneClickContainer ?? 'auto'}
+                    value={playlistContainer ?? settings.oneClickContainer ?? 'mp4'}
                   />
                   <WebmThumbnailNotice
                     className="w-full"

@@ -47,6 +47,91 @@ function BatchField({
   )
 }
 
+function ClipBuilder({
+  entry,
+  command
+}: {
+  entry: MixedEntry
+  command: (action: MixedBatchAction, body?: Record<string, unknown>) => Promise<boolean>
+}) {
+  const [ranges, setRanges] = useState([{ id: crypto.randomUUID(), start: '', end: '' }])
+  const [working, setWorking] = useState(false)
+  const addClips = async (start: boolean) => {
+    setWorking(true)
+    const success = await command('createClips', {
+      id: entry.id,
+      ranges: ranges.map(({ start: from, end }) => ({ start: from, end })),
+      start
+    })
+    if (success) {
+      setRanges([{ id: crypto.randomUUID(), start: '', end: '' }])
+    }
+    setWorking(false)
+  }
+  return (
+    <details className="rounded-xl border p-4" data-ui="clip-builder">
+      <summary className="cursor-pointer font-semibold">Create multiple clips</summary>
+      <p className="mt-2 text-muted-foreground text-sm">
+        Set a start and end for each clip. Clips inherit this item's download settings.
+      </p>
+      <div className="mt-3 space-y-4">
+        {ranges.map((range, index) => (
+          <div className="rounded-lg border p-3" key={range.id}>
+            <div className="flex items-center justify-between">
+              <strong>Clip {index + 1}</strong>
+              {ranges.length > 1 && (
+                <button
+                  onClick={() => setRanges(ranges.filter((item) => item.id !== range.id))}
+                  type="button"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <TrimRangeEditor
+              commit={async (patch) => {
+                setRanges((current) =>
+                  current.map((item) => (item.id === range.id ? { ...item, ...patch } : item))
+                )
+                return true
+              }}
+              entry={{
+                ...entry,
+                options: { ...entry.options, start: range.start, end: range.end }
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+        <button
+          className="rounded border px-3 py-2"
+          onClick={() => setRanges([...ranges, { id: crypto.randomUUID(), start: '', end: '' }])}
+          type="button"
+        >
+          Add clip
+        </button>
+        <button
+          className="rounded border px-3 py-2"
+          disabled={working}
+          onClick={() => void addClips(false)}
+          type="button"
+        >
+          Add clips to queue
+        </button>
+        <button
+          className="rounded bg-primary px-3 py-2 text-primary-foreground"
+          disabled={working}
+          onClick={() => void addClips(true)}
+          type="button"
+        >
+          Download all clips
+        </button>
+      </div>
+    </details>
+  )
+}
+
 export function BatchRow({
   entry,
   command
@@ -85,6 +170,7 @@ export function BatchRow({
           <div className="min-w-0 flex-1">
             <h3 className="line-clamp-2 font-semibold text-base" title={entry.title}>
               {entry.title}
+              {entry.clipNumber ? ` - ${entry.clipNumber}` : ''}
             </h3>
             <p
               className="beast-row-url truncate text-muted-foreground text-xs"
@@ -187,7 +273,7 @@ export function BatchRow({
                       aria-label="Media output"
                       className="beast-field block w-full"
                       onChange={(event) =>
-                        patch({ output: event.target.value as 'video' | 'audio' })
+                        patch({ output: event.target.value as 'video' | 'audio' | 'image' })
                       }
                       value={entry.options.output}
                     >
@@ -197,8 +283,57 @@ export function BatchRow({
                       <option disabled={!audios.length} value="audio">
                         Audio only
                       </option>
+                      <option disabled={!entry.options.imageUrl} value="image">
+                        Thumbnail only
+                      </option>
                     </select>
                   </label>
+                  <label className="space-y-1 text-xs">
+                    Thumbnail size
+                    <select
+                      aria-label="Thumbnail size"
+                      className="beast-field block w-full"
+                      onChange={(event) => patch({ imageUrl: event.target.value })}
+                      value={entry.options.imageUrl}
+                    >
+                      {[
+                        ...(entry.info?.thumbnails || []),
+                        ...(entry.info?.thumbnail ? [{ url: entry.info.thumbnail }] : [])
+                      ]
+                        .filter((v, i, a) => a.findIndex((other) => other.url === v.url) === i)
+                        .map((v) => (
+                          <option key={v.url} value={v.url}>
+                            {v.width ? `${v.width}px wide` : 'Source size'}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-xs">
+                    Thumbnail format
+                    <select
+                      aria-label="Thumbnail format"
+                      className="beast-field block w-full"
+                      onChange={(event) =>
+                        patch({ imageOutput: event.target.value as MixedOptions['imageOutput'] })
+                      }
+                      value={entry.options.imageOutput}
+                    >
+                      {['original', 'png', 'jpeg', 'webp'].map((format) => (
+                        <option key={format}>{format}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {entry.options.output !== 'image' && (
+                    <label className="text-xs">
+                      <input
+                        checked={Boolean(entry.options.saveThumbnail)}
+                        disabled={!entry.options.imageUrl}
+                        onChange={(event) => patch({ saveThumbnail: event.target.checked })}
+                        type="checkbox"
+                      />{' '}
+                      Save thumbnail alongside media
+                    </label>
+                  )}
                   {entry.options.output === 'video' ? (
                     <>
                       <label className="space-y-1 text-xs">
@@ -238,7 +373,7 @@ export function BatchRow({
                         </select>
                       </label>
                     </>
-                  ) : (
+                  ) : entry.options.output === 'audio' ? (
                     <>
                       <label className="space-y-1 text-xs">
                         Audio format
@@ -270,24 +405,27 @@ export function BatchRow({
                         </select>
                       </label>
                     </>
+                  ) : null}
+                  {entry.options.output !== 'image' && (
+                    <label className="space-y-1 text-xs">
+                      Audio language / track
+                      <select
+                        aria-label="Audio track"
+                        className="beast-field block w-full"
+                        disabled={!audios.length}
+                        onChange={(event) => patch({ audioTrack: event.target.value })}
+                        value={entry.options.audioTrack}
+                      >
+                        {!audios.length && <option value="">No advertised audio track</option>}
+                        {audios.map((f) => (
+                          <option key={f.format_id} value={f.format_id}>
+                            {f.language || 'Source audio'} · {f.format_note || f.ext} ·{' '}
+                            {f.format_id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   )}
-                  <label className="space-y-1 text-xs">
-                    Audio language / track
-                    <select
-                      aria-label="Audio track"
-                      className="beast-field block w-full"
-                      disabled={!audios.length}
-                      onChange={(event) => patch({ audioTrack: event.target.value })}
-                      value={entry.options.audioTrack}
-                    >
-                      {!audios.length && <option value="">No advertised audio track</option>}
-                      {audios.map((f) => (
-                        <option key={f.format_id} value={f.format_id}>
-                          {f.language || 'Source audio'} · {f.format_note || f.ext} · {f.format_id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                   <TrimRangeEditor commit={patch} entry={entry} />
                 </>
               )}
@@ -303,6 +441,7 @@ export function BatchRow({
               </label>
             </fieldset>
           )}
+          {entry.info && entry.kind !== 'image' && <ClipBuilder command={command} entry={entry} />}
           <div className="flex flex-wrap gap-2 text-xs">
             {editable && (
               <button
@@ -383,7 +522,9 @@ export function AllInOneDownloads() {
     [audioOutput, setAudioOutput] = useState(''),
     [bitrate, setBitrate] = useState(''),
     [imageOutput, setImageOutput] = useState(''),
+    [imageWidth, setImageWidth] = useState(''),
     [output, setOutput] = useState(''),
+    [saveThumbnail, setSaveThumbnail] = useState(''),
     [folder, setFolder] = useState('')
   const refresh = useCallback(async () => {
     setSnapshot(await ipcServices.batch.snapshot(page, query, filter))
@@ -481,7 +622,13 @@ export function AllInOneDownloads() {
       patch.height = Number(height)
     }
     if (output) {
-      patch.output = output as 'video' | 'audio'
+      patch.output = output as 'video' | 'audio' | 'image'
+    }
+    if (saveThumbnail !== '') {
+      patch.saveThumbnail = saveThumbnail === 'yes'
+    }
+    if (imageWidth !== '') {
+      patch.imageWidth = Number(imageWidth)
     }
     if (audioOutput) {
       patch.audioOutput = audioOutput
@@ -616,6 +763,35 @@ export function AllInOneDownloads() {
               <option value="">Keep each type</option>
               <option value="video">Video where available</option>
               <option value="audio">Audio only where available</option>
+              <option value="image">Images / thumbnails only</option>
+            </select>
+          </label>
+          <label className="text-xs">
+            Save thumbnail alongside video / audio
+            <select
+              className="beast-field mt-1 block w-full"
+              onChange={(e) => setSaveThumbnail(e.target.value)}
+              value={saveThumbnail}
+            >
+              <option value="">Keep each choice</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label className="text-xs">
+            Maximum image width
+            <select
+              className="beast-field mt-1 block w-full"
+              onChange={(e) => setImageWidth(e.target.value)}
+              value={imageWidth}
+            >
+              <option value="">Keep each size</option>
+              <option value="0">Largest advertised</option>
+              {[320, 640, 1280, 1920, 3840].map((width) => (
+                <option key={width} value={width}>
+                  {width}px
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-xs">

@@ -120,6 +120,7 @@ const buildTaskInput = (id: string, options: DownloadOptions): TaskInput => {
       audioFormat: options.audioFormat,
       audioBitrate: options.audioBitrate,
       editorCompatible: options.editorCompatible,
+      maxShortEdge: options.maxShortEdge,
       audioFormatIds: options.audioFormatIds,
       startTime: options.startTime,
       endTime: options.endTime,
@@ -133,7 +134,9 @@ const buildTaskInput = (id: string, options: DownloadOptions): TaskInput => {
       settings: {
         ...toSharedSettings(settings),
         embedThumbnail:
-          options.type === 'audio' ? (options.embedAudioCover ?? true) : settings.embedThumbnail,
+          options.type === 'audio'
+            ? (options.embedAudioCover ?? true)
+            : (options.embedVideoCover ?? settings.embedThumbnail),
         downloadSubtitles: options.downloadSubs ?? settings.downloadSubtitles
       },
       // Renderer hint: stash original client id for diagnostics; not used

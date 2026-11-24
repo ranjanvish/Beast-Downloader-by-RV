@@ -101,6 +101,16 @@ files:
   - '!node_modules/better-sqlite3/deps{,/**}'
   - '!node_modules/better-sqlite3/src{,/**}'
 extraResources:
+  - from: ../cli/beast.cmd
+    to: beast.cmd
+  - from: ../cli
+    to: beast-agent
+    filter:
+      - 'beast-mcp.mjs'
+      - 'beast-agent.mjs'
+      - 'agent-bridge.mjs'
+      - 'BEAST-AGENT.md'
+      - 'BEAST-MCP.md'
   - from: ../extension/.output/chrome-mv3
     to: browser-extension
     filter: ['**/*']

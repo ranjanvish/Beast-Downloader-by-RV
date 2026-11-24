@@ -1,6 +1,6 @@
 {
   "name": "beast-downloader",
-  "version": "3.1.9",
+  "version": "3.1.24",
   "description": "Free Windows video and audio downloader with language selection and clip trimming",
   "main": "./out/main/index.js",
   "author": "RV",
@@ -145,4 +145,3 @@
     "vite": "^8.2.1"
   }
 }
-

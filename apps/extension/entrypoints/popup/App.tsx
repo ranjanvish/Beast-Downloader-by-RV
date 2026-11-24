@@ -52,7 +52,9 @@ export default function App() {
     setInfo(result)
     const videos = result.formats.filter((f) => f.vcodec && f.vcodec !== 'none' && (!f.height || f.height <= 2160)).sort((a, b) => (b.height || 0) - (a.height || 0) || Number(b.protocol === 'https') - Number(a.protocol === 'https'))
     const audios = audioFormats(result)
-    setVideo((videos.find((f) => f.height === 1080) || videos[0])?.format_id || '')
+    const resolution = (f: (typeof videos)[number]) => f.width && f.height ? Math.min(f.width, f.height) : f.height || f.width || 0
+    const eligible = videos.filter((f) => resolution(f) > 0 && resolution(f) <= 1080).sort((a, b) => resolution(b) - resolution(a) || (b.tbr || 0) - (a.tbr || 0))
+    setVideo(eligible[0]?.format_id || '')
     setAudio((audios.find((f) => /original/i.test(f.format_note || '')) || audios[0])?.format_id || (videos.length ? 'none' : ''))
     setEnd(String(Math.min(result.duration || 10, 10)))
     setMessage('Choose the source quality and audio language below.')

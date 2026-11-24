@@ -15,12 +15,14 @@ export type BatchStatus =
   | 'cancelled'
 export interface MixedOptions {
   output: Exclude<MediaKind, 'auto'>
+  maxShortEdge?: number
   videoFormat: string
   audioTrack: string
   audioOutput: string
   audioBitrate: number
   imageOutput: ImageOutput
   imageUrl: string
+  saveThumbnail?: boolean
   container: 'auto' | 'mp4' | 'mkv' | 'webm'
   folder: string
   start: string
@@ -30,6 +32,7 @@ export interface MixedEntry {
   id: string
   sourceUrl: string
   pageUrl?: string
+  clipNumber?: number
   title: string
   kind: MediaKind
   status: BatchStatus
@@ -42,10 +45,13 @@ export interface MixedEntry {
   errorStage?: 'fetch' | 'download'
   taskId?: string
   filePath?: string
+  thumbnailPath?: string
 }
 export interface BatchBulkOptions {
-  output?: 'video' | 'audio'
+  output?: 'video' | 'audio' | 'image'
+  saveThumbnail?: boolean
   height?: number
+  imageWidth?: number
   audioOutput?: string
   audioBitrate?: number
   imageOutput?: ImageOutput
@@ -68,13 +74,15 @@ export interface BatchSnapshot {
 }
 export const emptyMixedOptions = (): MixedOptions => ({
   output: 'video',
+  maxShortEdge: 1080,
   videoFormat: '',
   audioTrack: '',
   audioOutput: 'mp3',
   audioBitrate: 192,
   imageOutput: 'original',
   imageUrl: '',
-  container: 'auto',
+  saveThumbnail: false,
+  container: 'mp4',
   folder: '',
   start: '',
   end: ''
@@ -140,10 +148,16 @@ export function isPlaylistUrl(value?: string): boolean {
   }
 }
 
+const videoResolution = (f: VideoFormat): number =>
+  f.width && f.height ? Math.min(f.width, f.height) : f.height || f.width || 0
+
 export const videoFormats = (info?: VideoInfo): VideoFormat[] =>
   (info?.formats || [])
-    .filter((f) => f.vcodec && f.vcodec !== 'none' && !f.format_note?.includes('storyboard'))
-    .sort((a, b) => (b.height || 0) - (a.height || 0) || (b.fps || 0) - (a.fps || 0))
+     .filter((f) => {
+      const video = f.vcodec ? f.vcodec !== 'none' : /^(mp4|mkv|webm|mov|avi|mpeg|mpg|ts|m4v)$/i.test(f.ext || '')
+      return video && !f.format_note?.includes('storyboard')
+    })
+    .sort((a, b) => videoResolution(b) - videoResolution(a) || (b.fps || 0) - (a.fps || 0))
 export const audioFormats = (info?: VideoInfo): VideoFormat[] =>
   (info?.formats || []).filter(
     (f) => f.acodec && f.acodec !== 'none' && !f.format_note?.toLowerCase().includes('storyboard')
@@ -154,7 +168,7 @@ export function bestVideoAt(info: VideoInfo | undefined, height = 1080): string 
   return (
     (height === 0
       ? formats[0]
-      : formats.find((f) => f.height && f.height <= height) || formats.at(-1)
+      : formats.find((f) => videoResolution(f) > 0 && videoResolution(f) <= height) ?? formats[formats.length - 1]
     )?.format_id || ''
   )
 }
@@ -190,8 +204,8 @@ export function validateMixedOptions(entry: MixedEntry, options: MixedOptions): 
   if (entry.kind === 'image' && options.output !== 'image') {
     throw new Error('Images must use an image output format.')
   }
-  if (entry.kind !== 'image' && options.output === 'image') {
-    throw new Error('Use Fetch as image to find images on this page.')
+  if (entry.kind !== 'image' && options.output === 'image' && !options.imageUrl) {
+    throw new Error('This source does not advertise a thumbnail.')
   }
   if (!['mp3', 'm4a', 'wav', 'flac', 'opus', 'ogg'].includes(options.audioOutput)) {
     throw new Error('Unsupported audio output format.')
@@ -227,6 +241,18 @@ export function validateMixedOptions(entry: MixedEntry, options: MixedOptions): 
   ) {
     throw new Error('Choose an image size advertised by this source.')
   }
+  if (
+    entry.info &&
+    options.imageUrl &&
+    ![entry.info.thumbnail, ...(entry.info.thumbnails || []).map((v) => v.url)].includes(
+      options.imageUrl
+    )
+  ) {
+    throw new Error('Choose a thumbnail advertised by this source.')
+  }
+  if (entry.info && options.saveThumbnail && !options.imageUrl) {
+    throw new Error('This source does not advertise a thumbnail.')
+  }
   const start = options.start ? parseClipTime(options.start) : 0
   const end = options.end ? parseClipTime(options.end) : undefined
   if (!Number.isFinite(start) || (end !== undefined && (!Number.isFinite(end) || end <= start))) {
@@ -256,8 +282,11 @@ export function mixedMediaOptions(entry: MixedEntry): DownloadOptions {
     format,
     audioFormat: type === 'video' ? '' : o.audioOutput,
     audioBitrate: type === 'audio' ? o.audioBitrate || undefined : undefined,
+    embedAudioCover: false,
+    embedVideoCover: false,
     customDownloadPath: o.folder || undefined,
     containerFormat: o.container,
+    maxShortEdge: o.maxShortEdge,
     startTime: o.start || undefined,
     endTime: o.end || undefined,
     title: entry.title,
@@ -267,6 +296,7 @@ export function mixedMediaOptions(entry: MixedEntry): DownloadOptions {
     customFilenameTemplate: beastFilenameVariant({
       type,
       format,
+      clipNumber: entry.clipNumber,
       videoId: `${entry.info?.id || ''}-${entry.id}`,
       audioFormat: `${o.audioOutput}-${audio?.format_id || ''}`,
       startTime: o.start,
@@ -288,6 +318,7 @@ export type MixedBatchAction =
   | 'cancel'
   | 'remove'
   | 'clone'
+  | 'createClips'
   | 'importImages'
   | 'concurrency'
 export type ImportedBatchImages = ImageScan

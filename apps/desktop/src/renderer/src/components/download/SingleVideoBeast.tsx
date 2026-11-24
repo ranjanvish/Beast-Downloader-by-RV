@@ -1,4 +1,5 @@
 import { RemoteImage } from '@renderer/components/ui/remote-image'
+import { bestVideoAt } from '@shared/mixed-download'
 import type { VideoFormat, VideoInfo } from '@shared/types'
 import { useEffect, useMemo } from 'react'
 import { BeastClip } from './BeastClip'
@@ -73,7 +74,7 @@ export function SingleVideoDownload({
     const update: Partial<SingleVideoState> = {}
     if (videos.length && !videos.some((f) => f.format_id === state.selectedVideoFormat)) {
       update.selectedVideoFormat =
-        (videos.find((f) => f.height === 1080) || videos[0])?.format_id || ''
+        bestVideoAt(videoInfo ?? undefined)
     }
     if (audios.length && !audios.some((f) => f.format_id === state.selectedAudioFormat)) {
       update.selectedAudioFormat =
@@ -82,7 +83,7 @@ export function SingleVideoDownload({
     if (Object.keys(update).length) {
       onStateChange(update)
     }
-  }, [videos, audios, state.selectedVideoFormat, state.selectedAudioFormat, onStateChange])
+  }, [videoInfo, videos, audios, state.selectedVideoFormat, state.selectedAudioFormat, onStateChange])
 
   if (loading) {
     return (

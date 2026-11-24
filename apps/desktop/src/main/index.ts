@@ -946,7 +946,7 @@ const startOneClickDownload = async (data: DeepLinkData): Promise<void> => {
         : buildAudioFormatPreference(settings)
 
     const containerFormat =
-      downloadType === 'video' ? (settings.oneClickContainer ?? 'auto') : undefined
+      downloadType === 'video' ? (settings.oneClickContainer ?? 'mp4') : undefined
 
     if (data.type === 'playlist') {
       const result = await downloadEngine.startPlaylistDownload({

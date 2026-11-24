@@ -77,7 +77,7 @@ const buildAudioSelectors = (preset: OneClickQualityPreset): string[] => {
 }
 
 export const buildVideoFormatPreference = (settings: OneClickFormatSettings): string => {
-  const preset = getQualityPreset(settings)
+  const preset = settings.oneClickQuality ?? 'good'
 
   if (preset === 'worst') {
     return 'worstvideo+worstaudio/worst/best'
@@ -86,7 +86,7 @@ export const buildVideoFormatPreference = (settings: OneClickFormatSettings): st
   const maxHeight = qualityPresetToVideoHeight[preset]
   const videoCandidates = dedupe([
     maxHeight ? `bestvideo[height<=${maxHeight}]` : undefined,
-    'bestvideo'
+    maxHeight ? `bestvideo[width<=${maxHeight}]` : undefined
   ])
 
   const audioSelectors = buildAudioSelectors(preset)
@@ -98,6 +98,7 @@ export const buildVideoFormatPreference = (settings: OneClickFormatSettings): st
     }
   }
 
+  if (maxHeight) combinations.push(`best[height<=${maxHeight}]`, `best[width<=${maxHeight}]`)
   combinations.push('bestvideo+bestaudio')
   combinations.push('best')
 

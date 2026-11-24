@@ -1,4 +1,5 @@
 import os from 'node:os'
+import path from 'node:path'
 import type { YtDlpKernelStatus } from '@shared/types'
 import { app, BrowserWindow, clipboard, dialog } from 'electron'
 import { type IpcContext, IpcMethod, IpcService } from 'electron-ipc-decorator'
@@ -16,6 +17,19 @@ class AppService extends IpcService {
   @IpcMethod()
   getBeastExtensionStatus(_context: IpcContext) {
     return beastExtensionStatus()
+  }
+
+  @IpcMethod()
+  copyBeastAgentSetup(_context: IpcContext): string {
+    const node = path.join(process.resourcesPath, 'resources', 'node', 'node.exe')
+    const server = path.join(process.resourcesPath, 'beast-agent', 'beast-mcp.mjs')
+    const config = JSON.stringify(
+      { mcpServers: { 'beast-downloader': { command: node, args: [server] } } },
+      null,
+      2
+    )
+    clipboard.writeText(config)
+    return server
   }
 
   @IpcMethod()

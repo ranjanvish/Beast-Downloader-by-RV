@@ -35,6 +35,11 @@ const waitFor = async (predicate) => {
 const video = {
   id: 'movie',
   title: 'Test video',
+  thumbnail: 'https://example.com/cover.jpg',
+  thumbnails: [
+    { url: 'https://example.com/cover-small.jpg', width: 320 },
+    { url: 'https://example.com/cover.jpg', width: 1280 }
+  ],
   duration: 30,
   formats: [
     { format_id: 'v360', ext: 'mp4', width: 640, height: 360, vcodec: 'h264', acodec: 'none' },
@@ -43,6 +48,25 @@ const video = {
     { format_id: 'a', ext: 'm4a', vcodec: 'none', acodec: 'aac', language: 'en' }
   ]
 }
+
+test('thumbnail-only and optional separate cover obey bulk and individual settings', async () => {
+  const { batch, admitted, savedImages, tasks } = make()
+  const result = batch.add('https://example.com/first\nhttps://example.com/second')
+  batch.fetch(result.ids)
+  await waitFor(() => batch.items.every((row) => row.status === 'ready'))
+  assert.equal(batch.bulk({ output: 'image', imageOutput: 'png' }).changed, 2)
+  batch.patch(result.ids[1], { output: 'video', saveThumbnail: true })
+  assert.equal(batch.start(result.ids).queued, 2)
+  await waitFor(() => savedImages.length === 2 && admitted.length === 1)
+  assert.equal(savedImages[0].options.output, 'image')
+  assert.equal(admitted[0].embedAudioCover, false)
+  assert.equal(admitted[0].embedVideoCover, false)
+  assert.ok(batch.items.find((row) => row.id === result.ids[1]).thumbnailPath)
+  for (const task of tasks.values()) {
+    task.status = 'completed'
+  }
+  batch.dispose()
+})
 const audio = {
   id: 'song',
   title: 'Test audio',
@@ -90,6 +114,29 @@ const make = (overrides = {}, saved = []) => {
   }
   return { batch: new MixedBatch(dependencies, saved), tasks, admitted, savedImages }
 }
+
+test('restored cancelled video rows recover thumbnail and can be queued individually or in bulk', async () => {
+  const saved = Array.from({ length: 7 }, (_, i) => ({
+    id: `old-${i}`,
+    sourceUrl: `https://example.com/${i}`,
+    title: `Video ${i}`,
+    kind: 'video',
+    status: 'cancelled',
+    selected: true,
+    progress: 0,
+    info: structuredClone(video),
+    options: { ...helpers.emptyMixedOptions(), videoFormat: 'v720', audioTrack: 'a', imageUrl: '' }
+  }))
+  const { batch, savedImages } = make({}, saved)
+  assert.ok(batch.items.every((item) => item.options.imageUrl === video.thumbnail))
+  assert.equal(batch.bulk({ output: 'image' }).changed, 7)
+  assert.equal(batch.start(['old-0']).queued, 1)
+  await waitFor(() => batch.items[0].status === 'completed')
+  assert.equal(batch.start(saved.slice(1).map((item) => item.id)).queued, 6)
+  await waitFor(() => savedImages.length === 7)
+  assert.ok(savedImages.every((item) => item.options.imageUrl === video.thumbnail))
+  batch.dispose()
+})
 
 test('1,000 links have bounded metadata concurrency, deduplication and pagination; one failure does not stop the rest', async () => {
   let active = 0,
@@ -438,4 +485,36 @@ test('clip times round-trip milliseconds, reject invalid ranges and exclude sile
   } finally {
     batch.dispose()
   }
+})
+
+test('multiple clips validate atomically and start independently', async () => {
+  const { batch, admitted } = make()
+  batch.add('https://example.com/video')
+  batch.fetch()
+  await waitFor(() => batch.items[0].status === 'ready')
+  const id = batch.items[0].id
+  assert.throws(() =>
+    batch.createClips(
+      id,
+      [
+        { start: '3', end: '5' },
+        { start: '9', end: '2' }
+      ],
+      true
+    )
+  )
+  assert.equal(batch.items.length, 1)
+  const ranges = Array.from({ length: 20 }, (_, index) => ({
+    start: String(index),
+    end: String(index + 1)
+  }))
+  assert.equal(batch.createClips(id, ranges, true).queued, 20)
+  await waitFor(() => admitted.length === 3)
+  assert.equal(batch.items.length, 21)
+  assert.deepEqual(
+    admitted.map((item) => item.startTime),
+    ['0', '1', '2']
+  )
+  assert.equal(batch.items[0].status, 'ready')
+  batch.dispose()
 })

@@ -51,7 +51,7 @@ export const buildDesktopSubscriptionTaskInput = (input: {
       ? buildVideoFormatPreference(input.settings)
       : buildAudioFormatPreference(input.settings)
   const containerFormat =
-    downloadType === 'video' ? (input.settings.oneClickContainer ?? 'auto') : undefined
+    downloadType === 'video' ? (input.settings.oneClickContainer ?? 'mp4') : undefined
   const tags = Array.from(new Set([input.subscription.platform, ...input.subscription.tags]))
 
   return {

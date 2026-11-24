@@ -2,19 +2,1779 @@
 // @vidbee/cli — standalone build (NEX-148). Built by scripts/build.mjs.
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// ../../packages/task-queue/src/types.ts
-var TERMINAL_STATUSES, PRIORITY_USER, PRIORITY_SUBSCRIPTION, PRIORITY_BACKGROUND, EMPTY_PROGRESS;
+// ../../node_modules/evlog/dist/utils.mjs
+function formatDuration(ms) {
+  if (ms < 1e3) return `${Math.round(ms)}ms`;
+  return `${(ms / 1e3).toFixed(2)}s`;
+}
+function isBrowser() {
+  if (typeof window === "undefined") return false;
+  if (typeof document === "undefined") return false;
+  if (typeof navigator !== "undefined" && navigator.product === "ReactNative") return false;
+  return true;
+}
+function isDev() {
+  if (typeof process !== "undefined") return process.env.NODE_ENV !== "production";
+  if (typeof window !== "undefined") return true;
+  return false;
+}
+function detectEnvironment() {
+  const env = typeof process !== "undefined" ? process.env : {};
+  const defaultEnvironment = isDev() ? "development" : "production";
+  return {
+    environment: env.NODE_ENV || defaultEnvironment,
+    service: env.SERVICE_NAME || "app",
+    version: env.APP_VERSION,
+    commitHash: env.COMMIT_SHA || env.GITHUB_SHA || env.VERCEL_GIT_COMMIT_SHA || env.CF_PAGES_COMMIT_SHA,
+    region: env.VERCEL_REGION || env.AWS_REGION || env.FLY_REGION || env.CF_REGION
+  };
+}
+function isLevelEnabled(level, minLevel) {
+  return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
+}
+function getConsoleMethod(level) {
+  return level;
+}
+function getLevelColor(level) {
+  return levelColorMap[level] ?? colors.white;
+}
+function getCssLevelColor(level) {
+  return cssLevelColorMap[level] ?? cssColors.reset;
+}
+function escapeFormatString(str) {
+  return str.replace(/%/g, "%%");
+}
+function globToRegExp(pattern, separator = "/") {
+  const cacheKey = `${separator}:${pattern}`;
+  let regex = patternCache.get(cacheKey);
+  if (!regex) {
+    const segment = separator === "/" ? "[^/]*" : "[^.]*";
+    const char = separator === "/" ? "[^/]" : "[^.]";
+    const regexPattern = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "{{GLOBSTAR}}").replace(/\*/g, segment).replace(/{{GLOBSTAR}}/g, ".*").replace(/\?/g, char);
+    regex = new RegExp(`^${regexPattern}$`);
+    patternCache.set(cacheKey, regex);
+  }
+  return regex;
+}
+function isoNow() {
+  const now = Date.now();
+  const sec = Math.floor(now / 1e3);
+  if (sec !== _isoCachedSecond) {
+    _isoCachedSecond = sec;
+    _isoDate.setTime(now);
+    _isoCachedPrefix = _isoDate.toISOString().slice(0, 19);
+  }
+  return `${_isoCachedPrefix}.${String(now % 1e3).padStart(3, "0")}Z`;
+}
+var LEVEL_ORDER, colors, levelColorMap, cssColors, cssLevelColorMap, SENSITIVE_HEADERS, SENSITIVE_HEADER_SET, patternCache, _isoDate, _isoCachedSecond, _isoCachedPrefix;
+var init_utils = __esm({
+  "../../node_modules/evlog/dist/utils.mjs"() {
+    LEVEL_ORDER = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3
+    };
+    colors = {
+      reset: "\x1B[0m",
+      bold: "\x1B[1m",
+      dim: "\x1B[2m",
+      red: "\x1B[31m",
+      green: "\x1B[32m",
+      yellow: "\x1B[33m",
+      blue: "\x1B[34m",
+      magenta: "\x1B[35m",
+      cyan: "\x1B[36m",
+      white: "\x1B[37m",
+      gray: "\x1B[90m"
+    };
+    levelColorMap = {
+      error: colors.red,
+      warn: colors.yellow,
+      info: colors.cyan,
+      debug: colors.gray
+    };
+    cssColors = {
+      dim: "color: #6b7280",
+      red: "color: #ef4444; font-weight: bold",
+      green: "color: #22c55e",
+      yellow: "color: #f59e0b; font-weight: bold",
+      cyan: "color: #06b6d4; font-weight: bold",
+      gray: "color: #6b7280; font-weight: bold",
+      reset: "color: inherit; font-weight: normal"
+    };
+    cssLevelColorMap = {
+      error: cssColors.red,
+      warn: cssColors.yellow,
+      info: cssColors.cyan,
+      debug: cssColors.gray
+    };
+    SENSITIVE_HEADERS = [
+      "authorization",
+      "cookie",
+      "set-cookie",
+      "x-api-key",
+      "x-auth-token",
+      "proxy-authorization"
+    ];
+    SENSITIVE_HEADER_SET = new Set(SENSITIVE_HEADERS);
+    patternCache = /* @__PURE__ */ new Map();
+    _isoDate = /* @__PURE__ */ new Date();
+    _isoCachedSecond = -1;
+    _isoCachedPrefix = "";
+  }
+});
+
+// ../../node_modules/evlog/dist/globalRegistry-Bh3bIGwA.mjs
+function logPluginError(name, hook, err) {
+  console.error(`[evlog/${name}] ${hook} failed:`, err);
+}
+function createPluginRunner(plugins = []) {
+  const byName = /* @__PURE__ */ new Map();
+  for (const plugin of plugins) byName.set(plugin.name, plugin);
+  const list = Array.from(byName.values());
+  return {
+    plugins: list,
+    hasEnrich: list.some((p) => typeof p.enrich === "function"),
+    hasDrain: list.some((p) => typeof p.drain === "function"),
+    hasKeep: list.some((p) => typeof p.keep === "function"),
+    hasRequestLifecycle: list.some((p) => typeof p.onRequestStart === "function" || typeof p.onRequestFinish === "function"),
+    hasClientLog: list.some((p) => typeof p.onClientLog === "function"),
+    hasExtendLogger: list.some((p) => typeof p.extendLogger === "function"),
+    applyExtendLogger(logger) {
+      for (const plugin of list) {
+        if (!plugin.extendLogger) continue;
+        try {
+          plugin.extendLogger(logger);
+        } catch (err) {
+          logPluginError(plugin.name, "extendLogger", err);
+        }
+      }
+    },
+    runOnRequestStart(ctx) {
+      for (const plugin of list) {
+        if (!plugin.onRequestStart) continue;
+        try {
+          plugin.onRequestStart(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "onRequestStart", err);
+        }
+      }
+    },
+    runOnRequestFinish(ctx) {
+      for (const plugin of list) {
+        if (!plugin.onRequestFinish) continue;
+        try {
+          plugin.onRequestFinish(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "onRequestFinish", err);
+        }
+      }
+    },
+    async runEnrich(ctx) {
+      for (const plugin of list) {
+        if (!plugin.enrich) continue;
+        try {
+          await plugin.enrich(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "enrich", err);
+        }
+      }
+    },
+    async runDrain(ctx) {
+      const drains = list.filter((p) => typeof p.drain === "function");
+      if (drains.length === 0) return;
+      await Promise.allSettled(drains.map(async (plugin) => {
+        try {
+          await plugin.drain(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "drain", err);
+        }
+      }));
+    },
+    async runKeep(ctx) {
+      for (const plugin of list) {
+        if (!plugin.keep) continue;
+        try {
+          await plugin.keep(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "keep", err);
+        }
+      }
+    },
+    runOnClientLog(ctx) {
+      for (const plugin of list) {
+        if (!plugin.onClientLog) continue;
+        try {
+          plugin.onClientLog(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "onClientLog", err);
+        }
+      }
+    },
+    async runSetup(ctx) {
+      for (const plugin of list) {
+        if (!plugin.setup) continue;
+        try {
+          await plugin.setup(ctx);
+        } catch (err) {
+          logPluginError(plugin.name, "setup", err);
+        }
+      }
+    }
+  };
+}
+function getEmptyPluginRunner() {
+  return emptyRunner;
+}
+function createConfig() {
+  return {
+    env: {
+      service: "app",
+      environment: "development"
+    },
+    pretty: isDev(),
+    prettyError: {
+      snippet: isDev(),
+      stackDepth: 2,
+      compact: isDev(),
+      detail: "full"
+    },
+    sampling: {},
+    stringify: true,
+    drain: void 0,
+    redact: void 0,
+    enabled: true,
+    silent: false,
+    minLevel: "debug",
+    locked: false,
+    initialized: false,
+    pluginRunner: getEmptyPluginRunner()
+  };
+}
+function warnOnMultiMajor(host) {
+  const majors = host[MAJORS_KEY] ??= /* @__PURE__ */ new Set();
+  if (majors.has(EVLOG_MAJOR)) return;
+  majors.add(EVLOG_MAJOR);
+  if (majors.size > 1) console.warn(`[evlog] Multiple major versions of evlog are loaded in this process (${[...majors].map((m) => `${m}.x`).join(", ")}). They cannot share request scope or logger configuration: events emitted through the other copy will be undrained and unredacted, and useLogger() may throw. Deduplicate evlog to a single major.`);
+}
+function getRegistry() {
+  const host = globalThis;
+  warnOnMultiMajor(host);
+  return host[REGISTRY_KEY] ??= {
+    config: createConfig(),
+    storages: /* @__PURE__ */ new Map()
+  };
+}
+var emptyRunner, EVLOG_MAJOR, REGISTRY_KEY, MAJORS_KEY, globalConfig;
+var init_globalRegistry_Bh3bIGwA = __esm({
+  "../../node_modules/evlog/dist/globalRegistry-Bh3bIGwA.mjs"() {
+    init_utils();
+    emptyRunner = createPluginRunner([]);
+    EVLOG_MAJOR = 2;
+    REGISTRY_KEY = /* @__PURE__ */ Symbol.for(`evlog.registry.v${EVLOG_MAJOR}`);
+    MAJORS_KEY = /* @__PURE__ */ Symbol.for("evlog.majors");
+    globalConfig = getRegistry().config;
+  }
+});
+
+// ../../node_modules/evlog/dist/redact-C7FmdhwI.mjs
+function normalizeRedactPathPattern(pattern) {
+  if (!pattern.includes("*") && !pattern.includes(".")) return `**.${pattern}`;
+  return pattern;
+}
+function compileRedactPathMatchers(patterns) {
+  if (!patterns?.length) return void 0;
+  const exactPaths = /* @__PURE__ */ new Set();
+  const pathGlobs = [];
+  const keyGlobs = [];
+  const caseInsensitiveLeaves = /* @__PURE__ */ new Set();
+  for (const raw of patterns) {
+    if (!raw.includes("*")) {
+      if (raw.includes(".")) exactPaths.add(raw);
+      else addPathGlobPattern(normalizeRedactPathPattern(raw), exactPaths, pathGlobs, caseInsensitiveLeaves);
+      continue;
+    }
+    if (!raw.includes(".")) keyGlobs.push(globToRegExp(raw, "."));
+    else addPathGlobPattern(raw, exactPaths, pathGlobs, caseInsensitiveLeaves);
+  }
+  if (exactPaths.size === 0 && pathGlobs.length === 0 && keyGlobs.length === 0 && caseInsensitiveLeaves.size === 0) return;
+  return {
+    exactPaths,
+    pathGlobs,
+    keyGlobs,
+    caseInsensitiveLeaves
+  };
+}
+function addPathGlobPattern(pattern, exactPaths, pathGlobs, caseInsensitiveLeaves) {
+  pathGlobs.push(globToRegExp(pattern, "."));
+  const leaf = pattern.match(/^\*\*\.([^.?*]+)$/);
+  if (leaf) {
+    exactPaths.add(leaf[1]);
+    caseInsensitiveLeaves.add(leaf[1].toLowerCase());
+  }
+}
+function matchesRedactPath(fullPath, leafKey, matchers) {
+  if (matchers.exactPaths.has(fullPath)) return true;
+  if (matchers.caseInsensitiveLeaves.has(leafKey.toLowerCase())) return true;
+  for (const glob of matchers.pathGlobs) {
+    glob.lastIndex = 0;
+    if (glob.test(fullPath)) return true;
+  }
+  for (const glob of matchers.keyGlobs) {
+    glob.lastIndex = 0;
+    if (glob.test(leafKey)) return true;
+  }
+  return false;
+}
+function resolveReplacement(replacement, matched, ctx) {
+  if (typeof replacement === "string") return replacement;
+  try {
+    const result = replacement(matched, ctx);
+    if (typeof result !== "string") {
+      console.error(`[evlog] redact replacement returned ${typeof result} for "${ctx.path}", expected string \u2014 using ${DEFAULT_REPLACEMENT}`);
+      return DEFAULT_REPLACEMENT;
+    }
+    return result;
+  } catch (err) {
+    console.error(`[evlog] redact replacement failed for "${ctx.path}":`, err);
+    return DEFAULT_REPLACEMENT;
+  }
+}
+function redactPathsInTree(obj, matchers, replacement, prefix = "") {
+  if (obj === null || obj === void 0) return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const segment = String(i);
+      const fullPath = prefix ? `${prefix}.${segment}` : segment;
+      redactPathsInTree(obj[i], matchers, replacement, fullPath);
+    }
+    return;
+  }
+  if (typeof obj === "object") {
+    const record2 = obj;
+    for (const key of redactableKeys(record2)) {
+      const fullPath = prefix ? `${prefix}.${key}` : key;
+      if (matchesRedactPath(fullPath, key, matchers)) setRedacted(record2, key, resolveReplacement(replacement, record2[key], {
+        path: fullPath,
+        key
+      }), fullPath);
+      else redactPathsInTree(record2[key], matchers, replacement, fullPath);
+    }
+  }
+}
+function redactableKeys(record2) {
+  return Object.keys(record2);
+}
+function setRedacted(record2, key, value, path5) {
+  if (Reflect.set(record2, key, value)) return;
+  const desc2 = Object.getOwnPropertyDescriptor(record2, key);
+  if (desc2 && "value" in desc2 && desc2.configurable) {
+    Object.defineProperty(record2, key, {
+      ...desc2,
+      value
+    });
+    return;
+  }
+  console.warn(`[evlog] redact could not rewrite read-only field "${path5}" \u2014 value left as-is`);
+}
+function resolveRedactConfig(input) {
+  if (input === void 0 || input === false) return void 0;
+  if (input === true) return { _maskers: allBuiltinMaskers() };
+  if (input.builtins === false) return {
+    ...input,
+    _pathMatchers: compileRedactPathMatchers(input.paths)
+  };
+  const maskers = Array.isArray(input.builtins) ? input.builtins.map((name) => builtinPatterns[name]).filter(Boolean).map((b) => [cloneRegex(b.pattern), b.mask]) : allBuiltinMaskers();
+  return {
+    ...input,
+    _maskers: maskers,
+    _pathMatchers: compileRedactPathMatchers(input.paths)
+  };
+}
+function allBuiltinMaskers() {
+  return Object.values(builtinPatterns).map((b) => [cloneRegex(b.pattern), b.mask]);
+}
+function cloneRegex(re) {
+  return new RegExp(re.source, re.flags);
+}
+function markGloballyRedacted(event) {
+  Object.defineProperty(event, globallyRedacted, {
+    value: true,
+    enumerable: false,
+    configurable: true
+  });
+}
+function cloneForRedaction(event) {
+  try {
+    return structuredClone(event);
+  } catch {
+    try {
+      return JSON.parse(JSON.stringify(event));
+    } catch {
+      console.warn("[cloneForRedaction] Shallow clone used \u2014 nested objects may be mutated by redactPath, redactPatterns, and applyMaskersToTree");
+      return { ...event };
+    }
+  }
+}
+function redactEvent(event, config2) {
+  const clone2 = cloneForRedaction(event);
+  const replacement = config2.replacement ?? DEFAULT_REPLACEMENT;
+  if (config2.transform) try {
+    config2.transform(clone2);
+  } catch (err) {
+    console.error("[evlog] redact transform failed:", err);
+  }
+  const pathMatchers = config2._pathMatchers ?? compileRedactPathMatchers(config2.paths);
+  if (pathMatchers) redactPathsInTree(clone2, pathMatchers, replacement);
+  if (config2._maskers?.length) applyMaskersToTree(clone2, config2._maskers);
+  if (config2.patterns?.length) redactPatterns(clone2, config2.patterns, replacement);
+  return clone2;
+}
+function redactPatterns(obj, patterns, replacement, prefix = "") {
+  if (obj === null || obj === void 0) return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const key = String(i);
+      const fullPath = prefix ? `${prefix}.${key}` : key;
+      if (typeof obj[i] === "string") obj[i] = applyPatterns(obj[i], patterns, replacement, fullPath, key);
+      else if (typeof obj[i] === "object") redactPatterns(obj[i], patterns, replacement, fullPath);
+    }
+    return;
+  }
+  if (typeof obj === "object") {
+    const record2 = obj;
+    for (const key of redactableKeys(record2)) {
+      const val = record2[key];
+      const fullPath = prefix ? `${prefix}.${key}` : key;
+      if (typeof val === "string") setRedacted(record2, key, applyPatterns(val, patterns, replacement, fullPath, key), fullPath);
+      else if (typeof val === "object") redactPatterns(val, patterns, replacement, fullPath);
+    }
+  }
+}
+function applyPatterns(value, patterns, replacement, path5, key) {
+  let result = value;
+  for (const pattern of patterns) {
+    if (typeof replacement === "string") {
+      result = result.replace(pattern, replacement);
+      continue;
+    }
+    result = result.replace(pattern, (...args) => {
+      const match = args[0];
+      return resolveReplacement(replacement, match, {
+        path: path5,
+        key,
+        groups: captureGroups(args)
+      });
+    });
+  }
+  return result;
+}
+function captureGroups(args) {
+  const last = args.at(-1);
+  const trailing = typeof last === "object" && last !== null ? 3 : 2;
+  return args.slice(1, Math.max(1, args.length - trailing));
+}
+function applyMaskersToTree(obj, maskers) {
+  if (obj === null || obj === void 0) return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) if (typeof obj[i] === "string") obj[i] = applyMaskers(obj[i], maskers);
+    else if (typeof obj[i] === "object") applyMaskersToTree(obj[i], maskers);
+    return;
+  }
+  if (typeof obj === "object") {
+    const record2 = obj;
+    for (const key of redactableKeys(record2)) {
+      const val = record2[key];
+      if (typeof val === "string") setRedacted(record2, key, applyMaskers(val, maskers), key);
+      else if (typeof val === "object") applyMaskersToTree(val, maskers);
+    }
+  }
+}
+function applyMaskers(value, maskers) {
+  let result = value;
+  for (const [pattern, mask] of maskers) result = result.replace(pattern, mask);
+  return result;
+}
+var DEFAULT_REPLACEMENT, builtinPatterns, globallyRedacted;
+var init_redact_C7FmdhwI = __esm({
+  "../../node_modules/evlog/dist/redact-C7FmdhwI.mjs"() {
+    init_utils();
+    DEFAULT_REPLACEMENT = "[REDACTED]";
+    builtinPatterns = {
+      /** Credit card numbers → ****1111 (PCI DSS: last 4 allowed) */
+      creditCard: {
+        pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+        mask: (m) => `****${m.replace(/[\s-]/g, "").slice(-4)}`
+      },
+      /** Email addresses → a***@***.com */
+      email: {
+        pattern: /[\w.+-]+@[\w-]+\.[\w.]+/g,
+        mask: (m) => {
+          if (m.indexOf("@") < 1) return "***@***";
+          const tld = m.slice(m.lastIndexOf("."));
+          return `${m[0]}***@***${tld}`;
+        }
+      },
+      /** IPv4 addresses → ***.***.***.100 (last octet only) */
+      ipv4: {
+        pattern: /\b(?!0\.0\.0\.0\b)(?!127\.0\.0\.1\b)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
+        mask: (m) => `***.***.***.${m.split(".").pop()}`
+      },
+      /**
+      * International phone numbers → `+33******78` (country code + last 2 digits).
+      *
+      * Requires an explicit phone signal (`+countryCode` prefix or `(areaCode)`
+      * parens) to avoid false positives on digit-rich identifiers (UUIDs,
+      * idempotency keys, order ids, hex hashes). Bare digit runs like `12345678`
+      * are intentionally not matched — opt in via custom `patterns` if your app
+      * stores phones in unformatted form.
+      */
+      phone: {
+        pattern: /(?:\+\d{1,3}[\s.-]?\(?\d{1,4}\)?|\(\d{1,4}\))(?:[\s.-]?\d{2,4}){2,4}\b/g,
+        mask: (m) => {
+          const digits = m.replace(/[^\d]/g, "");
+          if (m.startsWith("+") && digits.length > 4) {
+            const ccMatch = m.match(/^\+\d{1,3}/);
+            return `${ccMatch ? ccMatch[0] : "+"}******${digits.slice(-2)}`;
+          }
+          if (digits.length > 2) return `${"*".repeat(digits.length - 2)}${digits.slice(-2)}`;
+          return "***";
+        }
+      },
+      /** JWT tokens → eyJ***.*** */
+      jwt: {
+        pattern: /\beyJ[\w-]*\.[\w-]*\.[\w-]*\b/g,
+        mask: () => "eyJ***.***"
+      },
+      /** Bearer tokens → Bearer *** */
+      bearer: {
+        pattern: /\bBearer\s+[\w\-.~+/]{8,}=*/gi,
+        mask: () => "Bearer ***"
+      },
+      /** IBAN → FR76****189 (country + check digits + last 3) */
+      iban: {
+        pattern: /\b[A-Z]{2}\d{2}[\s-]?[\dA-Z]{4}[\s-]?[\dA-Z]{4}[\s-]?[\dA-Z]{4}[\s-]?[\dA-Z]{0,4}[\s-]?[\dA-Z]{0,4}[\s-]?[\dA-Z]{0,4}\b/g,
+        mask: (m) => {
+          const clean = m.replace(/[\s-]/g, "");
+          return `${clean.slice(0, 4)}****${clean.slice(-3)}`;
+        }
+      }
+    };
+    globallyRedacted = /* @__PURE__ */ Symbol.for("evlog.globallyRedacted");
+  }
+});
+
+// ../../node_modules/evlog/dist/pretty-error-DTIHxnBN.mjs
+function pushTreeSpacer(children) {
+  children.push(PRETTY_ERROR_TREE_SPACER);
+}
+function isPlainObject(val) {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+function pickString(obj, key) {
+  const val = obj[key];
+  return typeof val === "string" && val.length > 0 ? val : void 0;
+}
+function pickNumber(obj, key) {
+  const val = obj[key];
+  return typeof val === "number" ? val : void 0;
+}
+function extractGuidance(data) {
+  return {
+    code: pickString(data, "code"),
+    why: pickString(data, "why"),
+    fix: pickString(data, "fix"),
+    link: pickString(data, "link")
+  };
+}
+function normalizeErrorContext(error51) {
+  if (error51 === null || error51 === void 0) return null;
+  if (typeof error51 === "string") return { message: error51 };
+  if (!isPlainObject(error51)) return { message: String(error51) };
+  const result = {
+    message: pickString(error51, "message") ?? pickString(error51, "statusText") ?? pickString(error51, "statusMessage") ?? "Unknown error",
+    name: pickString(error51, "name"),
+    code: pickString(error51, "code"),
+    why: pickString(error51, "why"),
+    fix: pickString(error51, "fix"),
+    link: pickString(error51, "link"),
+    status: pickNumber(error51, "status") ?? pickNumber(error51, "statusCode"),
+    stack: pickString(error51, "stack")
+  };
+  const { data, cause } = error51;
+  if (isPlainObject(data)) {
+    const guidance = extractGuidance(data);
+    if (!result.code) result.code = guidance.code;
+    if (!result.why) result.why = guidance.why;
+    if (!result.fix) result.fix = guidance.fix;
+    if (!result.link) result.link = guidance.link;
+  }
+  if (cause instanceof Error) result.cause = cause.message;
+  else if (isPlainObject(cause) && pickString(cause, "message")) result.cause = pickString(cause, "message");
+  return result;
+}
+function decodeFileUrl(file2) {
+  if (file2.startsWith("file://")) try {
+    return decodeURIComponent(new URL(file2).pathname);
+  } catch {
+    return file2.slice(7);
+  }
+  return file2;
+}
+function isAppPath(file2) {
+  const normalized = decodeFileUrl(file2).replace(/\\/g, "/");
+  if (normalized.startsWith("node:")) return false;
+  if (SKIP_PATH_RE.test(normalized)) return false;
+  if (normalized.includes("/node_modules/")) return false;
+  if (isFrameworkRuntimePath(normalized)) return false;
+  return true;
+}
+function formatDisplayPath(file2, cwd) {
+  const decoded = decodeFileUrl(file2).replace(/\\/g, "/");
+  const cwdNorm = cwd.replace(/\\/g, "/").replace(/\/$/, "");
+  if (cwdNorm && decoded.startsWith(`${cwdNorm}/`)) {
+    const rel = decoded.slice(cwdNorm.length + 1);
+    return rel.startsWith("./") ? rel.slice(2) : rel;
+  }
+  const serverIdx = decoded.indexOf("/server/");
+  if (serverIdx >= 0) return decoded.slice(serverIdx + 1);
+  const srcIdx = decoded.indexOf("/src/");
+  if (srcIdx >= 0) return decoded.slice(srcIdx + 1);
+  return decoded;
+}
+function parseStackFrames(stack) {
+  if (!stack) return [];
+  const lines = stack.split("\n");
+  const frames = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("at ")) continue;
+    const withFn = trimmed.match(/^at (.+?) \((.+):(\d+):(\d+)\)$/);
+    if (withFn) {
+      const [, fn, file2, lineStr, colStr] = withFn;
+      frames.push({
+        raw: trimmed,
+        fn,
+        file: file2,
+        line: Number(lineStr),
+        column: Number(colStr),
+        isApp: isAppPath(file2)
+      });
+      continue;
+    }
+    const withoutFn = trimmed.match(/^at (.+):(\d+):(\d+)$/);
+    if (withoutFn) {
+      const [, file2, lineStr, colStr] = withoutFn;
+      frames.push({
+        raw: trimmed,
+        file: file2,
+        line: Number(lineStr),
+        column: Number(colStr),
+        isApp: isAppPath(file2)
+      });
+      continue;
+    }
+    const asyncFn = trimmed.match(/^at async (.+?) \((.+):(\d+):(\d+)\)$/);
+    if (asyncFn) {
+      const [, fn, file2, lineStr, colStr] = asyncFn;
+      frames.push({
+        raw: trimmed,
+        fn: `async ${fn}`,
+        file: file2,
+        line: Number(lineStr),
+        column: Number(colStr),
+        isApp: isAppPath(file2)
+      });
+    }
+  }
+  return frames;
+}
+function isFrameworkRuntimePath(path5) {
+  const normalized = path5.replace(/\\/g, "/");
+  return normalized.includes("route-modules/") || normalized.includes("webpack://next/") || normalized.includes("/next/dist/") || normalized.includes("/compiled/next-server/");
+}
+function isFrameworkRuntimeFrame(frame) {
+  if (!frame.file) return false;
+  return isFrameworkRuntimePath(decodeFileUrl(frame.file));
+}
+function isInternalErrorFrame(frame) {
+  if (isFrameworkRuntimeFrame(frame)) return true;
+  if (frame.fn) {
+    const fn = frame.fn.replace(/^async /, "");
+    if (SKIP_FRAME_FN_RE.test(fn)) return true;
+  }
+  if (!frame.file) return true;
+  const path5 = decodeFileUrl(frame.file).replace(/\\/g, "/");
+  if (SKIP_FRAME_PATH_RE.test(path5)) return true;
+  if (path5.includes(".nuxt/")) return true;
+  if (path5.includes(".next/")) return true;
+  return false;
+}
+function pickPrimaryFrame(frames) {
+  for (const frame of frames) if (frame.isApp && frame.file && frame.line && !isInternalErrorFrame(frame)) return frame;
+}
+function readCodeSnippet(file2, line, contextLines = 2) {
+  if (!isDev() || isBrowser() || !snippetReader) return null;
+  const path5 = decodeFileUrl(file2).replace(/\\/g, "/");
+  if (path5.includes(".next/") || path5.includes(".nuxt/") || path5.includes(".output/")) return null;
+  return snippetReader(file2, line, contextLines);
+}
+function formatSnippetLines(snippet) {
+  const width = String(snippet[snippet.length - 1]?.line ?? 0).length;
+  return snippet.map(({ line, content, isErrorLine }) => {
+    const marker = isErrorLine ? `${colors.red}\u276F${colors.reset}` : `${colors.dim} ${colors.reset}`;
+    const numColor = isErrorLine ? colors.red : colors.gray;
+    const trimmed = content.length > 120 ? `${content.slice(0, 117)}\u2026` : content;
+    return `${marker} ${numColor}${String(line).padStart(width, " ")}${colors.reset} ${colors.dim}\u2503${colors.reset} ${colors.dim}${trimmed}${colors.reset}`;
+  });
+}
+function formatFrameLocation(frame, cwd) {
+  const file2 = frame.file ? formatDisplayPath(frame.file, cwd) : "unknown";
+  const loc = frame.line ? `${file2}:${frame.line}` : file2;
+  const fn = frame.fn && frame.fn !== "<unknown>" ? frame.fn : void 0;
+  return fn ? `at ${fn} (${loc})` : `at ${loc}`;
+}
+function formatCollapsedFrame(frame, cwd) {
+  const file2 = frame.file ? formatDisplayPath(frame.file, cwd) : "unknown";
+  const loc = frame.line ? `${file2}:${frame.line}` : file2;
+  const prefix = frame.fn?.startsWith("async") ? "at async " : "at ";
+  const fn = frame.fn?.replace(/^async /, "");
+  if (fn && fn !== "<unknown>" && fn !== loc) return `${prefix}${fn} (${loc})`;
+  return `${prefix}${loc}`;
+}
+function formatGuidanceLine(label, text2, labelColor) {
+  const prefix = `${labelColor}${label}:${colors.reset} `;
+  const lines = [];
+  let remaining = text2.trim();
+  let first = true;
+  while (remaining.length > 0) {
+    const budget = first ? Math.max(24, GUIDANCE_WRAP_WIDTH - prefix.length) : Math.max(24, GUIDANCE_WRAP_WIDTH - 5);
+    if (remaining.length <= budget) {
+      lines.push(first ? `${prefix}${remaining}` : `${GUIDANCE_CONTINUATION}${remaining}`);
+      break;
+    }
+    let split = remaining.lastIndexOf(" ", budget);
+    if (split <= 0) split = budget;
+    const chunk = remaining.slice(0, split).trimEnd();
+    lines.push(first ? `${prefix}${chunk}` : `${GUIDANCE_CONTINUATION}${chunk}`);
+    remaining = remaining.slice(split).trimStart();
+    first = false;
+  }
+  return lines;
+}
+function buildErrorEntries(error51, options = {}) {
+  const normalized = normalizeErrorContext(error51);
+  if (!normalized) return [];
+  const cwd = options.cwd ?? (typeof process !== "undefined" && typeof process.cwd === "function" ? process.cwd() : ".");
+  const compact = options.compact ?? isDev();
+  const guidanceOnly = (options.detail ?? "full") === "guidance";
+  const showFrames = !guidanceOnly && !isBrowser() && (options.snippet ?? isDev());
+  const stackDepth = guidanceOnly ? 0 : options.stackDepth ?? (compact ? 2 : 3);
+  const snippetContextLines = compact ? 1 : 2;
+  const children = [];
+  const frames = guidanceOnly ? [] : parseStackFrames(normalized.stack);
+  const primary = guidanceOnly ? void 0 : pickPrimaryFrame(frames);
+  if (!guidanceOnly && primary?.file && primary.line) {
+    pushTreeSpacer(children);
+    if (showFrames) {
+      const snippet = readCodeSnippet(primary.file, primary.line, snippetContextLines);
+      children.push(`${colors.dim}   ${formatFrameLocation(primary, cwd)}${colors.reset}`);
+      if (snippet) children.push(...formatSnippetLines(snippet));
+    } else children.push(`${colors.dim}   ${formatFrameLocation(primary, cwd)}${colors.reset}`);
+  }
+  if (normalized.code) children.push(`${colors.dim}Code:${colors.reset} ${normalized.code}`);
+  if (Boolean(normalized.why || normalized.fix || normalized.link)) pushTreeSpacer(children);
+  if (normalized.why) children.push(...formatGuidanceLine("Why", normalized.why, colors.yellow));
+  if (normalized.fix) children.push(...formatGuidanceLine("Fix", normalized.fix, colors.cyan));
+  if (normalized.link) children.push(`${colors.dim}More:${colors.reset} ${normalized.link}`);
+  if (normalized.cause && normalized.cause !== normalized.message) children.push(`${colors.dim}Caused by:${colors.reset} ${normalized.cause}`);
+  const hiddenCount = guidanceOnly ? 0 : frames.filter((f) => !f.isApp || isInternalErrorFrame(f)).length;
+  const tailFrames = stackDepth > 0 ? frames.filter((f) => f !== primary && !isInternalErrorFrame(f)).slice(0, stackDepth) : [];
+  if (!guidanceOnly && (hiddenCount > 0 || tailFrames.length > 0)) {
+    pushTreeSpacer(children);
+    if (hiddenCount > 0) children.push(`${colors.gray}stack (${hiddenCount} frame${hiddenCount === 1 ? "" : "s"} hidden in node_modules)${colors.reset}`);
+    else children.push(`${colors.gray}stack${colors.reset}`);
+    for (const frame of tailFrames) children.push(`${colors.gray}  ${formatCollapsedFrame(frame, cwd)}${colors.reset}`);
+  }
+  return [{
+    key: "error",
+    value: `${colors.red}${colors.bold}${normalized.message}${colors.reset}`,
+    children: children.length > 0 ? children : void 0
+  }];
+}
+var snippetReader, PRETTY_ERROR_TREE_SPACER, SKIP_PATH_RE, SKIP_FRAME_PATH_RE, SKIP_FRAME_FN_RE, GUIDANCE_WRAP_WIDTH, GUIDANCE_CONTINUATION;
+var init_pretty_error_DTIHxnBN = __esm({
+  "../../node_modules/evlog/dist/pretty-error-DTIHxnBN.mjs"() {
+    init_utils();
+    snippetReader = null;
+    PRETTY_ERROR_TREE_SPACER = "__EVLOG_TREE_SPACER__";
+    SKIP_PATH_RE = /(?:^|[/\\])(?:node_modules|\.nuxt|\.next|\.output)(?:[/\\]|$)/;
+    SKIP_FRAME_PATH_RE = /(?:^|[/\\])(?:packages[/\\]evlog|evlog[/\\](?:dist|src))(?:[/\\]|$)/;
+    SKIP_FRAME_FN_RE = /^(?:createError|EvlogError|new EvlogError)$/;
+    GUIDANCE_WRAP_WIDTH = 76;
+    GUIDANCE_CONTINUATION = "     ";
+  }
+});
+
+// ../../node_modules/evlog/dist/dev-terminal-Brarc6vc.mjs
+function finalizePrettyError(partial2, frameworkOverlay, pretty, inDev) {
+  const compact = partial2.compact ?? (inDev && pretty);
+  const detail = partial2.detail ?? (frameworkOverlay ? "guidance" : "full");
+  const stackDepth = detail === "guidance" ? 0 : partial2.stackDepth ?? (compact ? 2 : 3);
+  return {
+    snippet: partial2.snippet ?? (detail === "full" && pretty && inDev),
+    stackDepth,
+    compact,
+    detail
+  };
+}
+function resolveDevTerminal(input = {}) {
+  const pretty = input.pretty ?? isDev();
+  const inDev = isDev();
+  let frameworkOverlay;
+  let prettyError = {};
+  if (typeof input.dev === "string" && input.dev in DEV_PRESETS) {
+    const { frameworkOverlay: presetOverlay, detail } = DEV_PRESETS[input.dev];
+    frameworkOverlay = presetOverlay;
+    prettyError = { detail };
+  } else if (input.dev && typeof input.dev === "object") {
+    const { frameworkOverlay: devOverlay, prettyError: devPrettyError } = input.dev;
+    frameworkOverlay = devOverlay;
+    if (devPrettyError) prettyError = devPrettyError;
+  }
+  if (frameworkOverlay === void 0) frameworkOverlay = !(pretty && inDev);
+  return {
+    frameworkOverlay,
+    prettyError: finalizePrettyError(prettyError, frameworkOverlay, pretty, inDev)
+  };
+}
+var DEV_PRESETS;
+var init_dev_terminal_Brarc6vc = __esm({
+  "../../node_modules/evlog/dist/dev-terminal-Brarc6vc.mjs"() {
+    init_utils();
+    DEV_PRESETS = {
+      evlog: {
+        frameworkOverlay: false,
+        detail: "full"
+      },
+      nitro: {
+        frameworkOverlay: true,
+        detail: "guidance"
+      },
+      both: {
+        frameworkOverlay: true,
+        detail: "full"
+      }
+    };
+  }
+});
+
+// ../../node_modules/evlog/dist/wideEventChannel-BUDW48oP.mjs
+function publishWideEvent(event) {
+  if (!publisher) return;
+  try {
+    publisher(event);
+  } catch (err) {
+    console.error("[evlog] diagnostics channel publish failed:", err);
+  }
+}
+var publisher;
+var init_wideEventChannel_BUDW48oP = __esm({
+  "../../node_modules/evlog/dist/wideEventChannel-BUDW48oP.mjs"() {
+    publisher = null;
+  }
+});
+
+// ../../node_modules/evlog/dist/audit-DZIXf7Z8.mjs
+function writePrettyStdout(text2) {
+  (globalThis.__evlogNativeStdoutWrite ?? nativeStdoutWrite)?.(text2);
+}
+function isPlainObject$1(val) {
+  return val !== null && typeof val === "object" && !Array.isArray(val);
+}
+function initLogger(config2 = {}) {
+  state.enabled = config2.enabled ?? true;
+  const detected = detectEnvironment();
+  state.env = {
+    service: config2.env?.service ?? detected.service ?? "app",
+    environment: config2.env?.environment ?? detected.environment ?? "development",
+    version: config2.env?.version ?? detected.version,
+    commitHash: config2.env?.commitHash ?? detected.commitHash,
+    region: config2.env?.region ?? detected.region
+  };
+  state.pretty = config2.pretty ?? isDev();
+  state.prettyError = resolveDevTerminal(config2).prettyError;
+  state.sampling = config2.sampling ?? {};
+  state.stringify = config2.stringify ?? true;
+  state.drain = config2.drain;
+  state.redact = resolveRedactConfig(config2.redact ?? !isDev());
+  state.silent = config2.silent ?? false;
+  state.minLevel = config2.minLevel ?? "debug";
+  state.pluginRunner = config2.plugins?.length ? createPluginRunner(config2.plugins) : getEmptyPluginRunner();
+  if (state.pluginRunner.plugins.length > 0) state.pluginRunner.runSetup({ env: { ...state.env } });
+  const hasAnyDrain = !!state.drain || state.pluginRunner.hasDrain;
+  if (state.silent && !hasAnyDrain && !config2._suppressDrainWarning) console.warn("[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).");
+  state.initialized = true;
+}
+function shouldSample(level) {
+  const { rates } = state.sampling;
+  if (!rates) return true;
+  const percentage = level === "error" && rates.error === void 0 ? 100 : rates[level] ?? 100;
+  if (percentage <= 0) return false;
+  if (percentage >= 100) return true;
+  return Math.random() * 100 < percentage;
+}
+function emitWideEvent(level, event, options = {}) {
+  const { deferDrain = false, ownsEvent = false, waitUntil } = options;
+  if (!state.enabled) return null;
+  if (!ownsEvent) {
+    if (!isLevelEnabled(level, state.minLevel)) return null;
+    if (!shouldSample(level)) return null;
+  }
+  let formatted;
+  if (ownsEvent) {
+    event.timestamp = isoNow();
+    event.level = level;
+    if (event.service === void 0) event.service = state.env.service;
+    if (event.environment === void 0) event.environment = state.env.environment;
+    if (state.env.version !== void 0 && event.version === void 0) event.version = state.env.version;
+    if (state.env.commitHash !== void 0 && event.commitHash === void 0) event.commitHash = state.env.commitHash;
+    if (state.env.region !== void 0 && event.region === void 0) event.region = state.env.region;
+    formatted = event;
+  } else formatted = {
+    timestamp: isoNow(),
+    level,
+    ...state.env,
+    ...event
+  };
+  finalizeAudit(formatted);
+  if (state.redact) {
+    formatted = redactEvent(formatted, state.redact);
+    markGloballyRedacted(formatted);
+  }
+  if (!state.silent) if (state.pretty) prettyPrintWideEvent(formatted);
+  else if (state.stringify) console[getConsoleMethod(level)](JSON.stringify(formatted));
+  else console[getConsoleMethod(level)](formatted);
+  if (!deferDrain) {
+    publishWideEvent(formatted);
+    const drainPromises = [];
+    if (state.drain) drainPromises.push((async () => {
+      try {
+        await state.drain({ event: formatted });
+      } catch (err) {
+        console.error("[evlog] drain failed:", err);
+      }
+    })());
+    if (state.pluginRunner.hasDrain) drainPromises.push(state.pluginRunner.runDrain({ event: formatted }));
+    if (drainPromises.length > 0 && waitUntil) waitUntil(Promise.all(drainPromises));
+  }
+  return formatted;
+}
+function emitTaggedLog(level, tag, message) {
+  if (!state.enabled) return;
+  if (state.pretty && !state.silent) {
+    if (!isLevelEnabled(level, state.minLevel)) return;
+    if (!shouldSample(level)) return;
+    if (isBrowser()) {
+      const levelColor = getCssLevelColor(level);
+      const timestamp = isoNow().slice(11, 23);
+      console.log(`%c${timestamp}%c %c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`, cssColors.dim, cssColors.reset, levelColor, cssColors.reset);
+    } else {
+      const color = getLevelColor(level);
+      const timestamp = isoNow().slice(11, 23);
+      console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`);
+    }
+    return;
+  }
+  emitWideEvent(level, {
+    tag,
+    message
+  });
+}
+function formatValue(value) {
+  if (value === null || value === void 0) return String(value);
+  if (Array.isArray(value)) return JSON.stringify(value);
+  if (isPlainObject$1(value)) {
+    const pairs = [];
+    for (const [k, v] of Object.entries(value)) if (v !== void 0 && v !== null) if (typeof v === "object") pairs.push(`${k}=${JSON.stringify(v)}`);
+    else pairs.push(`${k}=${v}`);
+    return pairs.join(" ");
+  }
+  return String(value);
+}
+function formatCost(cost) {
+  if (cost < 0.01) return `$${cost.toFixed(6)}`;
+  if (cost < 1) return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
+}
+function asNumber(value) {
+  return typeof value === "number" ? value : void 0;
+}
+function asStringArray(value) {
+  if (!Array.isArray(value)) return void 0;
+  return value.every((item) => typeof item === "string") ? value : void 0;
+}
+function isToolUsageEntry(value) {
+  return isPlainObject$1(value) && typeof value.name === "string" && typeof value.durationMs === "number" && typeof value.success === "boolean";
+}
+function asToolUsageArray(value) {
+  if (!Array.isArray(value)) return void 0;
+  return value.every(isToolUsageEntry) ? value : void 0;
+}
+function serializeToolInput(input) {
+  if (typeof input === "string") return input;
+  const seen = /* @__PURE__ */ new WeakSet();
+  try {
+    return JSON.stringify(input, (_key, value) => {
+      if (typeof value === "bigint") return value.toString();
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return "[Circular]";
+        seen.add(value);
+      }
+      return value;
+    }) ?? "";
+  } catch {
+    return "[unserializable tool input]";
+  }
+}
+function isToolCallEntry(value) {
+  return isPlainObject$1(value) && typeof value.name === "string" && "input" in value;
+}
+function asToolCallArray(value) {
+  if (!Array.isArray(value)) return void 0;
+  return value.every(isToolCallEntry) ? value : void 0;
+}
+function buildAIEntries(ai) {
+  const entries = [];
+  const headerParts = [];
+  if (ai.model) {
+    let m = String(ai.model);
+    if (ai.provider) m += ` (${ai.provider})`;
+    headerParts.push(m);
+  }
+  if (ai.calls) {
+    const calls = asNumber(ai.calls);
+    if (calls !== void 0) headerParts.push(`${calls} call${calls > 1 ? "s" : ""}`);
+  }
+  const steps = asNumber(ai.steps);
+  if (steps !== void 0 && steps > 1) headerParts.push(`${steps} steps`);
+  entries.push({
+    key: "ai",
+    value: headerParts.join(" \xB7 ")
+  });
+  const inputTokens = asNumber(ai.inputTokens);
+  const outputTokens = asNumber(ai.outputTokens);
+  const totalTokens = asNumber(ai.totalTokens);
+  if (inputTokens !== void 0 && outputTokens !== void 0) {
+    let tokLine = `${inputTokens} in \u2192 ${outputTokens} out`;
+    if (totalTokens) tokLine += ` (${totalTokens} total)`;
+    const extras = [];
+    if (ai.cacheReadTokens) extras.push(`${ai.cacheReadTokens} cache read`);
+    if (ai.cacheWriteTokens) extras.push(`${ai.cacheWriteTokens} cache write`);
+    if (ai.reasoningTokens) extras.push(`${ai.reasoningTokens} reasoning`);
+    if (extras.length) tokLine += ` \xB7 ${extras.join(" \xB7 ")}`;
+    entries.push({
+      key: "ai.tokens",
+      value: tokLine
+    });
+  }
+  const msFirst = asNumber(ai.msToFirstChunk);
+  const msFinish = asNumber(ai.msToFinish);
+  const tps = asNumber(ai.tokensPerSecond);
+  if (msFirst !== void 0 || msFinish !== void 0) {
+    const parts = [];
+    if (msFirst !== void 0) parts.push(`${formatDuration(msFirst)} to first chunk`);
+    if (msFinish !== void 0) parts.push(`${formatDuration(msFinish)} total`);
+    let streamLine = parts.join(" \u2192 ");
+    if (tps) streamLine += ` \xB7 ${tps} tok/s`;
+    entries.push({
+      key: "ai.streaming",
+      value: streamLine
+    });
+  }
+  const estimatedCost = asNumber(ai.estimatedCost);
+  if (estimatedCost !== void 0) entries.push({
+    key: "ai.cost",
+    value: formatCost(estimatedCost)
+  });
+  const totalDurationMs = asNumber(ai.totalDurationMs);
+  if (totalDurationMs !== void 0) entries.push({
+    key: "ai.totalDuration",
+    value: formatDuration(totalDurationMs)
+  });
+  const toolCalls = Array.isArray(ai.toolCalls) ? ai.toolCalls : void 0;
+  const tools = asToolUsageArray(ai.tools);
+  const toolCallEntries = toolCalls ? asToolCallArray(toolCalls) : void 0;
+  const hasInputs = toolCallEntries !== void 0 && toolCallEntries.length > 0;
+  if (tools?.length) {
+    const children = tools.map((t, idx) => {
+      const mark = t.success ? "\u2713" : "\u2717";
+      let line = `${t.name} ${formatDuration(t.durationMs)} ${mark}`;
+      if (t.error) line += ` ${t.error}`;
+      if (hasInputs && toolCallEntries && idx < toolCallEntries.length) {
+        const tc = toolCallEntries[idx];
+        const inputStr = serializeToolInput(tc.input);
+        const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}\u2026` : inputStr;
+        line += ` ${truncated}`;
+      }
+      return line;
+    });
+    entries.push({
+      key: "ai.tools",
+      value: "",
+      children
+    });
+  } else if (toolCalls?.length) if (toolCallEntries?.length) {
+    const children = toolCallEntries.map((tc) => {
+      const inputStr = serializeToolInput(tc.input);
+      const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}\u2026` : inputStr;
+      return `${tc.name}(${truncated})`;
+    });
+    entries.push({
+      key: "ai.tools",
+      value: "",
+      children
+    });
+  } else {
+    const names = asStringArray(toolCalls);
+    if (names?.length) entries.push({
+      key: "ai.tools",
+      value: names.join(", ")
+    });
+  }
+  const stepsUsage = Array.isArray(ai.stepsUsage) ? ai.stepsUsage.filter(isPlainObject$1) : void 0;
+  if (stepsUsage?.length) {
+    const firstModel = stepsUsage[0]?.model;
+    const allSameModel = firstModel !== void 0 && stepsUsage.every((s) => s.model === firstModel);
+    const children = stepsUsage.map((s) => {
+      let line = `${allSameModel ? "" : `${String(s.model)} `}${s.inputTokens} in \u2192 ${s.outputTokens} out`;
+      const stepTools = asStringArray(s.toolCalls);
+      if (stepTools?.length) line += ` [${stepTools.join(", ")}]`;
+      return line;
+    });
+    entries.push({
+      key: "ai.steps",
+      value: "",
+      children
+    });
+  } else if (steps !== void 0 && steps > 1) entries.push({
+    key: "ai.steps",
+    value: String(steps)
+  });
+  const embedding = isPlainObject$1(ai.embedding) ? ai.embedding : void 0;
+  if (embedding) {
+    const parts = [];
+    if (embedding.model) parts.push(String(embedding.model));
+    parts.push(`${embedding.tokens} tokens`);
+    if (embedding.dimensions) parts.push(`${embedding.dimensions}d`);
+    if (embedding.count) parts.push(`${embedding.count} items`);
+    entries.push({
+      key: "ai.embedding",
+      value: parts.join(" \xB7 ")
+    });
+  }
+  if (ai.finishReason) entries.push({
+    key: "ai.finishReason",
+    value: String(ai.finishReason)
+  });
+  if (ai.error) entries.push({
+    key: "ai.error",
+    value: String(ai.error)
+  });
+  if (ai.responseId) entries.push({
+    key: "ai.responseId",
+    value: String(ai.responseId)
+  });
+  return entries;
+}
+function flushPrettyLines(lines) {
+  if (lines.length === 0) return;
+  const text2 = `${lines.join("\n")}
+`;
+  if (nativeStdoutWrite && !isBrowser() && process.env.VITEST !== "true") {
+    writePrettyStdout(text2);
+    return;
+  }
+  console.log(lines.join("\n"));
+}
+function prettyPrintWideEvent(event) {
+  const { timestamp, level, service, environment, version: version3, ...rest } = event;
+  const ts = typeof timestamp === "string" ? timestamp.slice(11, 23) : "";
+  const levelLabel = typeof level === "string" ? level : "info";
+  const browser = isBrowser();
+  const lines = [];
+  const writeLine = (...args) => {
+    if (browser) {
+      console.log(...args);
+      return;
+    }
+    const [line] = args;
+    if (typeof line === "string") lines.push(line);
+  };
+  const parts = [];
+  const styles = [];
+  if (browser) {
+    const lc = getCssLevelColor(levelLabel);
+    parts.push(`%c${ts}%c %c${levelLabel.toUpperCase()}%c %c[${escapeFormatString(String(service))}]%c`);
+    styles.push(cssColors.dim, cssColors.reset, lc, cssColors.reset, cssColors.cyan, cssColors.reset);
+  } else {
+    const lc = getLevelColor(levelLabel);
+    parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`);
+  }
+  if (rest.method && rest.path) {
+    parts.push(browser ? ` ${escapeFormatString(String(rest.method))} ${escapeFormatString(String(rest.path))}` : ` ${rest.method} ${rest.path}`);
+    delete rest.method;
+    delete rest.path;
+  }
+  if (rest.status) {
+    const statusCode = asNumber(rest.status) ?? Number(rest.status);
+    const sc = browser ? statusCode >= 400 ? cssColors.red : cssColors.green : statusCode >= 400 ? colors.red : colors.green;
+    if (browser) {
+      parts.push(` %c${rest.status}%c`);
+      styles.push(sc, cssColors.reset);
+    } else parts.push(` ${sc}${rest.status}${colors.reset}`);
+    delete rest.status;
+  }
+  if (rest.duration) {
+    if (browser) {
+      parts.push(` %c${escapeFormatString(`in ${rest.duration}`)}%c`);
+      styles.push(cssColors.dim, cssColors.reset);
+    } else parts.push(` ${colors.dim}in ${rest.duration}${colors.reset}`);
+    delete rest.duration;
+  }
+  delete rest.durationMs;
+  writeLine(parts.join(""), ...styles);
+  const aiData = isPlainObject$1(rest.ai) ? rest.ai : void 0;
+  if (aiData) delete rest.ai;
+  const errorData = rest.error;
+  if (errorData !== void 0) delete rest.error;
+  const restEntries = Object.entries(rest).filter(([_, v]) => v !== void 0);
+  const aiEntries = aiData ? buildAIEntries(aiData) : [];
+  const errorEntries = errorData !== void 0 ? buildErrorEntries(errorData, state.prettyError) : [];
+  const contextEntries = [...restEntries.map(([key, value]) => ({
+    key,
+    value: formatValue(value)
+  })), ...aiEntries];
+  const allEntries = errorEntries.length > 0 ? [...errorEntries, ...contextEntries] : contextEntries;
+  for (let i = 0; i < allEntries.length; i++) {
+    const entry = allEntries[i];
+    if (!entry) continue;
+    const { children } = entry;
+    const hasChildren = children !== void 0 && children.length > 0;
+    const prefix = i === allEntries.length - 1 && !hasChildren ? "\u2514\u2500" : "\u251C\u2500";
+    if (browser) {
+      const val = entry.value ? ` ${escapeFormatString(entry.value)}` : "";
+      writeLine(`  %c${prefix}%c %c${escapeFormatString(entry.key)}:%c${val}`, cssColors.dim, cssColors.reset, cssColors.cyan, cssColors.reset);
+    } else {
+      const val = entry.value ? ` ${entry.value}` : "";
+      writeLine(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${entry.key}:${colors.reset}${val}`);
+    }
+    if (hasChildren && children) {
+      const connector = i === allEntries.length - 1 ? " " : "\u2502";
+      for (let j = 0; j < children.length; j++) {
+        const child = children[j];
+        if (child === void 0) continue;
+        if (child === "__EVLOG_TREE_SPACER__") {
+          writeLine(`  ${colors.dim}${connector}${colors.reset}`);
+          continue;
+        }
+        const childPrefix = j === children.length - 1 ? "\u2514\u2500" : "\u251C\u2500";
+        if (child === "") {
+          writeLine("");
+          continue;
+        }
+        if (browser) writeLine(`  %c${connector}  ${childPrefix}%c ${escapeFormatString(child)}`, cssColors.dim, cssColors.reset);
+        else if (child.startsWith(" ") || child.startsWith("\x1B")) writeLine(`  ${colors.dim}${connector}${colors.reset}${child}`);
+        else writeLine(`  ${colors.dim}${connector}  ${childPrefix}${colors.reset} ${child}`);
+      }
+    }
+  }
+  if (!browser && lines.length > 0) flushPrettyLines(lines);
+}
+function createLogMethod(level) {
+  return function logMethod(tagOrEvent, message) {
+    if (typeof tagOrEvent === "string" && message !== void 0) emitTaggedLog(level, tagOrEvent, message);
+    else if (typeof tagOrEvent === "object") emitWideEvent(level, tagOrEvent);
+    else emitTaggedLog(level, "log", String(tagOrEvent));
+  };
+}
+function isPlainObject2(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  if (Object.prototype.toString.call(value) !== "[object Object]") return false;
+  return Object.getPrototypeOf(value) === Object.prototype || value.constructor === Object;
+}
+function stableStringify(value, ancestors = /* @__PURE__ */ new WeakSet()) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (ancestors.has(value)) return '"[Circular]"';
+  if (!Array.isArray(value) && !isPlainObject2(value)) return JSON.stringify(value);
+  ancestors.add(value);
+  const out = Array.isArray(value) ? `[${value.map((v) => stableStringify(v, ancestors)).join(",")}]` : `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableStringify(value[k], ancestors)}`).join(",")}}`;
+  ancestors.delete(value);
+  return out;
+}
+function fnv1a32(input, seed) {
+  let h = seed >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i) & 255;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+function computeIdempotencyKey(audit2, timestamp) {
+  const seconds = timestamp.slice(0, 19);
+  const payload = stableStringify({
+    action: audit2.action,
+    actor: {
+      type: audit2.actor.type,
+      id: audit2.actor.id
+    },
+    target: audit2.target ? {
+      type: audit2.target.type,
+      id: audit2.target.id
+    } : void 0,
+    outcome: audit2.outcome,
+    timestamp: seconds
+  });
+  const a = fnv1a32(payload, 2166136261).toString(16).padStart(8, "0");
+  const b = fnv1a32(payload, 3735928559).toString(16).padStart(8, "0");
+  const c = fnv1a32(payload, 528734635).toString(16).padStart(8, "0");
+  const d = fnv1a32(payload, 1541459225).toString(16).padStart(8, "0");
+  return a + b + c + d;
+}
+function decorateAudit(audit2, timestamp) {
+  if (audit2.idempotencyKey) return audit2;
+  return {
+    ...audit2,
+    idempotencyKey: computeIdempotencyKey(audit2, timestamp)
+  };
+}
+function isCompleteAuditFields(a) {
+  if (!a || typeof a !== "object") return false;
+  const audit2 = a;
+  return typeof audit2.action === "string" && typeof audit2.actor?.type === "string" && typeof audit2.actor?.id === "string";
+}
+function finalizeAudit(event) {
+  const a = event.audit;
+  if (!isCompleteAuditFields(a)) return;
+  const decorated = decorateAudit(a, String(event.timestamp));
+  event.audit = decorated;
+  _testCollector?.(decorated, event);
+}
+var nativeStdoutWrite, state, _log, noopLogger, _testCollector;
+var init_audit_DZIXf7Z8 = __esm({
+  "../../node_modules/evlog/dist/audit-DZIXf7Z8.mjs"() {
+    init_utils();
+    init_redact_C7FmdhwI();
+    init_globalRegistry_Bh3bIGwA();
+    init_pretty_error_DTIHxnBN();
+    init_dev_terminal_Brarc6vc();
+    init_wideEventChannel_BUDW48oP();
+    nativeStdoutWrite = typeof process !== "undefined" && typeof process.stdout?.write === "function" ? process.stdout.write.bind(process.stdout) : void 0;
+    state = globalConfig;
+    _log = {
+      info: createLogMethod("info"),
+      error: createLogMethod("error"),
+      warn: createLogMethod("warn"),
+      debug: createLogMethod("debug")
+    };
+    noopLogger = {
+      set() {
+      },
+      setLevel() {
+      },
+      error() {
+      },
+      info() {
+      },
+      warn() {
+      },
+      emit() {
+        return null;
+      },
+      getContext() {
+        return {};
+      },
+      audit: Object.assign(() => {
+      }, { deny: () => {
+      } })
+    };
+    if (typeof __EVLOG_CONFIG__ !== "undefined") initLogger(__EVLOG_CONFIG__);
+    _testCollector = null;
+  }
+});
+
+// ../../node_modules/evlog/dist/index.mjs
+var init_dist = __esm({
+  "../../node_modules/evlog/dist/index.mjs"() {
+    init_audit_DZIXf7Z8();
+  }
+});
+
+// ../../node_modules/@vidbee/logger/src/node.ts
+function logCaughtError(event, error51) {
+  _log.error({
+    event,
+    error: error51 instanceof Error ? error51.message : String(error51),
+    stack: error51 instanceof Error ? error51.stack : void 0
+  });
+}
+var init_node = __esm({
+  "../../node_modules/@vidbee/logger/src/node.ts"() {
+    init_dist();
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/classifier/index.ts
+function getRuleForCategory(c) {
+  const r = RULE_BY_CATEGORY.get(c);
+  if (!r) {
+    throw new Error(`no rule for category ${c}`);
+  }
+  return r;
+}
+function sanitizeOutput(s) {
+  let out = s;
+  for (const re of SECRET_PATTERNS) {
+    out = out.replace(re, (_m, p1, _p2) => {
+      return typeof p1 === "string" ? `${p1}: <redacted>` : "<redacted>";
+    });
+  }
+  return out;
+}
+function takeStderrTail(s, bytes = STDERR_TAIL_BYTES) {
+  if (Buffer.byteLength(s, "utf8") <= bytes) {
+    return s;
+  }
+  while (Buffer.byteLength(s, "utf8") > bytes) {
+    s = s.slice(Math.floor(s.length * 0.1));
+  }
+  return s;
+}
+function parseRetryAfter(header) {
+  if (!header) {
+    return null;
+  }
+  const trimmed = header.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^\d+$/.test(trimmed)) {
+    const secs = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(secs) && secs >= 0) {
+      return secs * 1e3;
+    }
+    return null;
+  }
+  const t = Date.parse(trimmed);
+  if (Number.isNaN(t)) {
+    return null;
+  }
+  const delta = t - Date.now();
+  return delta > 0 ? delta : 0;
+}
+function classify(input) {
+  const tail = takeStderrTail(input.stderr ?? "");
+  const sanitizedTail = sanitizeOutput(tail);
+  for (const rule of CLASSIFIER_RULES) {
+    if (!rule.regex) {
+      continue;
+    }
+    if (rule.regex.test(tail) || rule.exitCodeHint != null && input.exitCode === rule.exitCodeHint) {
+      return buildError(rule, sanitizedTail, input);
+    }
+  }
+  const unknown2 = getRuleForCategory("unknown");
+  return buildError(unknown2, sanitizedTail, input);
+}
+function virtualError(category, rawMessage) {
+  const rule = getRuleForCategory(category);
+  return {
+    category,
+    exitCode: null,
+    rawMessage,
+    uiMessageKey: rule.uiMessageKey,
+    uiActionHints: rule.uiActionHints,
+    retryable: rule.defaultMaxAttempts > 0,
+    suggestedRetryAfterMs: rule.defaultBackoffMs
+  };
+}
+function buildError(rule, sanitizedTail, input) {
+  let suggestedRetryAfterMs = rule.defaultBackoffMs;
+  if (rule.category === "http-429") {
+    const fromInput = parseRetryAfter(input.retryAfterHeader ?? null);
+    if (fromInput == null) {
+      const m = sanitizedTail.match(RETRY_AFTER_REGEX);
+      if (m && m[1]) {
+        const fromTail = parseRetryAfter(m[1]);
+        if (fromTail != null) {
+          suggestedRetryAfterMs = fromTail;
+        }
+      }
+    } else {
+      suggestedRetryAfterMs = fromInput;
+    }
+  }
+  return {
+    category: rule.category,
+    exitCode: input.exitCode ?? null,
+    rawMessage: sanitizedTail,
+    uiMessageKey: rule.uiMessageKey,
+    uiActionHints: rule.uiActionHints,
+    retryable: rule.defaultMaxAttempts > 0,
+    suggestedRetryAfterMs
+  };
+}
+function defaultMaxAttempts(c) {
+  return getRuleForCategory(c).defaultMaxAttempts;
+}
+var CLASSIFIER_RULES, RULE_BY_CATEGORY, STDERR_TAIL_BYTES, SECRET_PATTERNS, RETRY_AFTER_REGEX;
+var init_classifier = __esm({
+  "../../node_modules/@vidbee/task-queue/src/classifier/index.ts"() {
+    CLASSIFIER_RULES = [
+      {
+        category: "http-429",
+        regex: /HTTP Error 429|Too Many Requests/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 3,
+        defaultBackoffMs: 3e4,
+        uiActionHints: ["retry-later"],
+        uiMessageKey: "task.error.http429"
+      },
+      {
+        category: "auth-required",
+        regex: /Sign in to confirm|Login required|Private video|members-only|cookies are no longer valid/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["import-cookies"],
+        uiMessageKey: "task.error.authRequired"
+      },
+      {
+        category: "geo-blocked",
+        regex: /not available in your country|geo-restricted|geo restricted|content isn't available in your country/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["set-proxy"],
+        uiMessageKey: "task.error.geoBlocked"
+      },
+      {
+        category: "network-transient",
+        regex: /RemoteDisconnected|remote end closed connection|Connection aborted|Connection reset|IncompleteRead/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 3,
+        defaultBackoffMs: 2e3,
+        uiActionHints: ["retry"],
+        uiMessageKey: "task.error.networkTransient"
+      },
+      {
+        category: "not-found",
+        regex: /HTTP Error 404|Video unavailable|This video has been removed|Requested format is not available/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["remove-task"],
+        uiMessageKey: "task.error.notFound"
+      },
+      {
+        category: "disk-full",
+        regex: /ENOSPC|No space left on device/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["open-folder", "free-disk"],
+        uiMessageKey: "task.error.diskFull"
+      },
+      {
+        category: "permission-denied",
+        regex: /EACCES|EPERM|Permission denied/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["choose-folder"],
+        uiMessageKey: "task.error.permissionDenied"
+      },
+      {
+        category: "binary-missing",
+        regex: /yt-dlp.*not found|ffmpeg.*not found|ffprobe.*not found/i,
+        exitCodeHint: 127,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["report-bug"],
+        uiMessageKey: "task.error.binaryMissing"
+      },
+      {
+        category: "ffmpeg",
+        regex: /ffmpeg|Postprocessing|Conversion failed/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 1,
+        defaultBackoffMs: 5e3,
+        uiActionHints: ["report-bug"],
+        uiMessageKey: "task.error.ffmpeg"
+      },
+      {
+        category: "network-transient",
+        regex: /socket hang up|ECONNRESET|ECONNREFUSED|getaddrinfo ENOTFOUND|Connection timed out|HTTP Error 5\d\d|Read timed out/i,
+        exitCodeHint: null,
+        defaultMaxAttempts: 5,
+        defaultBackoffMs: null,
+        uiActionHints: ["retry"],
+        uiMessageKey: "task.error.networkTransient"
+      },
+      // Virtual rules — produced by Watchdog/cancel; never matched against stderr.
+      {
+        category: "stalled",
+        regex: null,
+        exitCodeHint: null,
+        defaultMaxAttempts: 3,
+        defaultBackoffMs: 5e3,
+        uiActionHints: ["retry"],
+        uiMessageKey: "task.error.stalled"
+      },
+      {
+        category: "cancelled-by-user",
+        regex: null,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: [],
+        uiMessageKey: "task.error.cancelledByUser"
+      },
+      {
+        // Virtual: produced by `processing → completed` guard when the output
+        // file is missing or zero-byte. Non-retryable by default.
+        category: "output-missing",
+        regex: null,
+        exitCodeHint: null,
+        defaultMaxAttempts: 0,
+        defaultBackoffMs: null,
+        uiActionHints: ["report-bug"],
+        uiMessageKey: "task.error.outputMissing"
+      },
+      {
+        category: "unknown",
+        regex: null,
+        exitCodeHint: null,
+        defaultMaxAttempts: 1,
+        defaultBackoffMs: null,
+        uiActionHints: ["retry", "report-bug"],
+        uiMessageKey: "task.error.unknown"
+      }
+    ];
+    RULE_BY_CATEGORY = new Map(
+      CLASSIFIER_RULES.map((r) => [r.category, r])
+    );
+    STDERR_TAIL_BYTES = 8 * 1024;
+    SECRET_PATTERNS = [
+      // Authorization / cookie / api key headers
+      /(authorization|cookie|x-api-key|x-auth-token):\s*([^\r\n]+)/gi,
+      // Inline cookies/tokens that yt-dlp may print as flags
+      /(--cookies(?:-from-browser)?)\s+("[^"]*"|'[^']*'|\S+)/gi,
+      /(token|secret|password)=([^\s&]+)/gi
+    ];
+    RETRY_AFTER_REGEX = /Retry-After:\s*([^\r\n]+)/i;
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/complete.ts
+function isOutputComplete(kind, output, check2) {
+  if (kind === "transcription") {
+    const result = output.transcript;
+    return Boolean(result?.transcriptId && (result.resultKind === "transcript" || result.resultKind === "no-speech"));
+  }
+  return Boolean(output.filePath) && output.size > 0 && check2.filePresent(output.filePath);
+}
+var init_complete = __esm({
+  "../../node_modules/@vidbee/task-queue/src/complete.ts"() {
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/events/index.ts
+var EventBus;
+var init_events = __esm({
+  "../../node_modules/@vidbee/task-queue/src/events/index.ts"() {
+    init_node();
+    EventBus = class {
+      listeners = /* @__PURE__ */ new Map();
+      subscribe(listener) {
+        return this.subscribeFiltered("*", listener);
+      }
+      on(type, listener) {
+        return this.subscribeFiltered(type, listener);
+      }
+      emit(event) {
+        const typed = this.listeners.get(event.type);
+        if (typed) {
+          for (const l of typed) {
+            this.safeCall(l, event);
+          }
+        }
+        const wildcard = this.listeners.get("*");
+        if (wildcard) {
+          for (const l of wildcard) {
+            this.safeCall(l, event);
+          }
+        }
+      }
+      /** Number of subscribers. */
+      size() {
+        let n = 0;
+        for (const set2 of this.listeners.values()) {
+          n += set2.size;
+        }
+        return n;
+      }
+      subscribeFiltered(key, listener) {
+        let set2 = this.listeners.get(key);
+        if (!set2) {
+          set2 = /* @__PURE__ */ new Set();
+          this.listeners.set(key, set2);
+        }
+        set2.add(listener);
+        return () => {
+          set2.delete(listener);
+          if (set2.size === 0) {
+            this.listeners.delete(key);
+          }
+        };
+      }
+      safeCall(listener, event) {
+        try {
+          listener(event);
+        } catch (err) {
+          logCaughtError("task_queue_listener_threw", err);
+        }
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/types.ts
+var TRANSCRIBABLE_TASK_KINDS, TRANSCRIPTION_GROUP_KEY, isDownloadTaskKind, isMediaTaskKind, TERMINAL_STATUSES, PRIORITY_USER, PRIORITY_SUBSCRIPTION, PRIORITY_BACKGROUND, EMPTY_PROGRESS;
 var init_types = __esm({
-  "../../packages/task-queue/src/types.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/types.ts"() {
+    TRANSCRIBABLE_TASK_KINDS = /* @__PURE__ */ new Set([
+      "video",
+      "audio",
+      "subscription-item"
+    ]);
+    TRANSCRIPTION_GROUP_KEY = "transcription";
+    isDownloadTaskKind = (kind) => kind !== "transcription" && kind !== "conversion" && kind !== "model-download";
+    isMediaTaskKind = (kind) => isDownloadTaskKind(kind) || kind === "conversion";
     TERMINAL_STATUSES = /* @__PURE__ */ new Set([
       "completed",
       "failed",
@@ -34,7 +1794,2664 @@ var init_types = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js
+// ../../node_modules/@vidbee/task-queue/src/fsm/index.ts
+function isLegalTransition(from, to) {
+  return LEGAL_TRANSITIONS[from]?.has(to) ?? false;
+}
+function transition(task, to, ctx) {
+  const from = task.status;
+  if (TERMINAL_STATUSES.has(from) && from !== to) {
+  }
+  if (!isLegalTransition(from, to)) {
+    throw new IllegalTransitionError(from, to, ctx.trigger);
+  }
+  const now = ctx.now ?? Date.now();
+  const next = {
+    ...task,
+    prevStatus: from,
+    status: to,
+    statusReason: ctx.reason ?? null,
+    enteredStatusAt: now,
+    updatedAt: now
+  };
+  switch (to) {
+    case "running":
+      next.input = {
+        ...task.input,
+        options: { ...task.input.options, startedAt: task.input.options?.startedAt ?? now }
+      };
+      if (from === "queued" && task.attempt === 0) {
+        next.attempt = 1;
+      }
+      break;
+    case "queued":
+      if (TERMINAL_STATUSES.has(from)) {
+        next.input = {
+          ...task.input,
+          options: { ...task.input.options, completedAt: void 0 }
+        };
+      }
+      if (ctx.trigger === "retry-tick") {
+        next.attempt = task.attempt + 1;
+        next.nextRetryAt = null;
+      } else if (ctx.trigger === "retry-manual") {
+        next.attempt = 0;
+        next.lastError = null;
+        next.nextRetryAt = null;
+      } else if (ctx.trigger === "requeue") {
+        next.lastError = null;
+        next.nextRetryAt = null;
+      } else if (ctx.trigger === "resume") {
+        next.nextRetryAt = null;
+      }
+      break;
+    case "completed": {
+      if (!ctx.output) {
+        throw new IllegalTransitionError(
+          from,
+          to,
+          "finalize-success requires output"
+        );
+      }
+      if (ctx.output.size <= 0) {
+        throw new IllegalTransitionError(
+          from,
+          to,
+          "completed requires output.size > 0"
+        );
+      }
+      next.output = ctx.output;
+      next.lastError = null;
+      next.pid = null;
+      next.pidStartedAt = null;
+      break;
+    }
+    case "failed": {
+      if (ctx.error) next.lastError = ctx.error;
+      next.pid = null;
+      next.pidStartedAt = null;
+      break;
+    }
+    case "cancelled": {
+      next.pid = null;
+      next.pidStartedAt = null;
+      break;
+    }
+    case "retry-scheduled": {
+      if (ctx.nextRetryAt == null || ctx.nextRetryAt <= 0) {
+        throw new IllegalTransitionError(
+          from,
+          to,
+          "retry-scheduled requires nextRetryAt"
+        );
+      }
+      if (ctx.error) next.lastError = ctx.error;
+      next.nextRetryAt = ctx.nextRetryAt;
+      next.pid = null;
+      next.pidStartedAt = null;
+      break;
+    }
+    case "paused": {
+      next.pid = null;
+      next.pidStartedAt = null;
+      break;
+    }
+    case "processing":
+      break;
+  }
+  return next;
+}
+var IllegalTransitionError, LEGAL_TRANSITIONS;
+var init_fsm = __esm({
+  "../../node_modules/@vidbee/task-queue/src/fsm/index.ts"() {
+    init_types();
+    IllegalTransitionError = class extends Error {
+      from;
+      to;
+      reason;
+      constructor(from, to, reason) {
+        super(
+          `IllegalTransition: ${from} -> ${to}${reason ? ` (${reason})` : ""}`
+        );
+        this.name = "IllegalTransitionError";
+        this.from = from;
+        this.to = to;
+        this.reason = reason;
+      }
+    };
+    LEGAL_TRANSITIONS = {
+      queued: /* @__PURE__ */ new Set(["running", "paused", "cancelled"]),
+      running: /* @__PURE__ */ new Set([
+        "processing",
+        "completed",
+        "retry-scheduled",
+        "failed",
+        "paused",
+        "cancelled"
+      ]),
+      processing: /* @__PURE__ */ new Set([
+        "completed",
+        "retry-scheduled",
+        "failed",
+        "paused",
+        "cancelled"
+      ]),
+      paused: /* @__PURE__ */ new Set(["queued", "cancelled", "failed"]),
+      "retry-scheduled": /* @__PURE__ */ new Set(["queued", "paused", "cancelled"]),
+      failed: /* @__PURE__ */ new Set(["queued"]),
+      cancelled: /* @__PURE__ */ new Set(["queued"]),
+      completed: /* @__PURE__ */ new Set()
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/process/kill-process-tree.ts
+import { execFile } from "node:child_process";
+var killProcessTree;
+var init_kill_process_tree = __esm({
+  "../../node_modules/@vidbee/task-queue/src/process/kill-process-tree.ts"() {
+    killProcessTree = (pid, signal = "SIGTERM") => {
+      if (pid === void 0 || pid <= 0) {
+        return;
+      }
+      if (process.platform === "win32") {
+        execFile("taskkill", ["/PID", String(pid), "/T", "/F"], () => {
+        });
+        return;
+      }
+      process.kill(pid, signal);
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/process/pid-start-time.ts
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+function setReadPidStartTimeImpl(fn) {
+  impl = fn;
+}
+function readPidStartTime(pid) {
+  try {
+    return impl(pid);
+  } catch {
+    return null;
+  }
+}
+function defaultImpl(pid) {
+  if (process.platform === "linux") return readLinuxStart(pid);
+  if (process.platform === "darwin") return readDarwinStart(pid);
+  return null;
+}
+function readLinuxStart(pid) {
+  const path5 = `/proc/${pid}/stat`;
+  if (!existsSync(path5)) return null;
+  const raw = readFileSync(path5, "utf8");
+  const lastParen = raw.lastIndexOf(")");
+  if (lastParen < 0) return null;
+  const fields = raw.slice(lastParen + 2).split(" ");
+  const starttimeTicks = Number.parseInt(fields[19] ?? "", 10);
+  if (!Number.isFinite(starttimeTicks)) return null;
+  const stat2 = readFileSync("/proc/stat", "utf8");
+  const btimeMatch = stat2.match(/^btime\s+(\d+)/m);
+  if (!btimeMatch) return null;
+  const btime = Number.parseInt(btimeMatch[1] ?? "", 10);
+  const hz = readClockTickRate() ?? 100;
+  return (btime + starttimeTicks / hz) * 1e3;
+}
+function readDarwinStart(pid) {
+  try {
+    const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8"
+    }).trim();
+    if (!out) return null;
+    const t = Date.parse(out);
+    return Number.isNaN(t) ? null : t;
+  } catch {
+    return null;
+  }
+}
+function readClockTickRate() {
+  if (cachedHz !== void 0) return cachedHz;
+  try {
+    const out = execFileSync("getconf", ["CLK_TCK"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8"
+    }).trim();
+    const n = Number.parseInt(out, 10);
+    cachedHz = Number.isFinite(n) ? n : null;
+  } catch {
+    cachedHz = null;
+  }
+  return cachedHz;
+}
+function isPidAlive(pid) {
+  if (process.platform === "linux") return existsSync(`/proc/${pid}`);
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const code = err.code;
+    return code === "EPERM";
+  }
+}
+var impl, cachedHz;
+var init_pid_start_time = __esm({
+  "../../node_modules/@vidbee/task-queue/src/process/pid-start-time.ts"() {
+    impl = defaultImpl;
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/process/registry.ts
+var ProcessRegistry;
+var init_registry = __esm({
+  "../../node_modules/@vidbee/task-queue/src/process/registry.ts"() {
+    init_kill_process_tree();
+    init_pid_start_time();
+    ProcessRegistry = class {
+      constructor(deps) {
+        this.deps = deps;
+        this.clock = deps.clock ?? Date.now;
+        this.kill = deps.kill ?? ((pid, sig) => killProcessTree(pid, sig));
+        this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+        this.killGracePeriodMs = deps.killGracePeriodMs ?? 1e4;
+      }
+      deps;
+      handles = /* @__PURE__ */ new Map();
+      clock;
+      kill;
+      sleep;
+      killGracePeriodMs;
+      /** Record a spawn and append a journal row. */
+      async recordSpawn(handle) {
+        this.handles.set(this.key(handle.taskId, handle.attemptId), handle);
+        await this.deps.persist.appendJournal({
+          ts: handle.spawnedAt,
+          op: "spawn",
+          taskId: handle.taskId,
+          attemptId: handle.attemptId,
+          pid: handle.pid,
+          pidStartedAt: handle.pidStartedAt,
+          exitCode: null,
+          signal: null
+        });
+      }
+      /** Record a clean close (process exited under its own steam). */
+      async recordClose(taskId, attemptId, exitCode, signal) {
+        const handle = this.handles.get(this.key(taskId, attemptId));
+        this.handles.delete(this.key(taskId, attemptId));
+        await this.appendJournal("close", {
+          taskId,
+          attemptId,
+          pid: handle?.pid ?? -1,
+          pidStartedAt: handle?.pidStartedAt ?? null,
+          exitCode,
+          signal
+        });
+      }
+      /** Cancel: SIGTERM → 10s → SIGKILL → journal `killed`. */
+      async cancel(taskId, attemptId) {
+        const handle = this.handles.get(this.key(taskId, attemptId));
+        if (!handle) return;
+        try {
+          this.kill(handle.pid, "SIGTERM");
+        } catch {
+        }
+        await this.sleep(this.killGracePeriodMs);
+        if (isPidAlive(handle.pid)) {
+          try {
+            this.kill(handle.pid, "SIGKILL");
+          } catch {
+          }
+        }
+        this.handles.delete(this.key(taskId, attemptId));
+        await this.appendJournal("killed", {
+          taskId,
+          attemptId,
+          pid: handle.pid,
+          pidStartedAt: handle.pidStartedAt,
+          exitCode: null,
+          signal: "SIGKILL"
+        });
+      }
+      /**
+       * Walk the journal for unclosed spawns. For each, verify the same process
+       * is still alive (pid + pidStartedAt match). If yes → kill it. Either way,
+       * append a `killed` row so the journal is reconciled.
+       *
+       * Returns the list of taskIds whose attempts the orchestrator must
+       * re-classify (typically: transition to `paused('crash-recovery')`).
+       */
+      async reconcile() {
+        const open = await this.deps.persist.findOpenSpawns();
+        const reconciled = [];
+        for (const row of open) {
+          const stillAlive = isPidAlive(row.pid);
+          const startedAtNow = stillAlive ? readPidStartTime(row.pid) : null;
+          const sameProcess = stillAlive && (row.pidStartedAt == null || startedAtNow == null || Math.abs((startedAtNow ?? 0) - (row.pidStartedAt ?? 0)) < 2e3);
+          let killed = false;
+          if (sameProcess) {
+            try {
+              this.kill(row.pid, "SIGTERM");
+              await this.sleep(this.killGracePeriodMs);
+              if (isPidAlive(row.pid)) this.kill(row.pid, "SIGKILL");
+              killed = true;
+            } catch {
+            }
+          }
+          await this.appendJournal("killed", {
+            taskId: row.taskId,
+            attemptId: row.attemptId,
+            pid: row.pid,
+            pidStartedAt: row.pidStartedAt,
+            exitCode: null,
+            signal: killed ? "SIGKILL" : null
+          });
+          reconciled.push({
+            taskId: row.taskId,
+            attemptId: row.attemptId,
+            pid: row.pid,
+            killed
+          });
+        }
+        return reconciled;
+      }
+      size() {
+        return this.handles.size;
+      }
+      key(taskId, attemptId) {
+        return `${taskId}:${attemptId}`;
+      }
+      async appendJournal(op, row) {
+        await this.deps.persist.appendJournal({
+          ts: this.clock(),
+          op,
+          taskId: row.taskId,
+          attemptId: row.attemptId,
+          pid: row.pid,
+          pidStartedAt: row.pidStartedAt,
+          exitCode: row.exitCode,
+          signal: row.signal
+        });
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/process/watchdog.ts
+var Watchdog;
+var init_watchdog = __esm({
+  "../../node_modules/@vidbee/task-queue/src/process/watchdog.ts"() {
+    init_node();
+    Watchdog = class {
+      entries = /* @__PURE__ */ new Map();
+      runningIdleMs;
+      processingIdleMs;
+      setTimer;
+      clearTimer;
+      clock;
+      onStalled;
+      constructor(onStalled, config2 = {}) {
+        this.onStalled = onStalled;
+        this.runningIdleMs = config2.runningIdleMs ?? 6e4;
+        this.processingIdleMs = config2.processingIdleMs ?? 6e5;
+        this.setTimer = config2.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+        this.clearTimer = config2.clearTimer ?? ((h) => clearTimeout(h));
+        this.clock = config2.clock ?? Date.now;
+      }
+      arm(taskId, status) {
+        this.disarm(taskId);
+        const entry = {
+          taskId,
+          status,
+          lastBumpAt: this.clock(),
+          timer: null
+        };
+        entry.timer = this.scheduleNext(entry);
+        this.entries.set(taskId, entry);
+      }
+      /**
+       * Move from `running` → `processing` thresholds, preserving lastBumpAt.
+       * Used when yt-dlp emits the Postprocess line.
+       */
+      promoteToProcessing(taskId) {
+        const e = this.entries.get(taskId);
+        if (!e) {
+          return;
+        }
+        if (e.timer) {
+          this.clearTimer(e.timer);
+        }
+        e.status = "processing";
+        e.lastBumpAt = this.clock();
+        e.timer = this.scheduleNext(e);
+      }
+      bump(taskId) {
+        const e = this.entries.get(taskId);
+        if (!e) {
+          return;
+        }
+        if (e.timer) {
+          this.clearTimer(e.timer);
+        }
+        e.lastBumpAt = this.clock();
+        e.timer = this.scheduleNext(e);
+      }
+      disarm(taskId) {
+        const e = this.entries.get(taskId);
+        if (!e) {
+          return;
+        }
+        if (e.timer) {
+          this.clearTimer(e.timer);
+        }
+        this.entries.delete(taskId);
+      }
+      size() {
+        return this.entries.size;
+      }
+      scheduleNext(entry) {
+        const idle = entry.status === "processing" ? this.processingIdleMs : this.runningIdleMs;
+        return this.setTimer(() => {
+          const cur = this.entries.get(entry.taskId);
+          if (!cur) {
+            return;
+          }
+          const elapsed = this.clock() - cur.lastBumpAt;
+          if (elapsed >= idle) {
+            this.entries.delete(entry.taskId);
+            try {
+              this.onStalled(entry.taskId, cur);
+            } catch (err) {
+              logCaughtError("task_queue_watchdog_threw", err);
+            }
+            return;
+          }
+          cur.timer = this.scheduleNext(cur);
+        }, idle);
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/process/index.ts
+var init_process = __esm({
+  "../../node_modules/@vidbee/task-queue/src/process/index.ts"() {
+    init_kill_process_tree();
+    init_registry();
+    init_watchdog();
+    init_pid_start_time();
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/util/async-mutex.ts
+var AsyncMutex;
+var init_async_mutex = __esm({
+  "../../node_modules/@vidbee/task-queue/src/util/async-mutex.ts"() {
+    AsyncMutex = class {
+      locked = false;
+      waiters = [];
+      async acquire() {
+        if (!this.locked) {
+          this.locked = true;
+          return () => this.release();
+        }
+        await new Promise((resolve2) => this.waiters.push(resolve2));
+        this.locked = true;
+        return () => this.release();
+      }
+      async runExclusive(fn) {
+        const release = await this.acquire();
+        try {
+          return await fn();
+        } finally {
+          release();
+        }
+      }
+      release() {
+        if (!this.locked) {
+          throw new Error("AsyncMutex: release called while not locked");
+        }
+        this.locked = false;
+        const next = this.waiters.shift();
+        if (next) next();
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/util/min-heap.ts
+var MinHeap;
+var init_min_heap = __esm({
+  "../../node_modules/@vidbee/task-queue/src/util/min-heap.ts"() {
+    MinHeap = class {
+      constructor(cmp) {
+        this.cmp = cmp;
+      }
+      cmp;
+      data = [];
+      size() {
+        return this.data.length;
+      }
+      peek() {
+        return this.data[0];
+      }
+      push(item) {
+        this.data.push(item);
+        this.siftUp(this.data.length - 1);
+      }
+      pop() {
+        if (this.data.length === 0) return void 0;
+        const top = this.data[0];
+        const last = this.data.pop();
+        if (this.data.length > 0) {
+          this.data[0] = last;
+          this.siftDown(0);
+        }
+        return top;
+      }
+      /**
+       * Remove the first element matching `pred`. O(n). Used for cancel/pause
+       * which are rare relative to dispatch.
+       */
+      remove(pred) {
+        const idx = this.data.findIndex(pred);
+        if (idx < 0) return void 0;
+        const removed = this.data[idx];
+        const last = this.data.pop();
+        if (idx < this.data.length) {
+          this.data[idx] = last;
+          this.siftDown(idx);
+          this.siftUp(idx);
+        }
+        return removed;
+      }
+      toArray() {
+        return this.data;
+      }
+      siftUp(idx) {
+        let i = idx;
+        while (i > 0) {
+          const parent = i - 1 >> 1;
+          if (this.cmp(this.data[i], this.data[parent]) >= 0) return;
+          [this.data[i], this.data[parent]] = [this.data[parent], this.data[i]];
+          i = parent;
+        }
+      }
+      siftDown(idx) {
+        const n = this.data.length;
+        let i = idx;
+        while (true) {
+          const l = i * 2 + 1;
+          const r = i * 2 + 2;
+          let smallest = i;
+          if (l < n && this.cmp(this.data[l], this.data[smallest]) < 0) smallest = l;
+          if (r < n && this.cmp(this.data[r], this.data[smallest]) < 0) smallest = r;
+          if (smallest === i) return;
+          [this.data[i], this.data[smallest]] = [
+            this.data[smallest],
+            this.data[i]
+          ];
+          i = smallest;
+        }
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/scheduler/scheduler.ts
+var Scheduler;
+var init_scheduler = __esm({
+  "../../node_modules/@vidbee/task-queue/src/scheduler/scheduler.ts"() {
+    init_async_mutex();
+    init_min_heap();
+    init_node();
+    Scheduler = class {
+      constructor(opts) {
+        this.opts = opts;
+        this.maxConcurrency = opts.maxConcurrency;
+        this.defaultMaxPerGroup = opts.defaultMaxPerGroup ?? null;
+      }
+      opts;
+      readyHeap = new MinHeap(
+        (a, b) => a.priority !== b.priority ? a.priority - b.priority : a.seq - b.seq
+      );
+      /** taskId → 1 currently consuming a slot. */
+      running = /* @__PURE__ */ new Set();
+      /** groupKey → number of tasks currently consuming a slot. */
+      perGroupRunning = /* @__PURE__ */ new Map();
+      /** groupKey → explicit per-group cap. Null means unlimited. */
+      perGroupCap = /* @__PURE__ */ new Map();
+      mutex = new AsyncMutex();
+      seqCounter = 0;
+      maxConcurrency;
+      defaultMaxPerGroup;
+      // ─────────────── Public API ───────────────
+      async enqueue(taskId, priority) {
+        await this.mutex.runExclusive(() => {
+          this.readyHeap.push({
+            taskId,
+            priority,
+            seq: ++this.seqCounter
+          });
+        });
+        await this.tryDispatch();
+      }
+      /** Removes a task from the ready heap (does not touch running set). */
+      async dequeue(taskId) {
+        return this.mutex.runExclusive(() => {
+          const removed = this.readyHeap.remove((e) => e.taskId === taskId);
+          return removed != null;
+        });
+      }
+      /**
+       * Push a queued task onto the ready heap if it is not already waiting or running.
+       *
+       * @param taskId Task to schedule.
+       * @param priority Heap priority.
+       */
+      async ensureEnqueued(taskId, priority) {
+        await this.mutex.runExclusive(() => {
+          if (this.running.has(taskId)) {
+            return;
+          }
+          if (this.readyHeap.toArray().some((entry) => entry.taskId === taskId)) {
+            return;
+          }
+          this.readyHeap.push({
+            taskId,
+            priority,
+            seq: ++this.seqCounter
+          });
+        });
+        await this.tryDispatch();
+      }
+      /**
+       * Drop slot reservations for tasks that are no longer actually executing.
+       *
+       * @param isLive Return true when `taskId` still owns a real run.
+       */
+      async sweepDeadSlots(isLive) {
+        await this.mutex.runExclusive(() => {
+          for (const id of [...this.running]) {
+            if (isLive(id)) {
+              continue;
+            }
+            this.running.delete(id);
+            const task = this.opts.getTask(id);
+            if (task?.groupKey) {
+              this.decGroup(task.groupKey);
+            }
+          }
+        });
+        await this.tryDispatch();
+      }
+      /**
+       * Attempt to fill free slots from the ready heap.
+       */
+      kick() {
+        return this.tryDispatch();
+      }
+      /**
+       * Marker that a previously-dispatched task has reached a terminal/yielding
+       * status (completed/failed/cancelled/paused/retry-scheduled). Releases its
+       * slot and bumps dispatch.
+       */
+      async releaseSlot(taskId) {
+        await this.mutex.runExclusive(() => {
+          if (!this.running.has(taskId)) return;
+          this.running.delete(taskId);
+          const t = this.opts.getTask(taskId);
+          const groupKey = t?.groupKey;
+          if (groupKey) this.decGroup(groupKey);
+        });
+        await this.tryDispatch();
+      }
+      async setMaxConcurrency(n) {
+        if (!Number.isInteger(n) || n < 1) {
+          throw new Error(`maxConcurrency must be \u2265 1 integer, got ${n}`);
+        }
+        const toDemote = [];
+        await this.mutex.runExclusive(() => {
+          this.maxConcurrency = n;
+          while (this.running.size > this.maxConcurrency) {
+            const victim = this.pickDemoteVictim();
+            if (!victim) break;
+            toDemote.push(victim);
+            this.running.delete(victim);
+            const t = this.opts.getTask(victim);
+            if (t?.groupKey) this.decGroup(t.groupKey);
+          }
+        });
+        for (const id of toDemote) {
+          try {
+            await this.opts.demote(id);
+          } catch (err) {
+            logCaughtError("task_queue_demote_threw", err);
+          }
+        }
+        void this.tryDispatch();
+      }
+      async setMaxPerGroup(groupKey, n) {
+        await this.mutex.runExclusive(() => {
+          if (n == null) {
+            this.perGroupCap.delete(groupKey);
+          } else {
+            if (!Number.isInteger(n) || n < 1) {
+              throw new Error(`maxPerGroup must be null or \u2265 1 integer, got ${n}`);
+            }
+            this.perGroupCap.set(groupKey, n);
+          }
+        });
+        void this.tryDispatch();
+      }
+      setDefaultMaxPerGroup(n) {
+        this.defaultMaxPerGroup = n;
+      }
+      stats() {
+        const perGroup = {};
+        for (const [k, v] of this.perGroupRunning) perGroup[k] = v;
+        return {
+          running: this.running.size,
+          queued: this.readyHeap.size(),
+          capacity: this.maxConcurrency,
+          perGroup
+        };
+      }
+      // ─────────────── Internals ───────────────
+      /**
+       * Tries to fill open slots. Held under the mutex so two concurrent triggers
+       * cannot both consume the same slot. The dispatch callback is invoked
+       * outside the mutex (callbacks may do FSM transitions and IO).
+       */
+      async tryDispatch() {
+        const toDispatch = [];
+        await this.mutex.runExclusive(() => {
+          while (this.running.size < this.maxConcurrency && this.readyHeap.size() > 0) {
+            const candidate = this.popEligible();
+            if (!candidate) break;
+            const t = this.opts.getTask(candidate.taskId);
+            if (!t) continue;
+            this.running.add(candidate.taskId);
+            this.incGroup(t.groupKey);
+            toDispatch.push(candidate.taskId);
+          }
+        });
+        for (const id of toDispatch) {
+          let ok2 = false;
+          try {
+            ok2 = await this.opts.dispatch(id);
+          } catch (err) {
+            logCaughtError("task_queue_dispatch_threw", err);
+          }
+          if (!ok2) {
+            await this.mutex.runExclusive(() => {
+              if (this.running.delete(id)) {
+                const t = this.opts.getTask(id);
+                if (t?.groupKey) this.decGroup(t.groupKey);
+              }
+            });
+          }
+        }
+      }
+      /**
+       * Pop the next entry that satisfies the per-group cap. Skipped entries are
+       * stashed and re-pushed at the end of the call so we do not lose them.
+       */
+      popEligible() {
+        const skipped = [];
+        let chosen;
+        while (this.readyHeap.size() > 0) {
+          const top = this.readyHeap.pop();
+          const task = this.opts.getTask(top.taskId);
+          if (!task) {
+            continue;
+          }
+          if (this.canRunInGroup(task.groupKey)) {
+            chosen = top;
+            break;
+          }
+          skipped.push(top);
+        }
+        for (const s of skipped) this.readyHeap.push(s);
+        return chosen;
+      }
+      canRunInGroup(groupKey) {
+        const cap = this.perGroupCap.has(groupKey) ? this.perGroupCap.get(groupKey) : this.defaultMaxPerGroup;
+        if (cap == null) return true;
+        const n = this.perGroupRunning.get(groupKey) ?? 0;
+        return n < cap;
+      }
+      pickDemoteVictim() {
+        let victim = null;
+        let victimPri = -1;
+        for (const id of this.running) {
+          const t = this.opts.getTask(id);
+          if (!t) continue;
+          if (t.priority > victimPri) {
+            victimPri = t.priority;
+            victim = id;
+          }
+        }
+        return victim;
+      }
+      incGroup(groupKey) {
+        this.perGroupRunning.set(groupKey, (this.perGroupRunning.get(groupKey) ?? 0) + 1);
+      }
+      decGroup(groupKey) {
+        const cur = this.perGroupRunning.get(groupKey) ?? 0;
+        if (cur <= 1) this.perGroupRunning.delete(groupKey);
+        else this.perGroupRunning.set(groupKey, cur - 1);
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/scheduler/retry-scheduler.ts
+function computeBackoffMs(attempt, suggestedMs, rng = Math.random) {
+  if (suggestedMs != null && suggestedMs >= 0) {
+    return suggestedMs;
+  }
+  const base = 2e3;
+  const cap = 6e4;
+  const exp = Math.min(cap, base * 2 ** Math.max(0, attempt));
+  return Math.floor(rng() * exp);
+}
+var RetryScheduler;
+var init_retry_scheduler = __esm({
+  "../../node_modules/@vidbee/task-queue/src/scheduler/retry-scheduler.ts"() {
+    init_node();
+    init_min_heap();
+    RetryScheduler = class {
+      heap = new MinHeap(
+        (a, b) => a.nextRetryAt === b.nextRetryAt ? a.seq - b.seq : a.nextRetryAt - b.nextRetryAt
+      );
+      timer = null;
+      seqCounter = 0;
+      clock;
+      setTimer;
+      clearTimer;
+      onDue;
+      constructor(opts) {
+        this.clock = opts.clock ?? Date.now;
+        this.setTimer = opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+        this.clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h));
+        this.onDue = opts.onDue;
+      }
+      size() {
+        return this.heap.size();
+      }
+      /**
+       * Add (or re-add — `enqueue` first removes any existing entry for the same
+       * id, since a task can only be retry-scheduled once at a time).
+       */
+      enqueue(taskId, nextRetryAt) {
+        this.heap.remove((it) => it.taskId === taskId);
+        this.heap.push({ taskId, nextRetryAt, seq: ++this.seqCounter });
+        this.rearm();
+      }
+      remove(taskId) {
+        const removed = this.heap.remove((it) => it.taskId === taskId);
+        this.rearm();
+        return removed != null;
+      }
+      /**
+       * Drain all items whose nextRetryAt <= now. The timer fires this.
+       * A per-item handler error is logged and the handler is retried on the next tick.
+       */
+      async tick() {
+        const now = this.clock();
+        while (true) {
+          const top = this.heap.peek();
+          if (!top || top.nextRetryAt > now) {
+            break;
+          }
+          const item = this.heap.pop();
+          try {
+            await this.onDue(item.taskId, now);
+          } catch (err) {
+            logCaughtError("task_queue_retry_tick_threw", err);
+            this.heap.push({
+              taskId: item.taskId,
+              nextRetryAt: now + 1e3,
+              seq: ++this.seqCounter
+            });
+          }
+        }
+        this.rearm();
+      }
+      /** Cancel any pending timer; tests use this between cases. */
+      stop() {
+        if (this.timer != null) {
+          this.clearTimer(this.timer);
+          this.timer = null;
+        }
+      }
+      rearm() {
+        if (this.timer != null) {
+          this.clearTimer(this.timer);
+          this.timer = null;
+        }
+        const top = this.heap.peek();
+        if (!top) {
+          return;
+        }
+        const wait = Math.max(0, top.nextRetryAt - this.clock());
+        this.timer = this.setTimer(() => {
+          this.timer = null;
+          void this.tick();
+        }, wait);
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/scheduler/index.ts
+var init_scheduler2 = __esm({
+  "../../node_modules/@vidbee/task-queue/src/scheduler/index.ts"() {
+    init_scheduler();
+    init_retry_scheduler();
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/store/index.ts
+var STATUSES, TaskStore;
+var init_store = __esm({
+  "../../node_modules/@vidbee/task-queue/src/store/index.ts"() {
+    STATUSES = [
+      "queued",
+      "running",
+      "processing",
+      "paused",
+      "retry-scheduled",
+      "completed",
+      "failed",
+      "cancelled"
+    ];
+    TaskStore = class {
+      byId = /* @__PURE__ */ new Map();
+      byGroup = /* @__PURE__ */ new Map();
+      byStatus = /* @__PURE__ */ new Map();
+      constructor() {
+        for (const s of STATUSES) {
+          this.byStatus.set(s, /* @__PURE__ */ new Set());
+        }
+      }
+      has(id) {
+        return this.byId.has(id);
+      }
+      get(id) {
+        return this.byId.get(id);
+      }
+      /** Insert a new task. Throws if id already exists. */
+      insert(task) {
+        if (this.byId.has(task.id)) {
+          throw new Error(`TaskStore: duplicate id ${task.id}`);
+        }
+        this.byId.set(task.id, task);
+        this.bucket(this.byGroup, task.groupKey).add(task.id);
+        this.byStatus.get(task.status).add(task.id);
+      }
+      /**
+       * Replace the existing record. Maintains index consistency for status and
+       * groupKey transitions. Throws if the id is missing.
+       */
+      update(next) {
+        const prev = this.byId.get(next.id);
+        if (!prev) {
+          throw new Error(`TaskStore: missing id ${next.id}`);
+        }
+        if (prev.status !== next.status) {
+          this.byStatus.get(prev.status)?.delete(prev.id);
+          this.byStatus.get(next.status)?.add(next.id);
+        }
+        if (prev.groupKey !== next.groupKey) {
+          const oldBucket = this.byGroup.get(prev.groupKey);
+          oldBucket?.delete(prev.id);
+          if (oldBucket && oldBucket.size === 0) {
+            this.byGroup.delete(prev.groupKey);
+          }
+          this.bucket(this.byGroup, next.groupKey).add(next.id);
+        }
+        this.byId.set(next.id, next);
+      }
+      /** Remove a record (used by removeFromHistory). */
+      remove(id) {
+        const prev = this.byId.get(id);
+        if (!prev) {
+          return false;
+        }
+        this.byId.delete(id);
+        this.byStatus.get(prev.status)?.delete(id);
+        const groupSet = this.byGroup.get(prev.groupKey);
+        groupSet?.delete(id);
+        if (groupSet && groupSet.size === 0) {
+          this.byGroup.delete(prev.groupKey);
+        }
+        return true;
+      }
+      snapshot(id) {
+        const t = this.byId.get(id);
+        return t ? { task: t } : void 0;
+      }
+      list(opts) {
+        let candidates;
+        if (opts?.status) {
+          candidates = this.byStatus.get(opts.status) ?? [];
+        } else if (opts?.groupKey) {
+          candidates = this.byGroup.get(opts.groupKey) ?? [];
+        } else {
+          candidates = this.byId.keys();
+        }
+        const all = [];
+        const query = opts?.query?.trim().toLocaleLowerCase();
+        for (const id of candidates) {
+          const t = this.byId.get(id);
+          if (!t) {
+            continue;
+          }
+          if (opts?.groupKey && t.groupKey !== opts.groupKey) {
+            continue;
+          }
+          if (opts?.parentId && t.parentId !== opts.parentId) {
+            continue;
+          }
+          if (opts?.kind && t.kind !== opts.kind) {
+            continue;
+          }
+          if (query && !`${t.id}
+${t.input.title ?? ""}
+${t.input.url}`.toLocaleLowerCase().includes(query)) {
+            continue;
+          }
+          all.push(t);
+        }
+        all.sort((a, b) => {
+          if (a.createdAt !== b.createdAt) {
+            return a.createdAt - b.createdAt;
+          }
+          return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        });
+        let startIdx = 0;
+        if (opts?.cursor) {
+          startIdx = all.findIndex((t) => t.id === opts.cursor);
+          startIdx = startIdx < 0 ? 0 : startIdx + 1;
+        }
+        const limit = opts?.limit ?? 100;
+        const slice = all.slice(startIdx, startIdx + limit);
+        const nextCursor = startIdx + slice.length < all.length && slice.length > 0 ? slice[slice.length - 1].id : null;
+        return { tasks: slice, nextCursor };
+      }
+      stats(capacity) {
+        const byStatus = {
+          queued: 0,
+          running: 0,
+          processing: 0,
+          paused: 0,
+          "retry-scheduled": 0,
+          completed: 0,
+          failed: 0,
+          cancelled: 0
+        };
+        for (const s of STATUSES) {
+          byStatus[s] = this.byStatus.get(s)?.size ?? 0;
+        }
+        const perGroup = {};
+        for (const [k, set2] of this.byGroup) {
+          perGroup[k] = set2.size;
+        }
+        return {
+          total: this.byId.size,
+          byStatus,
+          running: byStatus.running,
+          queued: byStatus.queued,
+          capacity,
+          perGroup
+        };
+      }
+      size() {
+        return this.byId.size;
+      }
+      bucket(map2, key) {
+        let s = map2.get(key);
+        if (!s) {
+          s = /* @__PURE__ */ new Set();
+          map2.set(key, s);
+        }
+        return s;
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/task-queue/src/api/index.ts
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync as existsSync2, statSync as statSync2 } from "node:fs";
+function defaultGroupKey(input) {
+  if (input.kind === "transcription") {
+    return TRANSCRIPTION_GROUP_KEY;
+  }
+  if (input.subscriptionId) {
+    return `sub:${input.subscriptionId}`;
+  }
+  try {
+    return new URL(input.url).host || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+function hashRawArgs(args) {
+  if (!args || args.length === 0) {
+    return "sha256:none";
+  }
+  const h = createHash("sha256");
+  h.update(args.join(" "));
+  return `sha256:${h.digest("hex")}`;
+}
+var PROGRESS_DOWNSAMPLE_MS, TaskQueueAPI;
+var init_api = __esm({
+  "../../node_modules/@vidbee/task-queue/src/api/index.ts"() {
+    init_node();
+    init_classifier();
+    init_complete();
+    init_events();
+    init_fsm();
+    init_process();
+    init_scheduler2();
+    init_store();
+    init_types();
+    PROGRESS_DOWNSAMPLE_MS = 1e3;
+    TaskQueueAPI = class {
+      bus = new EventBus();
+      store = new TaskStore();
+      scheduler;
+      retry;
+      watchdog;
+      processes;
+      persist;
+      executor;
+      clock;
+      filePresent;
+      rng;
+      active = /* @__PURE__ */ new Map();
+      progressLastWrite = /* @__PURE__ */ new Map();
+      progressDirty = /* @__PURE__ */ new Map();
+      /** Running tasks whose current cancel was requested as pause, not user-cancel. */
+      pendingPause = /* @__PURE__ */ new Map();
+      /** Running tasks whose user-cancel should win over an in-flight pause. */
+      pendingCancel = /* @__PURE__ */ new Set();
+      started = false;
+      reconcileBusy = false;
+      idleKickTimer = null;
+      setTimer;
+      clearTimer;
+      idleQueueKickMs;
+      zombieRunningMs;
+      constructor(opts) {
+        this.persist = opts.persist;
+        this.executor = opts.executor;
+        this.clock = opts.clock ?? Date.now;
+        this.filePresent = opts.filePresent ?? ((p) => {
+          try {
+            return existsSync2(p) && statSync2(p).size > 0;
+          } catch {
+            return false;
+          }
+        });
+        this.rng = opts.rng ?? Math.random;
+        this.setTimer = opts.setTimer ?? ((fn, ms) => {
+          const handle = setTimeout(fn, ms);
+          handle.unref?.();
+          return handle;
+        });
+        this.clearTimer = opts.clearTimer ?? ((handle) => clearTimeout(handle));
+        this.idleQueueKickMs = opts.idleQueueKickMs ?? 15e3;
+        this.zombieRunningMs = opts.zombieRunningMs ?? 8e3;
+        this.scheduler = new Scheduler({
+          maxConcurrency: opts.maxConcurrency ?? 4,
+          defaultMaxPerGroup: opts.defaultMaxPerGroup ?? null,
+          dispatch: (id) => this.dispatchOne(id),
+          demote: (id) => this.demoteOne(id),
+          getTask: (id) => this.store.get(id)
+        });
+        this.retry = new RetryScheduler({
+          clock: this.clock,
+          setTimer: opts.setTimer,
+          clearTimer: opts.clearTimer,
+          onDue: (id) => this.handleRetryDue(id)
+        });
+        this.watchdog = new Watchdog((id, entry) => this.handleStalled(id, entry), {
+          runningIdleMs: opts.runningIdleMs,
+          processingIdleMs: opts.processingIdleMs,
+          setTimer: opts.setTimer,
+          clearTimer: opts.clearTimer,
+          clock: this.clock
+        });
+        this.processes = new ProcessRegistry({
+          persist: this.persist,
+          clock: this.clock,
+          kill: opts.killProcess
+        });
+      }
+      // ───────────── Lifecycle ─────────────
+      /**
+       * Crash recovery + reconciliation. Per §11:
+       *  1. load tasks from persistence
+       *  2. reconcile process_journal: kill orphans, journal `killed`
+       *  3. running/processing → paused('crash-recovery'); preserve progress
+       *  4. crash-recovery paused (including those just demoted) → resume to queued
+       *  5. queued → re-enqueue
+       *  6. retry-scheduled → re-arm RetryScheduler with original nextRetryAt
+       */
+      async start() {
+        if (this.started) {
+          return;
+        }
+        this.started = true;
+        const tasks = await this.persist.loadAllTasks();
+        for (const t of tasks) {
+          this.store.insert(t);
+        }
+        const orphans = await this.processes.reconcile();
+        for (const o of orphans) {
+          this.bus.emit({
+            type: "orphan-killed",
+            taskId: o.taskId,
+            pid: o.pid,
+            pidStartedAt: null,
+            signal: "SIGKILL",
+            at: this.clock()
+          });
+        }
+        for (const t of tasks) {
+          if (t.status === "running" || t.status === "processing") {
+            await this.applyTransition(t.id, "paused", {
+              trigger: "crash-recovery",
+              reason: "crash-recovery"
+            });
+            await this.resume(t.id);
+          } else if (t.status === "paused" && t.statusReason === "crash-recovery") {
+            await this.resume(t.id);
+          } else if (t.status === "queued") {
+            await this.scheduler.enqueue(t.id, t.priority);
+          } else if (t.status === "retry-scheduled" && t.nextRetryAt != null) {
+            this.retry.enqueue(t.id, t.nextRetryAt);
+          }
+        }
+        await this.reconcileQueue();
+        this.armIdleKick();
+      }
+      /**
+       * Recover stalled groups: resume crash-recovery, free ghost slots, and
+       * dispatch queued work when nothing is actually running.
+       */
+      async reconcileQueue() {
+        if (!this.started || this.reconcileBusy) {
+          return;
+        }
+        this.reconcileBusy = true;
+        try {
+          const now = this.clock();
+          for (const task of this.store.list({ limit: 1e3, status: "paused" }).tasks) {
+            if (task.statusReason === "crash-recovery") {
+              await this.resume(task.id);
+            }
+          }
+          for (const status of ["running", "processing"]) {
+            for (const task of this.store.list({ limit: 1e3, status }).tasks) {
+              if (this.active.has(task.id)) {
+                continue;
+              }
+              if (now - task.enteredStatusAt < this.zombieRunningMs) {
+                continue;
+              }
+              await this.applyTransition(task.id, "paused", {
+                reason: "crash-recovery",
+                trigger: "crash-recovery"
+              });
+              await this.resume(task.id);
+            }
+          }
+          await this.scheduler.sweepDeadSlots((id) => this.isLiveRun(id, now));
+          for (const task of this.store.list({ limit: 1e3, status: "queued" }).tasks) {
+            await this.scheduler.ensureEnqueued(task.id, task.priority);
+          }
+        } finally {
+          this.reconcileBusy = false;
+        }
+      }
+      /**
+       * Return whether a task still owns a live executor run or is within grace.
+       *
+       * @param id Task id.
+       * @param now Clock used for the zombie grace window.
+       */
+      isLiveRun(id, now) {
+        const task = this.store.get(id);
+        if (!task || task.status !== "running" && task.status !== "processing") {
+          return false;
+        }
+        if (this.active.has(id)) {
+          return true;
+        }
+        return now - task.enteredStatusAt < this.zombieRunningMs;
+      }
+      /**
+       * Periodically re-check for queued work with no live runner.
+       */
+      armIdleKick() {
+        if (this.idleQueueKickMs <= 0) {
+          return;
+        }
+        const tick = () => {
+          this.idleKickTimer = this.setTimer(() => {
+            void this.reconcileQueue().finally(() => {
+              if (this.started) {
+                tick();
+              }
+            });
+          }, this.idleQueueKickMs);
+        };
+        tick();
+      }
+      async stop() {
+        if (!this.started) {
+          return;
+        }
+        if (this.idleKickTimer != null) {
+          this.clearTimer(this.idleKickTimer);
+          this.idleKickTimer = null;
+        }
+        this.retry.stop();
+        for (const a of [...this.active.values()]) {
+          try {
+            await a.run.cancel(0);
+          } catch {
+          }
+        }
+        if (this.persist.close) {
+          await this.persist.close();
+        }
+        this.started = false;
+      }
+      // ───────────── RPC surface ─────────────
+      async add(req) {
+        const now = this.clock();
+        if (req.id) {
+          const existing = this.store.get(req.id);
+          if (existing) {
+            return { id: existing.id };
+          }
+        }
+        const id = req.id ?? randomUUID();
+        const task = {
+          id,
+          kind: req.input.kind,
+          parentId: req.parentId ?? null,
+          input: req.input,
+          priority: req.priority ?? PRIORITY_USER,
+          groupKey: req.groupKey ?? defaultGroupKey(req.input),
+          status: "queued",
+          prevStatus: null,
+          statusReason: null,
+          enteredStatusAt: now,
+          attempt: 0,
+          maxAttempts: req.maxAttempts ?? 5,
+          nextRetryAt: null,
+          progress: { ...EMPTY_PROGRESS },
+          output: null,
+          lastError: null,
+          pid: null,
+          pidStartedAt: null,
+          createdAt: now,
+          updatedAt: now
+        };
+        this.store.insert(task);
+        await this.persist.insertTask(task);
+        this.bus.emit({
+          type: "transition",
+          taskId: id,
+          from: null,
+          to: "queued",
+          reason: null,
+          attempt: 0,
+          at: now
+        });
+        this.bus.emit({
+          type: "snapshot-changed",
+          taskId: id,
+          task,
+          at: now
+        });
+        await this.scheduler.enqueue(id, task.priority);
+        return { id };
+      }
+      /**
+       * Insert an already-complete media task (local file import) without
+       * scheduling an executor run.
+       */
+      async importCompleted(req) {
+        if (req.id) {
+          const existing = this.store.get(req.id);
+          if (existing) {
+            return { id: existing.id, created: false };
+          }
+        }
+        const now = this.clock();
+        const id = req.id ?? randomUUID();
+        const size = req.output.size;
+        const task = {
+          id,
+          kind: req.input.kind,
+          parentId: null,
+          input: req.input,
+          priority: PRIORITY_USER,
+          groupKey: req.groupKey ?? defaultGroupKey(req.input),
+          status: "completed",
+          prevStatus: null,
+          statusReason: "local-import",
+          enteredStatusAt: now,
+          attempt: 0,
+          maxAttempts: 0,
+          nextRetryAt: null,
+          progress: {
+            percent: 1,
+            bytesDownloaded: size,
+            bytesTotal: size,
+            speedBps: null,
+            etaMs: null,
+            ticks: 1
+          },
+          output: req.output,
+          lastError: null,
+          pid: null,
+          pidStartedAt: null,
+          createdAt: now,
+          updatedAt: now
+        };
+        this.store.insert(task);
+        await this.persist.insertTask(task);
+        this.bus.emit({
+          type: "snapshot-changed",
+          taskId: id,
+          task,
+          at: now
+        });
+        return { id, created: true };
+      }
+      get(id) {
+        return this.store.get(id);
+      }
+      /**
+       * Whether `id` exists in the durable store. `get` only reads this process's
+       * memory, which is loaded from SQLite at startup and does not observe tasks
+       * another host later writes to the shared database.
+       */
+      async hasTask(id) {
+        return await this.persist.hasTask(id);
+      }
+      /** Persist a display title for any task kind without changing execution options. */
+      async rename(id, title) {
+        const task = this.store.get(id);
+        if (!task) {
+          throw new Error(`Task not found: ${id}`);
+        }
+        const normalized = title.trim();
+        if (!normalized || normalized.length > 200) {
+          throw new Error("Title must contain 1\u2013200 characters");
+        }
+        const next = { ...task, input: { ...task.input, title: normalized }, updatedAt: this.clock() };
+        this.store.update(next);
+        try {
+          await this.persist.upsertTask({ task: next, progress: next.progress });
+        } catch (error51) {
+          if (this.store.get(id) === next) {
+            this.store.update(task);
+          }
+          throw error51;
+        }
+        const current = this.store.get(id);
+        if (current) {
+          this.bus.emit({ type: "snapshot-changed", taskId: id, task: current, at: this.clock() });
+        }
+      }
+      /** Update all terminal task references to a relocated file in one persistence transaction. */
+      async relocateFileReferences(from, to) {
+        if (!(from && to)) {
+          throw new Error("Source and destination paths are required");
+        }
+        const tasks = this.store.list({ limit: Number.MAX_SAFE_INTEGER }).tasks;
+        const affected = tasks.filter(
+          (task) => task.output?.filePath === from || task.input.options?.sourceFilePath === from
+        );
+        if (affected.some((task) => !TERMINAL_STATUSES.has(task.status))) {
+          throw new Error("Finish or cancel tasks using this file before renaming it");
+        }
+        const affectedIds = new Set(affected.map((task) => task.id));
+        if (tasks.some(
+          (task) => task.parentId && affectedIds.has(task.parentId) && !TERMINAL_STATUSES.has(task.status)
+        )) {
+          throw new Error("Finish or cancel dependent tasks before renaming their source file");
+        }
+        const updated = affected.map((task) => ({
+          ...task,
+          input: task.input.options?.sourceFilePath === from ? { ...task.input, options: { ...task.input.options, sourceFilePath: to } } : task.input,
+          output: task.output?.filePath === from ? { ...task.output, filePath: to } : task.output,
+          updatedAt: this.clock()
+        }));
+        for (const task of updated) {
+          this.store.update(task);
+        }
+        try {
+          await this.persist.upsertTasks(updated.map((task) => ({ task, progress: task.progress })));
+        } catch (error51) {
+          for (const [index2, task] of updated.entries()) {
+            const original = affected[index2];
+            if (original && this.store.get(task.id) === task) {
+              this.store.update(original);
+            }
+          }
+          throw error51;
+        }
+        for (const task of updated) {
+          const current = this.store.get(task.id);
+          if (current) {
+            this.bus.emit({
+              type: "snapshot-changed",
+              taskId: task.id,
+              task: current,
+              at: this.clock()
+            });
+          }
+        }
+      }
+      list(opts = {}) {
+        return this.store.list(opts);
+      }
+      /**
+       * Read the persisted stdout/stderr tail for a task's latest attempt. Returns
+       * the combined log text (stdout then stderr), or null when no attempt has
+       * been recorded. Hosts use this to surface saved logs for terminal items
+       * after the live stream is gone (e.g. reopening a failed download).
+       */
+      async getTaskLog(id) {
+        const attempt = await this.persist.loadLatestAttempt(id);
+        if (!attempt) {
+          return null;
+        }
+        const parts = [];
+        if (attempt.stdoutTail?.trim()) {
+          parts.push(attempt.stdoutTail);
+        }
+        if (attempt.stderrTail?.trim()) {
+          parts.push(attempt.stderrTail);
+        }
+        const combined = parts.join("\n").trim();
+        return combined.length > 0 ? combined : null;
+      }
+      /**
+       * Persist cancellation before stopping an active executor so a restart cannot resume it.
+       *
+       * @param id Task id.
+       * @param reason Cancellation reason stored on the FSM transition.
+       */
+      async cancel(id, reason = "user") {
+        const t = this.store.get(id);
+        if (!t) {
+          return;
+        }
+        this.pendingCancel.add(id);
+        this.pendingPause.delete(id);
+        if (TERMINAL_STATUSES.has(t.status)) {
+          this.pendingCancel.delete(id);
+          return;
+        }
+        if (t.status === "queued" || t.status === "paused") {
+          await this.scheduler.dequeue(id);
+          this.retry.remove(id);
+          this.pendingCancel.delete(id);
+          await this.applyTransition(id, "cancelled", {
+            trigger: "cancel",
+            reason
+          });
+          return;
+        }
+        if (t.status === "retry-scheduled") {
+          this.retry.remove(id);
+          this.pendingCancel.delete(id);
+          await this.applyTransition(id, "cancelled", {
+            trigger: "cancel",
+            reason
+          });
+          return;
+        }
+        await this.applyTransition(id, "cancelled", {
+          trigger: "cancel",
+          reason
+        });
+        const active = this.active.get(id);
+        if (!active) {
+          this.pendingCancel.delete(id);
+          await this.scheduler.releaseSlot(id);
+          return;
+        }
+        try {
+          await active.run.cancel();
+        } catch (err) {
+          logCaughtError("task_queue_cancel_threw", err);
+        } finally {
+          this.pendingCancel.delete(id);
+        }
+      }
+      /**
+       * Pause a queued, retrying, or running task. Running work is stopped via
+       * the executor pause path (SIGTERM); resume re-queues and respawns.
+       *
+       * @param id Task id.
+       * @param reason Pause reason stored on the FSM transition.
+       */
+      async pause(id, reason = "user") {
+        const t = this.store.get(id);
+        if (!t) {
+          return;
+        }
+        if (t.status === "queued") {
+          await this.scheduler.dequeue(id);
+          await this.applyTransition(id, "paused", { trigger: "pause", reason });
+          return;
+        }
+        if (t.status === "retry-scheduled") {
+          this.retry.remove(id);
+          await this.applyTransition(id, "paused", { trigger: "pause", reason });
+          return;
+        }
+        if (t.status === "running" || t.status === "processing") {
+          const active = this.active.get(id);
+          if (active) {
+            this.pendingPause.set(id, reason);
+            try {
+              await active.run.pause();
+            } catch (err) {
+              this.pendingPause.delete(id);
+              logCaughtError("task_queue_pause_threw", err);
+            }
+          }
+        }
+      }
+      async resume(id) {
+        const t = this.store.get(id);
+        if (t?.status !== "paused") {
+          return;
+        }
+        await this.applyTransition(id, "queued", { trigger: "resume", reason: "resume" });
+        await this.scheduler.enqueue(id, t.priority);
+      }
+      async retryManual(id) {
+        const t = this.store.get(id);
+        if (!t || t.status !== "failed" && t.status !== "cancelled") {
+          return;
+        }
+        await this.applyTransition(id, "queued", {
+          trigger: t.status === "failed" ? "retry-manual" : "requeue",
+          reason: "manual"
+        });
+        await this.scheduler.enqueue(id, t.priority);
+      }
+      async setMaxConcurrency(n) {
+        await this.scheduler.setMaxConcurrency(n);
+      }
+      async setMaxPerGroup(groupKey, n) {
+        await this.scheduler.setMaxPerGroup(groupKey, n);
+      }
+      async removeFromHistory(id) {
+        const t = this.store.get(id);
+        if (!t) {
+          return;
+        }
+        if (!TERMINAL_STATUSES.has(t.status)) {
+          throw new Error(`removeFromHistory: ${id} is not in a terminal state`);
+        }
+        const descendants = this.collectDescendantIds(id);
+        for (const childId of descendants) {
+          const child = this.store.get(childId);
+          if (child && !TERMINAL_STATUSES.has(child.status)) {
+            try {
+              await this.cancel(childId, "user");
+            } catch {
+            }
+          }
+        }
+        await this.persist.deleteTask(id);
+        for (const removedId of [...descendants, id]) {
+          this.store.remove(removedId);
+          this.bus.emit({ type: "task-removed", taskId: removedId, at: this.clock() });
+        }
+      }
+      /**
+       * Return descendant task ids, deepest-first, so parent_id FKs can be cleared.
+       */
+      collectDescendantIds(id) {
+        const out = [];
+        const walk = (parentId) => {
+          const { tasks } = this.store.list({ parentId, limit: 1e3, cursor: null });
+          for (const child of tasks) {
+            walk(child.id);
+            out.push(child.id);
+          }
+        };
+        walk(id);
+        return out;
+      }
+      stats() {
+        const stats = this.store.stats(this.scheduler.stats().capacity);
+        const sStats = this.scheduler.stats();
+        stats.running = sStats.running;
+        stats.queued = sStats.queued;
+        stats.perGroup = { ...stats.perGroup, ...sStats.perGroup };
+        return stats;
+      }
+      subscribe(listener) {
+        return this.bus.subscribe(listener);
+      }
+      on(type, listener) {
+        return this.bus.on(type, listener);
+      }
+      // ───────────── Internal: dispatch + executor wiring ─────────────
+      async dispatchOne(id) {
+        const t = this.store.get(id);
+        if (t?.status !== "queued") {
+          return false;
+        }
+        const attemptId = randomUUID();
+        let next;
+        try {
+          next = await this.applyTransition(id, "running", {
+            trigger: "dispatch",
+            reason: null
+          });
+        } catch (err) {
+          if (err instanceof IllegalTransitionError) {
+            return false;
+          }
+          throw err;
+        }
+        await this.persist.insertAttempt({
+          taskId: id,
+          attemptId,
+          pid: -1,
+          pidStartedAt: null,
+          startedAt: this.clock(),
+          rawArgsHash: hashRawArgs(t.input.rawArgs)
+        });
+        let run2;
+        try {
+          run2 = this.executor.run(
+            {
+              taskId: id,
+              attemptId,
+              attemptNumber: next.attempt,
+              input: t.input
+            },
+            {
+              onSpawn: (e) => {
+                this.active.set(id, { taskId: id, attemptId, run: run2 });
+                void this.processes.recordSpawn({
+                  taskId: id,
+                  attemptId,
+                  pid: e.pid,
+                  pidStartedAt: e.pidStartedAt ?? readPidStartTime(e.pid),
+                  kind: e.kind,
+                  spawnedAt: e.spawnedAt
+                });
+                void this.persist.upsertTask({
+                  task: { ...next, pid: e.pid, pidStartedAt: e.pidStartedAt },
+                  progress: next.progress
+                });
+                this.watchdog.arm(id, "running");
+              },
+              onProgress: (e) => {
+                const current = this.store.get(id);
+                if (!current || TERMINAL_STATUSES.has(current.status)) {
+                  return;
+                }
+                this.applyProgress(id, e.progress);
+                this.watchdog.bump(id);
+                if (e.enteredProcessing) {
+                  this.enterProcessing(id, attemptId);
+                }
+              },
+              onProcessing: () => this.enterProcessing(id, attemptId),
+              onStd: (e) => {
+                this.watchdog.bump(id);
+                this.bus.emit({
+                  type: "log",
+                  taskId: id,
+                  attemptId,
+                  stream: e.stream,
+                  line: e.line,
+                  at: this.clock()
+                });
+              },
+              onFinish: (e) => {
+                void this.handleFinish(id, attemptId, e);
+              }
+            }
+          );
+          this.active.set(id, { taskId: id, attemptId, run: run2 });
+        } catch (err) {
+          const error51 = virtualError("unknown", String(err));
+          await this.applyTransition(id, "failed", {
+            trigger: "finalize-error",
+            reason: error51.category,
+            error: error51
+          });
+          await this.scheduler.releaseSlot(id);
+          return false;
+        }
+        return true;
+      }
+      async demoteOne(id) {
+        const a = this.active.get(id);
+        if (a) {
+          this.pendingPause.set(id, "demote");
+          try {
+            await a.run.pause();
+          } catch (err) {
+            this.pendingPause.delete(id);
+            logCaughtError("task_queue_demote_pause_threw", err);
+          }
+        }
+      }
+      async handleFinish(id, attemptId, e) {
+        this.watchdog.disarm(id);
+        this.active.delete(id);
+        try {
+          await this.finishAttempt(id, attemptId, e);
+        } catch (err) {
+          logCaughtError("task_queue_handle_finish_threw", err);
+        } finally {
+          await this.scheduler.releaseSlot(id);
+        }
+      }
+      /**
+       * Persist the attempt outcome and apply the matching terminal transition.
+       *
+       * @param id Task id.
+       * @param attemptId Attempt row id.
+       * @param e Executor finish event.
+       */
+      async finishAttempt(id, attemptId, e) {
+        const pauseReason = this.pendingPause.get(id);
+        this.pendingPause.delete(id);
+        if (e.result.type === "success") {
+          const out = e.result.output;
+          const current = this.store.get(id);
+          if (current?.status === "cancelled") {
+            await this.persist.closeAttempt({
+              taskId: id,
+              attemptId,
+              endedAt: e.closedAt,
+              exitCode: 0,
+              errorCategory: null,
+              stdoutTail: e.stdoutTail,
+              stderrTail: e.stderrTail
+            });
+            await this.processes.recordClose(id, attemptId, 0, null);
+            return;
+          }
+          const guardOk = isOutputComplete(current?.kind ?? "video", out, {
+            filePresent: this.filePresent
+          });
+          if (guardOk) {
+            await this.persist.closeAttempt({
+              taskId: id,
+              attemptId,
+              endedAt: e.closedAt,
+              exitCode: 0,
+              errorCategory: null,
+              stdoutTail: e.stdoutTail,
+              stderrTail: e.stderrTail
+            });
+            await this.processes.recordClose(id, attemptId, 0, null);
+            if (this.store.get(id)?.status === "cancelled") {
+              return;
+            }
+            await this.applyTransition(id, "completed", {
+              trigger: "finalize-success",
+              reason: null,
+              output: out
+            });
+          } else {
+            const err2 = virtualError("output-missing", `output ${out.filePath} missing or empty`);
+            await this.persist.closeAttempt({
+              taskId: id,
+              attemptId,
+              endedAt: e.closedAt,
+              exitCode: null,
+              errorCategory: "output-missing",
+              stdoutTail: e.stdoutTail,
+              stderrTail: e.stderrTail
+            });
+            await this.processes.recordClose(id, attemptId, null, null);
+            if (this.store.get(id)?.status === "cancelled") {
+              return;
+            }
+            await this.applyTransition(id, "failed", {
+              trigger: "finalize-error",
+              reason: "output-missing",
+              error: err2
+            });
+          }
+          return;
+        }
+        if (e.result.type === "cancelled") {
+          await this.persist.closeAttempt({
+            taskId: id,
+            attemptId,
+            endedAt: e.closedAt,
+            exitCode: null,
+            errorCategory: "cancelled-by-user",
+            stdoutTail: e.stdoutTail,
+            stderrTail: e.stderrTail
+          });
+          await this.processes.recordClose(id, attemptId, null, "SIGTERM");
+          const cancelRequested = this.pendingCancel.has(id);
+          this.pendingCancel.delete(id);
+          const t2 = this.store.get(id);
+          if (t2 && (t2.status === "running" || t2.status === "processing")) {
+            if (!cancelRequested && pauseReason !== void 0) {
+              await this.applyTransition(id, "paused", {
+                trigger: "pause",
+                reason: pauseReason
+              });
+            } else {
+              await this.applyTransition(id, "cancelled", {
+                trigger: "cancel",
+                reason: "user"
+              });
+            }
+          }
+          return;
+        }
+        const err = e.result.error;
+        const exitCode = e.result.exitCode ?? null;
+        await this.persist.closeAttempt({
+          taskId: id,
+          attemptId,
+          endedAt: e.closedAt,
+          exitCode,
+          errorCategory: err.category,
+          stdoutTail: e.stdoutTail,
+          stderrTail: e.stderrTail
+        });
+        await this.processes.recordClose(id, attemptId, exitCode, null);
+        if (this.store.get(id)?.status === "cancelled") {
+          return;
+        }
+        this.bus.emit({
+          type: "error-classified",
+          taskId: id,
+          attempt: this.store.get(id)?.attempt ?? 0,
+          error: err,
+          at: this.clock()
+        });
+        const t = this.store.get(id);
+        const maxAttempts = Math.max(t?.maxAttempts ?? 0, defaultMaxAttempts(err.category));
+        const willRetry = err.retryable && (t?.attempt ?? 0) < maxAttempts;
+        if (willRetry) {
+          const wait = computeBackoffMs(t?.attempt ?? 0, err.suggestedRetryAfterMs, this.rng);
+          const nextRetryAt = this.clock() + wait;
+          await this.applyTransition(id, "retry-scheduled", {
+            trigger: "finalize-error",
+            reason: err.category,
+            error: err,
+            nextRetryAt
+          });
+          this.retry.enqueue(id, nextRetryAt);
+        } else {
+          await this.applyTransition(id, "failed", {
+            trigger: "finalize-error",
+            reason: err.category,
+            error: err
+          });
+        }
+      }
+      async handleRetryDue(id) {
+        const t = this.store.get(id);
+        if (t?.status !== "retry-scheduled") {
+          return;
+        }
+        const next = await this.applyTransition(id, "queued", {
+          trigger: "retry-tick",
+          reason: "retry"
+        });
+        await this.scheduler.enqueue(id, next.priority);
+      }
+      enterProcessing(id, attemptId) {
+        if (this.active.get(id)?.attemptId !== attemptId || this.store.get(id)?.status !== "running") {
+          return;
+        }
+        void this.applyTransition(id, "processing", { trigger: "progressing", reason: null });
+        this.watchdog.promoteToProcessing(id);
+      }
+      handleStalled(id, entry) {
+        void (async () => {
+          const err = virtualError(
+            "stalled",
+            `Watchdog: task idle exceeded (phase=${entry.status}, idleMs=${this.clock() - entry.lastBumpAt}, lastOutputAt=${entry.lastBumpAt})`
+          );
+          const a = this.active.get(id);
+          if (a) {
+            try {
+              await a.run.cancel(0);
+            } catch {
+            }
+          }
+          const t = this.store.get(id);
+          if (!t) {
+            return;
+          }
+          const max = Math.max(t.maxAttempts, defaultMaxAttempts("stalled"));
+          if (t.attempt < max) {
+            const wait = computeBackoffMs(t.attempt, err.suggestedRetryAfterMs, this.rng);
+            const nextRetryAt = this.clock() + wait;
+            await this.applyTransition(id, "retry-scheduled", {
+              trigger: "finalize-error",
+              reason: "stalled",
+              error: err,
+              nextRetryAt
+            });
+            this.retry.enqueue(id, nextRetryAt);
+          } else {
+            await this.applyTransition(id, "failed", {
+              trigger: "finalize-error",
+              reason: "stalled",
+              error: err
+            });
+          }
+          await this.scheduler.releaseSlot(id);
+        })();
+      }
+      async applyTransition(id, to, ctx) {
+        const cur = this.store.get(id);
+        if (!cur) {
+          throw new Error(`applyTransition: missing task ${id}`);
+        }
+        let next;
+        try {
+          next = transition(cur, to, { ...ctx, now: this.clock() });
+        } catch (err) {
+          if (err instanceof IllegalTransitionError) {
+            await this.persist.appendJournal({
+              ts: this.clock(),
+              op: "panic",
+              taskId: id,
+              attemptId: null,
+              pid: cur.pid ?? -1,
+              pidStartedAt: cur.pidStartedAt,
+              exitCode: null,
+              signal: err.message
+            });
+            if (cur.status !== "completed" && cur.status !== "cancelled") {
+              const failedErr = virtualError("unknown", err.message);
+              const fallback = transition(cur, "failed", {
+                trigger: "finalize-error",
+                reason: "panic",
+                error: failedErr,
+                now: this.clock()
+              });
+              this.store.update(fallback);
+              await this.persist.upsertTask({
+                task: fallback,
+                progress: fallback.progress
+              });
+              this.bus.emit({
+                type: "transition",
+                taskId: id,
+                from: cur.status,
+                to: "failed",
+                reason: "panic",
+                attempt: fallback.attempt,
+                at: this.clock()
+              });
+            }
+            throw err;
+          }
+          throw err;
+        }
+        this.store.update(next);
+        await this.persist.upsertTask({ task: next, progress: next.progress });
+        this.bus.emit({
+          type: "transition",
+          taskId: id,
+          from: cur.status,
+          to: next.status,
+          reason: next.statusReason,
+          attempt: next.attempt,
+          at: next.updatedAt
+        });
+        this.bus.emit({
+          type: "snapshot-changed",
+          taskId: id,
+          task: next,
+          at: next.updatedAt
+        });
+        return next;
+      }
+      applyProgress(id, progress) {
+        const t = this.store.get(id);
+        if (!t) {
+          return;
+        }
+        const merged = { ...t, progress, updatedAt: this.clock() };
+        this.store.update(merged);
+        this.progressDirty.set(id, progress);
+        this.bus.emit({
+          type: "progress",
+          taskId: id,
+          progress,
+          at: merged.updatedAt
+        });
+        const last = this.progressLastWrite.get(id) ?? 0;
+        if (merged.updatedAt - last >= PROGRESS_DOWNSAMPLE_MS) {
+          this.progressLastWrite.set(id, merged.updatedAt);
+          void this.persist.upsertProgress(id, progress);
+          this.progressDirty.delete(id);
+        }
+      }
+    };
+  }
+});
+
+// ../../node_modules/@orpc/shared/dist/index.mjs
+function resolveMaybeOptionalOptions(rest) {
+  return rest[0] ?? {};
+}
+function sequential(fn) {
+  let lastOperationPromise = Promise.resolve();
+  return (...args) => {
+    return lastOperationPromise = lastOperationPromise.catch(() => {
+    }).then(() => {
+      return fn(...args);
+    });
+  };
+}
+function getConstructor(value) {
+  if (!isTypescriptObject(value)) {
+    return null;
+  }
+  return Object.getPrototypeOf(value)?.constructor;
+}
+function isTypescriptObject(value) {
+  return !!value && (typeof value === "object" || typeof value === "function");
+}
+var ORPC_SHARED_PACKAGE_NAME, ORPC_SHARED_PACKAGE_VERSION, GLOBAL_OTEL_CONFIG_KEY, fallbackAsyncDisposeSymbol, asyncDisposeSymbol, AsyncIteratorClass;
+var init_dist2 = __esm({
+  "../../node_modules/@orpc/shared/dist/index.mjs"() {
+    ORPC_SHARED_PACKAGE_NAME = "@orpc/shared";
+    ORPC_SHARED_PACKAGE_VERSION = "1.15.0";
+    GLOBAL_OTEL_CONFIG_KEY = `__${ORPC_SHARED_PACKAGE_NAME}@${ORPC_SHARED_PACKAGE_VERSION}/otel/config__`;
+    fallbackAsyncDisposeSymbol = /* @__PURE__ */ Symbol.for("asyncDispose");
+    asyncDisposeSymbol = Symbol.asyncDispose ?? fallbackAsyncDisposeSymbol;
+    AsyncIteratorClass = class {
+      #isDone = false;
+      #isExecuteComplete = false;
+      #cleanup;
+      #next;
+      constructor(next, cleanup) {
+        this.#cleanup = cleanup;
+        this.#next = sequential(async () => {
+          if (this.#isDone) {
+            return { done: true, value: void 0 };
+          }
+          try {
+            const result = await next();
+            if (result.done) {
+              this.#isDone = true;
+            }
+            return result;
+          } catch (err) {
+            this.#isDone = true;
+            throw err;
+          } finally {
+            if (this.#isDone && !this.#isExecuteComplete) {
+              this.#isExecuteComplete = true;
+              await this.#cleanup("next");
+            }
+          }
+        });
+      }
+      next() {
+        return this.#next();
+      }
+      async return(value) {
+        this.#isDone = true;
+        if (!this.#isExecuteComplete) {
+          this.#isExecuteComplete = true;
+          await this.#cleanup("return");
+        }
+        return { done: true, value };
+      }
+      async throw(err) {
+        this.#isDone = true;
+        if (!this.#isExecuteComplete) {
+          this.#isExecuteComplete = true;
+          await this.#cleanup("throw");
+        }
+        throw err;
+      }
+      /**
+       * asyncDispose symbol only available in esnext, we should fallback to Symbol.for('asyncDispose')
+       */
+      async [asyncDisposeSymbol]() {
+        this.#isDone = true;
+        if (!this.#isExecuteComplete) {
+          this.#isExecuteComplete = true;
+          await this.#cleanup("dispose");
+        }
+      }
+      [Symbol.asyncIterator]() {
+        return this;
+      }
+    };
+  }
+});
+
+// ../../node_modules/@orpc/client/dist/shared/client.CZlviB0y.mjs
+function fallbackORPCErrorStatus(code, status) {
+  return status ?? COMMON_ORPC_ERROR_DEFS[code]?.status ?? 500;
+}
+function fallbackORPCErrorMessage(code, message) {
+  return message || COMMON_ORPC_ERROR_DEFS[code]?.message || code;
+}
+function isORPCErrorStatus(status) {
+  return status < 200 || status >= 400;
+}
+var ORPC_CLIENT_PACKAGE_NAME, ORPC_CLIENT_PACKAGE_VERSION, COMMON_ORPC_ERROR_DEFS, globalORPCErrorConstructors, ORPCError;
+var init_client_CZlviB0y = __esm({
+  "../../node_modules/@orpc/client/dist/shared/client.CZlviB0y.mjs"() {
+    init_dist2();
+    ORPC_CLIENT_PACKAGE_NAME = "@orpc/client";
+    ORPC_CLIENT_PACKAGE_VERSION = "1.15.0";
+    COMMON_ORPC_ERROR_DEFS = {
+      BAD_REQUEST: {
+        status: 400,
+        message: "Bad Request"
+      },
+      UNAUTHORIZED: {
+        status: 401,
+        message: "Unauthorized"
+      },
+      FORBIDDEN: {
+        status: 403,
+        message: "Forbidden"
+      },
+      NOT_FOUND: {
+        status: 404,
+        message: "Not Found"
+      },
+      METHOD_NOT_SUPPORTED: {
+        status: 405,
+        message: "Method Not Supported"
+      },
+      NOT_ACCEPTABLE: {
+        status: 406,
+        message: "Not Acceptable"
+      },
+      TIMEOUT: {
+        status: 408,
+        message: "Request Timeout"
+      },
+      CONFLICT: {
+        status: 409,
+        message: "Conflict"
+      },
+      PRECONDITION_FAILED: {
+        status: 412,
+        message: "Precondition Failed"
+      },
+      PAYLOAD_TOO_LARGE: {
+        status: 413,
+        message: "Payload Too Large"
+      },
+      UNSUPPORTED_MEDIA_TYPE: {
+        status: 415,
+        message: "Unsupported Media Type"
+      },
+      UNPROCESSABLE_CONTENT: {
+        status: 422,
+        message: "Unprocessable Content"
+      },
+      TOO_MANY_REQUESTS: {
+        status: 429,
+        message: "Too Many Requests"
+      },
+      CLIENT_CLOSED_REQUEST: {
+        status: 499,
+        message: "Client Closed Request"
+      },
+      INTERNAL_SERVER_ERROR: {
+        status: 500,
+        message: "Internal Server Error"
+      },
+      NOT_IMPLEMENTED: {
+        status: 501,
+        message: "Not Implemented"
+      },
+      BAD_GATEWAY: {
+        status: 502,
+        message: "Bad Gateway"
+      },
+      SERVICE_UNAVAILABLE: {
+        status: 503,
+        message: "Service Unavailable"
+      },
+      GATEWAY_TIMEOUT: {
+        status: 504,
+        message: "Gateway Timeout"
+      }
+    };
+    ORPCError = class _ORPCError extends Error {
+      defined;
+      code;
+      status;
+      data;
+      static {
+        const GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL = /* @__PURE__ */ Symbol.for(`__${ORPC_CLIENT_PACKAGE_NAME}@${ORPC_CLIENT_PACKAGE_VERSION}/error/ORPC_ERROR_CONSTRUCTORS__`);
+        void (globalThis[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL] ??= /* @__PURE__ */ new WeakSet());
+        globalORPCErrorConstructors = globalThis[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL];
+        globalORPCErrorConstructors.add(_ORPCError);
+      }
+      constructor(code, ...rest) {
+        const options = resolveMaybeOptionalOptions(rest);
+        if (options.status !== void 0 && !isORPCErrorStatus(options.status)) {
+          throw new Error("[ORPCError] Invalid error status code.");
+        }
+        const message = fallbackORPCErrorMessage(code, options.message);
+        super(message, options);
+        this.code = code;
+        this.status = fallbackORPCErrorStatus(code, options.status);
+        this.defined = options.defined ?? false;
+        this.data = options.data;
+      }
+      toJSON() {
+        return {
+          defined: this.defined,
+          code: this.code,
+          status: this.status,
+          message: this.message,
+          data: this.data
+        };
+      }
+      /**
+       * Workaround for Next.js where different contexts use separate
+       * dependency graphs, causing multiple ORPCError constructors existing and breaking
+       * `instanceof` checks across contexts.
+       *
+       * This is particularly problematic with "Optimized SSR", where orpc-client
+       * executes in one context but is invoked from another. When an error is thrown
+       * in the execution context, `instanceof ORPCError` checks fail in the
+       * invocation context due to separate class constructors.
+       *
+       * @todo Remove this and related code if Next.js resolves the multiple dependency graph issue.
+       */
+      static [Symbol.hasInstance](instance) {
+        if (globalORPCErrorConstructors.has(this)) {
+          const constructor = getConstructor(instance);
+          if (constructor && globalORPCErrorConstructors.has(constructor)) {
+            return true;
+          }
+        }
+        return super[Symbol.hasInstance](instance);
+      }
+    };
+  }
+});
+
+// ../../node_modules/@orpc/client/dist/index.mjs
+var init_dist3 = __esm({
+  "../../node_modules/@orpc/client/dist/index.mjs"() {
+    init_client_CZlviB0y();
+  }
+});
+
+// ../../node_modules/@orpc/contract/dist/shared/contract.D_dZrO__.mjs
+function mergeErrorMap(errorMap1, errorMap2) {
+  return { ...errorMap1, ...errorMap2 };
+}
+function isContractProcedure(item) {
+  if (item instanceof ContractProcedure) {
+    return true;
+  }
+  return (typeof item === "object" || typeof item === "function") && item !== null && "~orpc" in item && typeof item["~orpc"] === "object" && item["~orpc"] !== null && "errorMap" in item["~orpc"] && "route" in item["~orpc"] && "meta" in item["~orpc"];
+}
+var ContractProcedure;
+var init_contract_D_dZrO = __esm({
+  "../../node_modules/@orpc/contract/dist/shared/contract.D_dZrO__.mjs"() {
+    init_dist3();
+    ContractProcedure = class {
+      /**
+       * This property holds the defined options for the contract procedure.
+       */
+      "~orpc";
+      constructor(def) {
+        if (def.route?.successStatus && isORPCErrorStatus(def.route.successStatus)) {
+          throw new Error("[ContractProcedure] Invalid successStatus.");
+        }
+        if (Object.values(def.errorMap).some((val) => val && val.status && !isORPCErrorStatus(val.status))) {
+          throw new Error("[ContractProcedure] Invalid error status code.");
+        }
+        this["~orpc"] = def;
+      }
+    };
+  }
+});
+
+// ../../node_modules/@orpc/contract/dist/index.mjs
+function mergeMeta(meta1, meta22) {
+  return { ...meta1, ...meta22 };
+}
+function mergeRoute(a, b) {
+  return { ...a, ...b };
+}
+function prefixRoute(route, prefix) {
+  if (!route.path) {
+    return route;
+  }
+  return {
+    ...route,
+    path: `${prefix}${route.path}`
+  };
+}
+function unshiftTagRoute(route, tags) {
+  return {
+    ...route,
+    tags: [...tags, ...route.tags ?? []]
+  };
+}
+function mergePrefix(a, b) {
+  return a ? `${a}${b}` : b;
+}
+function mergeTags(a, b) {
+  return a ? [...a, ...b] : b;
+}
+function enhanceRoute(route, options) {
+  let router = route;
+  if (options.prefix) {
+    router = prefixRoute(router, options.prefix);
+  }
+  if (options.tags?.length) {
+    router = unshiftTagRoute(router, options.tags);
+  }
+  return router;
+}
+function enhanceContractRouter(router, options) {
+  if (isContractProcedure(router)) {
+    const enhanced2 = new ContractProcedure({
+      ...router["~orpc"],
+      errorMap: mergeErrorMap(options.errorMap, router["~orpc"].errorMap),
+      route: enhanceRoute(router["~orpc"].route, options)
+    });
+    return enhanced2;
+  }
+  if (typeof router !== "object" || router === null) {
+    return router;
+  }
+  const enhanced = {};
+  for (const key in router) {
+    enhanced[key] = enhanceContractRouter(router[key], options);
+  }
+  return enhanced;
+}
+var ContractBuilder, oc;
+var init_dist4 = __esm({
+  "../../node_modules/@orpc/contract/dist/index.mjs"() {
+    init_contract_D_dZrO();
+    ContractBuilder = class _ContractBuilder extends ContractProcedure {
+      constructor(def) {
+        super(def);
+        this["~orpc"].prefix = def.prefix;
+        this["~orpc"].tags = def.tags;
+      }
+      /**
+       * Sets or overrides the initial meta.
+       *
+       * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
+       */
+      $meta(initialMeta) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          meta: initialMeta
+        });
+      }
+      /**
+       * Sets or overrides the initial route.
+       * This option is typically relevant when integrating with OpenAPI.
+       *
+       * @see {@link https://orpc.dev/docs/openapi/routing OpenAPI Routing Docs}
+       * @see {@link https://orpc.dev/docs/openapi/input-output-structure OpenAPI Input/Output Structure Docs}
+       */
+      $route(initialRoute) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          route: initialRoute
+        });
+      }
+      /**
+       * Sets or overrides the initial input schema.
+       *
+       * @see {@link https://orpc.dev/docs/procedure#initial-configuration Initial Procedure Configuration Docs}
+       */
+      $input(initialInputSchema) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          inputSchema: initialInputSchema
+        });
+      }
+      /**
+       * Adds type-safe custom errors to the contract.
+       * The provided errors are spared-merged with any existing errors in the contract.
+       *
+       * @see {@link https://orpc.dev/docs/error-handling#type%E2%80%90safe-error-handling Type-Safe Error Handling Docs}
+       */
+      errors(errors) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          errorMap: mergeErrorMap(this["~orpc"].errorMap, errors)
+        });
+      }
+      /**
+       * Sets or updates the metadata for the contract.
+       * The provided metadata is spared-merged with any existing metadata in the contract.
+       *
+       * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
+       */
+      meta(meta3) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          meta: mergeMeta(this["~orpc"].meta, meta3)
+        });
+      }
+      /**
+       * Sets or updates the route definition for the contract.
+       * The provided route is spared-merged with any existing route in the contract.
+       * This option is typically relevant when integrating with OpenAPI.
+       *
+       * @see {@link https://orpc.dev/docs/openapi/routing OpenAPI Routing Docs}
+       * @see {@link https://orpc.dev/docs/openapi/input-output-structure OpenAPI Input/Output Structure Docs}
+       */
+      route(route) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          route: mergeRoute(this["~orpc"].route, route)
+        });
+      }
+      /**
+       * Defines the input validation schema for the contract.
+       *
+       * @see {@link https://orpc.dev/docs/procedure#input-output-validation Input Validation Docs}
+       */
+      input(schema) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          inputSchema: schema
+        });
+      }
+      /**
+       * Defines the output validation schema for the contract.
+       *
+       * @see {@link https://orpc.dev/docs/procedure#input-output-validation Output Validation Docs}
+       */
+      output(schema) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          outputSchema: schema
+        });
+      }
+      /**
+       * Prefixes all procedures in the contract router.
+       * The provided prefix is post-appended to any existing router prefix.
+       *
+       * @note This option does not affect procedures that do not define a path in their route definition.
+       *
+       * @see {@link https://orpc.dev/docs/openapi/routing#route-prefixes OpenAPI Route Prefixes Docs}
+       */
+      prefix(prefix) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          prefix: mergePrefix(this["~orpc"].prefix, prefix)
+        });
+      }
+      /**
+       * Adds tags to all procedures in the contract router.
+       * This helpful when you want to group procedures together in the OpenAPI specification.
+       *
+       * @see {@link https://orpc.dev/docs/openapi/openapi-specification#operation-metadata OpenAPI Operation Metadata Docs}
+       */
+      tag(...tags) {
+        return new _ContractBuilder({
+          ...this["~orpc"],
+          tags: mergeTags(this["~orpc"].tags, tags)
+        });
+      }
+      /**
+       * Applies all of the previously defined options to the specified contract router.
+       *
+       * @see {@link https://orpc.dev/docs/router#extending-router Extending Router Docs}
+       */
+      router(router) {
+        return enhanceContractRouter(router, this["~orpc"]);
+      }
+    };
+    oc = new ContractBuilder({
+      errorMap: {},
+      route: {},
+      meta: {}
+    });
+  }
+});
+
+// ../../node_modules/zod/v4/core/core.js
 // @__NO_SIDE_EFFECTS__
 function $constructor(name, initializer3, params) {
   function init(inst, def) {
@@ -67,10 +4484,10 @@ function $constructor(name, initializer3, params) {
   }
   Object.defineProperty(Definition, "name", { value: name });
   function _(def) {
-    var _a2;
+    var _a3;
     const inst = params?.Parent ? new Definition() : this;
     init(inst, def);
-    (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
+    (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
     for (const fn of inst._zod.deferred) {
       fn();
     }
@@ -89,16 +4506,16 @@ function $constructor(name, initializer3, params) {
 }
 function config(newConfig) {
   if (newConfig)
-    Object.assign(globalConfig, newConfig);
-  return globalConfig;
+    Object.assign(globalConfig2, newConfig);
+  return globalConfig2;
 }
-var NEVER, $brand, $ZodAsyncError, $ZodEncodeError, globalConfig;
+var _a, NEVER, $brand, $ZodAsyncError, $ZodEncodeError, globalConfig2;
 var init_core = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/core.js"() {
-    NEVER = Object.freeze({
+  "../../node_modules/zod/v4/core/core.js"() {
+    NEVER = /* @__PURE__ */ Object.freeze({
       status: "aborted"
     });
-    $brand = Symbol("zod_brand");
+    $brand = /* @__PURE__ */ Symbol("zod_brand");
     $ZodAsyncError = class extends Error {
       constructor() {
         super(`Encountered Promise during synchronous parse. Use .parseAsync() instead.`);
@@ -110,11 +4527,12 @@ var init_core = __esm({
         this.name = "ZodEncodeError";
       }
     };
-    globalConfig = {};
+    (_a = globalThis).__zod_globalConfig ?? (_a.__zod_globalConfig = {});
+    globalConfig2 = globalThis.__zod_globalConfig;
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js
+// ../../node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -140,6 +4558,7 @@ __export(util_exports, {
   defineLazy: () => defineLazy,
   esc: () => esc,
   escapeRegex: () => escapeRegex,
+  explicitlyAborted: () => explicitlyAborted,
   extend: () => extend,
   finalizeIssue: () => finalizeIssue,
   floatSafeRemainder: () => floatSafeRemainder,
@@ -149,8 +4568,8 @@ __export(util_exports, {
   getParsedType: () => getParsedType,
   getSizableOrigin: () => getSizableOrigin,
   hexToUint8Array: () => hexToUint8Array,
-  isObject: () => isObject,
-  isPlainObject: () => isPlainObject,
+  isObject: () => isObject2,
+  isPlainObject: () => isPlainObject3,
   issue: () => issue,
   joinValues: () => joinValues,
   jsonStringifyReplacer: () => jsonStringifyReplacer,
@@ -201,19 +4620,19 @@ function getEnumValues(entries) {
 function joinValues(array2, separator = "|") {
   return array2.map((val) => stringifyPrimitive(val)).join(separator);
 }
-function jsonStringifyReplacer(_, value2) {
-  if (typeof value2 === "bigint")
-    return value2.toString();
-  return value2;
+function jsonStringifyReplacer(_, value) {
+  if (typeof value === "bigint")
+    return value.toString();
+  return value;
 }
 function cached(getter) {
   const set2 = false;
   return {
     get value() {
       if (!set2) {
-        const value2 = getter();
-        Object.defineProperty(this, "value", { value: value2 });
-        return value2;
+        const value = getter();
+        Object.defineProperty(this, "value", { value });
+        return value;
       }
       throw new Error("cached value already set");
     }
@@ -228,32 +4647,25 @@ function cleanRegex(source) {
   return source.slice(start, end);
 }
 function floatSafeRemainder(val, step) {
-  const valDecCount = (val.toString().split(".")[1] || "").length;
-  const stepString = step.toString();
-  let stepDecCount = (stepString.split(".")[1] || "").length;
-  if (stepDecCount === 0 && /\d?e-\d?/.test(stepString)) {
-    const match = stepString.match(/\d?e-(\d?)/);
-    if (match?.[1]) {
-      stepDecCount = Number.parseInt(match[1]);
-    }
-  }
-  const decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount;
-  const valInt = Number.parseInt(val.toFixed(decCount).replace(".", ""));
-  const stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
-  return valInt % stepInt / 10 ** decCount;
+  const ratio = val / step;
+  const roundedRatio = Math.round(ratio);
+  const tolerance = Number.EPSILON * Math.max(Math.abs(ratio), 1);
+  if (Math.abs(ratio - roundedRatio) < tolerance)
+    return 0;
+  return ratio - roundedRatio;
 }
 function defineLazy(object2, key, getter) {
-  let value2 = void 0;
+  let value = void 0;
   Object.defineProperty(object2, key, {
     get() {
-      if (value2 === EVALUATING) {
+      if (value === EVALUATING) {
         return void 0;
       }
-      if (value2 === void 0) {
-        value2 = EVALUATING;
-        value2 = getter();
+      if (value === void 0) {
+        value = EVALUATING;
+        value = getter();
       }
-      return value2;
+      return value;
     },
     set(v) {
       Object.defineProperty(object2, key, {
@@ -267,9 +4679,9 @@ function defineLazy(object2, key, getter) {
 function objectClone(obj) {
   return Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj));
 }
-function assignProp(target, prop, value2) {
+function assignProp(target, prop, value) {
   Object.defineProperty(target, prop, {
-    value: value2,
+    value,
     writable: true,
     enumerable: true,
     configurable: true
@@ -286,10 +4698,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -316,11 +4728,11 @@ function esc(str) {
 function slugify(input) {
   return input.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
 }
-function isObject(data) {
+function isObject2(data) {
   return typeof data === "object" && data !== null && !Array.isArray(data);
 }
-function isPlainObject(o) {
-  if (isObject(o) === false)
+function isPlainObject3(o) {
+  if (isObject2(o) === false)
     return false;
   const ctor = o.constructor;
   if (ctor === void 0)
@@ -328,7 +4740,7 @@ function isPlainObject(o) {
   if (typeof ctor !== "function")
     return true;
   const prot = ctor.prototype;
-  if (isObject(prot) === false)
+  if (isObject2(prot) === false)
     return false;
   if (Object.prototype.hasOwnProperty.call(prot, "isPrototypeOf") === false) {
     return false;
@@ -336,10 +4748,14 @@ function isPlainObject(o) {
   return true;
 }
 function shallowClone(o) {
-  if (isPlainObject(o))
+  if (isPlainObject3(o))
     return { ...o };
   if (Array.isArray(o))
     return [...o];
+  if (o instanceof Map)
+    return new Map(o);
+  if (o instanceof Set)
+    return new Set(o);
   return o;
 }
 function numKeys(data) {
@@ -383,9 +4799,9 @@ function createTransparentProxy(getter) {
       target ?? (target = getter());
       return Reflect.get(target, prop, receiver);
     },
-    set(_, prop, value2, receiver) {
+    set(_, prop, value, receiver) {
       target ?? (target = getter());
-      return Reflect.set(target, prop, value2, receiver);
+      return Reflect.set(target, prop, value, receiver);
     },
     has(_, prop) {
       target ?? (target = getter());
@@ -409,12 +4825,12 @@ function createTransparentProxy(getter) {
     }
   });
 }
-function stringifyPrimitive(value2) {
-  if (typeof value2 === "bigint")
-    return value2.toString() + "n";
-  if (typeof value2 === "string")
-    return `"${value2}"`;
-  return `${value2}`;
+function stringifyPrimitive(value) {
+  if (typeof value === "bigint")
+    return value.toString() + "n";
+  if (typeof value === "string")
+    return `"${value}"`;
+  return `${value}`;
 }
 function optionalKeys(shape) {
   return Object.keys(shape).filter((k) => {
@@ -472,7 +4888,7 @@ function omit(schema, mask) {
   return clone(schema, def);
 }
 function extend(schema, shape) {
-  if (!isPlainObject(shape)) {
+  if (!isPlainObject3(shape)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const checks = schema._zod.def.checks;
@@ -495,7 +4911,7 @@ function extend(schema, shape) {
   return clone(schema, def);
 }
 function safeExtend(schema, shape) {
-  if (!isPlainObject(shape)) {
+  if (!isPlainObject3(shape)) {
     throw new Error("Invalid input to safeExtend: expected a plain object");
   }
   const def = mergeDefs(schema._zod.def, {
@@ -508,6 +4924,9 @@ function safeExtend(schema, shape) {
   return clone(schema, def);
 }
 function merge(a, b) {
+  if (a._zod.def.checks?.length) {
+    throw new Error(".merge() cannot be used on object schemas containing refinements. Use .safeExtend() instead.");
+  }
   const def = mergeDefs(a._zod.def, {
     get shape() {
       const _shape = { ...a._zod.def.shape, ...b._zod.def.shape };
@@ -517,8 +4936,7 @@ function merge(a, b) {
     get catchall() {
       return b._zod.def.catchall;
     },
-    checks: []
-    // delete existing checks
+    checks: b._zod.def.checks ?? []
   });
   return clone(a, def);
 }
@@ -601,11 +5019,21 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function explicitlyAborted(x, startIndex = 0) {
+  if (x.aborted === true)
+    return true;
+  for (let i = startIndex; i < x.issues.length; i++) {
+    if (x.issues[i]?.continue === false) {
+      return true;
+    }
+  }
+  return false;
+}
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
-    var _a2;
-    (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path3);
+    var _a3;
+    (_a3 = iss).path ?? (_a3.path = []);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -613,17 +5041,14 @@ function unwrapMessage(message) {
   return typeof message === "string" ? message : message?.message;
 }
 function finalizeIssue(iss, ctx, config2) {
-  const full = { ...iss, path: iss.path ?? [] };
-  if (!iss.message) {
-    const message = unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config2.customError?.(iss)) ?? unwrapMessage(config2.localeError?.(iss)) ?? "Invalid input";
-    full.message = message;
+  const message = iss.message ? iss.message : unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config2.customError?.(iss)) ?? unwrapMessage(config2.localeError?.(iss)) ?? "Invalid input";
+  const { inst: _inst, continue: _continue, input: _input, ...rest } = iss;
+  rest.path ?? (rest.path = []);
+  rest.message = message;
+  if (ctx?.reportInput) {
+    rest.input = _input;
   }
-  delete full.inst;
-  delete full.continue;
-  if (!ctx?.reportInput) {
-    delete full.input;
-  }
-  return full;
+  return rest;
 }
 function getSizableOrigin(input) {
   if (input instanceof Set)
@@ -718,11 +5143,15 @@ function uint8ArrayToHex(bytes) {
 }
 var EVALUATING, captureStackTrace, allowsEval, getParsedType, propertyKeyTypes, primitiveTypes, NUMBER_FORMAT_RANGES, BIGINT_FORMAT_RANGES, Class;
 var init_util = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/util.js"() {
-    EVALUATING = Symbol("evaluating");
+  "../../node_modules/zod/v4/core/util.js"() {
+    init_core();
+    EVALUATING = /* @__PURE__ */ Symbol("evaluating");
     captureStackTrace = "captureStackTrace" in Error ? Error.captureStackTrace : (..._args) => {
     };
-    allowsEval = cached(() => {
+    allowsEval = /* @__PURE__ */ cached(() => {
+      if (globalConfig2.jitless) {
+        return false;
+      }
       if (typeof navigator !== "undefined" && navigator?.userAgent?.includes("Cloudflare")) {
         return false;
       }
@@ -779,7 +5208,14 @@ var init_util = __esm({
       }
     };
     propertyKeyTypes = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
-    primitiveTypes = /* @__PURE__ */ new Set(["string", "number", "bigint", "boolean", "symbol", "undefined"]);
+    primitiveTypes = /* @__PURE__ */ new Set([
+      "string",
+      "number",
+      "bigint",
+      "boolean",
+      "symbol",
+      "undefined"
+    ]);
     NUMBER_FORMAT_RANGES = {
       safeint: [Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
       int32: [-2147483648, 2147483647],
@@ -798,11 +5234,11 @@ var init_util = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js
-function flattenError(error48, mapper = (issue2) => issue2.message) {
+// ../../node_modules/zod/v4/core/errors.js
+function flattenError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = {};
   const formErrors = [];
-  for (const sub of error48.issues) {
+  for (const sub of error51.issues) {
     if (sub.path.length > 0) {
       fieldErrors[sub.path[0]] = fieldErrors[sub.path[0]] || [];
       fieldErrors[sub.path[0]].push(mapper(sub));
@@ -812,52 +5248,55 @@ function flattenError(error48, mapper = (issue2) => issue2.message) {
   }
   return { formErrors, fieldErrors };
 }
-function formatError(error48, mapper = (issue2) => issue2.message) {
+function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error49) => {
-    for (const issue2 of error49.issues) {
+  const processError = (error52, path5 = []) => {
+    for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues });
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues });
-      } else if (issue2.path.length === 0) {
-        fieldErrors._errors.push(mapper(issue2));
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        let curr = fieldErrors;
-        let i = 0;
-        while (i < issue2.path.length) {
-          const el = issue2.path[i];
-          const terminal = i === issue2.path.length - 1;
-          if (!terminal) {
-            curr[el] = curr[el] || { _errors: [] };
-          } else {
-            curr[el] = curr[el] || { _errors: [] };
-            curr[el]._errors.push(mapper(issue2));
+        const fullpath = [...path5, ...issue2.path];
+        if (fullpath.length === 0) {
+          fieldErrors._errors.push(mapper(issue2));
+        } else {
+          let curr = fieldErrors;
+          let i = 0;
+          while (i < fullpath.length) {
+            const el = fullpath[i];
+            const terminal = i === fullpath.length - 1;
+            if (!terminal) {
+              curr[el] = curr[el] || { _errors: [] };
+            } else {
+              curr[el] = curr[el] || { _errors: [] };
+              curr[el]._errors.push(mapper(issue2));
+            }
+            curr = curr[el];
+            i++;
           }
-          curr = curr[el];
-          i++;
         }
       }
     }
   };
-  processError(error48);
+  processError(error51);
   return fieldErrors;
 }
-function treeifyError(error48, mapper = (issue2) => issue2.message) {
+function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error49, path3 = []) => {
-    var _a2, _b;
-    for (const issue2 of error49.issues) {
+  const processError = (error52, path5 = []) => {
+    var _a3, _b;
+    for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, issue2.path));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, issue2.path);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, issue2.path);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -869,7 +5308,7 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
           const terminal = i === fullpath.length - 1;
           if (typeof el === "string") {
             curr.properties ?? (curr.properties = {});
-            (_a2 = curr.properties)[el] ?? (_a2[el] = { errors: [] });
+            (_a3 = curr.properties)[el] ?? (_a3[el] = { errors: [] });
             curr = curr.properties[el];
           } else {
             curr.items ?? (curr.items = []);
@@ -884,13 +5323,13 @@ function treeifyError(error48, mapper = (issue2) => issue2.message) {
       }
     }
   };
-  processError(error48);
+  processError(error51);
   return result;
 }
 function toDotPath(_path) {
   const segs = [];
-  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path3) {
+  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path5) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -905,9 +5344,9 @@ function toDotPath(_path) {
   }
   return segs.join("");
 }
-function prettifyError(error48) {
+function prettifyError(error51) {
   const lines = [];
-  const issues = [...error48.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
+  const issues = [...error51.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
   for (const issue2 of issues) {
     lines.push(`\u2716 ${issue2.message}`);
     if (issue2.path?.length)
@@ -917,7 +5356,7 @@ function prettifyError(error48) {
 }
 var initializer, $ZodError, $ZodRealError;
 var init_errors = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/errors.js"() {
+  "../../node_modules/zod/v4/core/errors.js"() {
     init_core();
     init_util();
     initializer = (inst, def) => {
@@ -941,16 +5380,16 @@ var init_errors = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js
+// ../../node_modules/zod/v4/core/parse.js
 var _parse, parse, _parseAsync, parseAsync, _safeParse, safeParse, _safeParseAsync, safeParseAsync, _encode, encode, _decode, decode, _encodeAsync, encodeAsync, _decodeAsync, decodeAsync, _safeEncode, safeEncode, _safeDecode, safeDecode, _safeEncodeAsync, safeEncodeAsync, _safeDecodeAsync, safeDecodeAsync;
 var init_parse = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/parse.js"() {
+  "../../node_modules/zod/v4/core/parse.js"() {
     init_core();
     init_errors();
     init_util();
-    _parse = (_Err) => (schema, value2, _ctx, _params) => {
-      const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
-      const result = schema._zod.run({ value: value2, issues: [] }, ctx);
+    _parse = (_Err) => (schema, value, _ctx, _params) => {
+      const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
+      const result = schema._zod.run({ value, issues: [] }, ctx);
       if (result instanceof Promise) {
         throw new $ZodAsyncError();
       }
@@ -962,9 +5401,9 @@ var init_parse = __esm({
       return result.value;
     };
     parse = /* @__PURE__ */ _parse($ZodRealError);
-    _parseAsync = (_Err) => async (schema, value2, _ctx, params) => {
-      const ctx = _ctx ? Object.assign(_ctx, { async: true }) : { async: true };
-      let result = schema._zod.run({ value: value2, issues: [] }, ctx);
+    _parseAsync = (_Err) => async (schema, value, _ctx, params) => {
+      const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+      let result = schema._zod.run({ value, issues: [] }, ctx);
       if (result instanceof Promise)
         result = await result;
       if (result.issues.length) {
@@ -975,9 +5414,9 @@ var init_parse = __esm({
       return result.value;
     };
     parseAsync = /* @__PURE__ */ _parseAsync($ZodRealError);
-    _safeParse = (_Err) => (schema, value2, _ctx) => {
+    _safeParse = (_Err) => (schema, value, _ctx) => {
       const ctx = _ctx ? { ..._ctx, async: false } : { async: false };
-      const result = schema._zod.run({ value: value2, issues: [] }, ctx);
+      const result = schema._zod.run({ value, issues: [] }, ctx);
       if (result instanceof Promise) {
         throw new $ZodAsyncError();
       }
@@ -987,9 +5426,9 @@ var init_parse = __esm({
       } : { success: true, data: result.value };
     };
     safeParse = /* @__PURE__ */ _safeParse($ZodRealError);
-    _safeParseAsync = (_Err) => async (schema, value2, _ctx) => {
-      const ctx = _ctx ? Object.assign(_ctx, { async: true }) : { async: true };
-      let result = schema._zod.run({ value: value2, issues: [] }, ctx);
+    _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
+      const ctx = _ctx ? { ..._ctx, async: true } : { async: true };
+      let result = schema._zod.run({ value, issues: [] }, ctx);
       if (result instanceof Promise)
         result = await result;
       return result.issues.length ? {
@@ -998,46 +5437,46 @@ var init_parse = __esm({
       } : { success: true, data: result.value };
     };
     safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
-    _encode = (_Err) => (schema, value2, _ctx) => {
-      const ctx = _ctx ? Object.assign(_ctx, { direction: "backward" }) : { direction: "backward" };
-      return _parse(_Err)(schema, value2, ctx);
+    _encode = (_Err) => (schema, value, _ctx) => {
+      const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+      return _parse(_Err)(schema, value, ctx);
     };
     encode = /* @__PURE__ */ _encode($ZodRealError);
-    _decode = (_Err) => (schema, value2, _ctx) => {
-      return _parse(_Err)(schema, value2, _ctx);
+    _decode = (_Err) => (schema, value, _ctx) => {
+      return _parse(_Err)(schema, value, _ctx);
     };
     decode = /* @__PURE__ */ _decode($ZodRealError);
-    _encodeAsync = (_Err) => async (schema, value2, _ctx) => {
-      const ctx = _ctx ? Object.assign(_ctx, { direction: "backward" }) : { direction: "backward" };
-      return _parseAsync(_Err)(schema, value2, ctx);
+    _encodeAsync = (_Err) => async (schema, value, _ctx) => {
+      const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+      return _parseAsync(_Err)(schema, value, ctx);
     };
     encodeAsync = /* @__PURE__ */ _encodeAsync($ZodRealError);
-    _decodeAsync = (_Err) => async (schema, value2, _ctx) => {
-      return _parseAsync(_Err)(schema, value2, _ctx);
+    _decodeAsync = (_Err) => async (schema, value, _ctx) => {
+      return _parseAsync(_Err)(schema, value, _ctx);
     };
     decodeAsync = /* @__PURE__ */ _decodeAsync($ZodRealError);
-    _safeEncode = (_Err) => (schema, value2, _ctx) => {
-      const ctx = _ctx ? Object.assign(_ctx, { direction: "backward" }) : { direction: "backward" };
-      return _safeParse(_Err)(schema, value2, ctx);
+    _safeEncode = (_Err) => (schema, value, _ctx) => {
+      const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+      return _safeParse(_Err)(schema, value, ctx);
     };
     safeEncode = /* @__PURE__ */ _safeEncode($ZodRealError);
-    _safeDecode = (_Err) => (schema, value2, _ctx) => {
-      return _safeParse(_Err)(schema, value2, _ctx);
+    _safeDecode = (_Err) => (schema, value, _ctx) => {
+      return _safeParse(_Err)(schema, value, _ctx);
     };
     safeDecode = /* @__PURE__ */ _safeDecode($ZodRealError);
-    _safeEncodeAsync = (_Err) => async (schema, value2, _ctx) => {
-      const ctx = _ctx ? Object.assign(_ctx, { direction: "backward" }) : { direction: "backward" };
-      return _safeParseAsync(_Err)(schema, value2, ctx);
+    _safeEncodeAsync = (_Err) => async (schema, value, _ctx) => {
+      const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
+      return _safeParseAsync(_Err)(schema, value, ctx);
     };
     safeEncodeAsync = /* @__PURE__ */ _safeEncodeAsync($ZodRealError);
-    _safeDecodeAsync = (_Err) => async (schema, value2, _ctx) => {
-      return _safeParseAsync(_Err)(schema, value2, _ctx);
+    _safeDecodeAsync = (_Err) => async (schema, value, _ctx) => {
+      return _safeParseAsync(_Err)(schema, value, _ctx);
     };
     safeDecodeAsync = /* @__PURE__ */ _safeDecodeAsync($ZodRealError);
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js
+// ../../node_modules/zod/v4/core/regexes.js
 var regexes_exports = {};
 __export(regexes_exports, {
   base64: () => base64,
@@ -1061,6 +5500,7 @@ __export(regexes_exports, {
   hex: () => hex,
   hostname: () => hostname,
   html5Email: () => html5Email,
+  httpProtocol: () => httpProtocol,
   idnEmail: () => idnEmail,
   integer: () => integer,
   ipv4: () => ipv4,
@@ -1126,11 +5566,11 @@ function fixedBase64(bodyLength, padding) {
 function fixedBase64url(length) {
   return new RegExp(`^[A-Za-z0-9_-]{${length}}$`);
 }
-var cuid, cuid2, ulid, xid, ksuid, nanoid, duration, extendedDuration, guid, uuid, uuid4, uuid6, uuid7, email, html5Email, rfc5322Email, unicodeEmail, idnEmail, browserEmail, _emoji, ipv4, ipv6, mac, cidrv4, cidrv6, base64, base64url, hostname, domain, e164, dateSource, date, string, bigint, integer, number, boolean, _null, _undefined, lowercase, uppercase, hex, md5_hex, md5_base64, md5_base64url, sha1_hex, sha1_base64, sha1_base64url, sha256_hex, sha256_base64, sha256_base64url, sha384_hex, sha384_base64, sha384_base64url, sha512_hex, sha512_base64, sha512_base64url;
+var cuid, cuid2, ulid, xid, ksuid, nanoid, duration, extendedDuration, guid, uuid, uuid4, uuid6, uuid7, email, html5Email, rfc5322Email, unicodeEmail, idnEmail, browserEmail, _emoji, ipv4, ipv6, mac, cidrv4, cidrv6, base64, base64url, hostname, domain, httpProtocol, e164, dateSource, date, string, bigint, integer, number, boolean, _null, _undefined, lowercase, uppercase, hex, md5_hex, md5_base64, md5_base64url, sha1_hex, sha1_base64, sha1_base64url, sha256_hex, sha256_base64, sha256_base64url, sha384_hex, sha384_base64, sha384_base64url, sha512_hex, sha512_base64, sha512_base64url;
 var init_regexes = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/regexes.js"() {
+  "../../node_modules/zod/v4/core/regexes.js"() {
     init_util();
-    cuid = /^[cC][^\s-]{8,}$/;
+    cuid = /^[cC][0-9a-z]{6,}$/;
     cuid2 = /^[0-9a-z]+$/;
     ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
     xid = /^[0-9a-vA-V]{20}$/;
@@ -1166,6 +5606,7 @@ var init_regexes = __esm({
     base64url = /^[A-Za-z0-9_-]*$/;
     hostname = /^(?=.{1,253}\.?$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[-0-9a-zA-Z]{0,61}[0-9a-zA-Z])?)*\.?$/;
     domain = /^([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    httpProtocol = /^https?$/;
     e164 = /^\+[1-9]\d{6,14}$/;
     dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
     date = /* @__PURE__ */ new RegExp(`^${dateSource}$`);
@@ -1200,7 +5641,7 @@ var init_regexes = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js
+// ../../node_modules/zod/v4/core/checks.js
 function handleCheckPropertyResult(result, payload, property) {
   if (result.issues.length) {
     payload.issues.push(...prefixIssues(property, result.issues));
@@ -1208,15 +5649,15 @@ function handleCheckPropertyResult(result, payload, property) {
 }
 var $ZodCheck, numericOriginMap, $ZodCheckLessThan, $ZodCheckGreaterThan, $ZodCheckMultipleOf, $ZodCheckNumberFormat, $ZodCheckBigIntFormat, $ZodCheckMaxSize, $ZodCheckMinSize, $ZodCheckSizeEquals, $ZodCheckMaxLength, $ZodCheckMinLength, $ZodCheckLengthEquals, $ZodCheckStringFormat, $ZodCheckRegex, $ZodCheckLowerCase, $ZodCheckUpperCase, $ZodCheckIncludes, $ZodCheckStartsWith, $ZodCheckEndsWith, $ZodCheckProperty, $ZodCheckMimeType, $ZodCheckOverwrite;
 var init_checks = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/checks.js"() {
+  "../../node_modules/zod/v4/core/checks.js"() {
     init_core();
     init_regexes();
     init_util();
     $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
-      var _a2;
+      var _a3;
       inst._zod ?? (inst._zod = {});
       inst._zod.def = def;
-      (_a2 = inst._zod).onattach ?? (_a2.onattach = []);
+      (_a3 = inst._zod).onattach ?? (_a3.onattach = []);
     });
     numericOriginMap = {
       number: "number",
@@ -1282,8 +5723,8 @@ var init_checks = __esm({
     $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (inst, def) => {
       $ZodCheck.init(inst, def);
       inst._zod.onattach.push((inst2) => {
-        var _a2;
-        (_a2 = inst2._zod.bag).multipleOf ?? (_a2.multipleOf = def.value);
+        var _a3;
+        (_a3 = inst2._zod.bag).multipleOf ?? (_a3.multipleOf = def.value);
       });
       inst._zod.check = (payload) => {
         if (typeof payload.value !== typeof def.value)
@@ -1416,9 +5857,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckMaxSize = /* @__PURE__ */ $constructor("$ZodCheckMaxSize", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.size !== void 0;
       });
@@ -1444,9 +5885,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckMinSize = /* @__PURE__ */ $constructor("$ZodCheckMinSize", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.size !== void 0;
       });
@@ -1472,9 +5913,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckSizeEquals = /* @__PURE__ */ $constructor("$ZodCheckSizeEquals", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.size !== void 0;
       });
@@ -1502,9 +5943,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.length !== void 0;
       });
@@ -1531,9 +5972,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.length !== void 0;
       });
@@ -1560,9 +6001,9 @@ var init_checks = __esm({
       };
     });
     $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
-      var _a2;
+      var _a3;
       $ZodCheck.init(inst, def);
-      (_a2 = inst._zod.def).when ?? (_a2.when = (payload) => {
+      (_a3 = inst._zod.def).when ?? (_a3.when = (payload) => {
         const val = payload.value;
         return !nullish(val) && val.length !== void 0;
       });
@@ -1591,7 +6032,7 @@ var init_checks = __esm({
       };
     });
     $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
-      var _a2, _b;
+      var _a3, _b;
       $ZodCheck.init(inst, def);
       inst._zod.onattach.push((inst2) => {
         const bag = inst2._zod.bag;
@@ -1602,7 +6043,7 @@ var init_checks = __esm({
         }
       });
       if (def.pattern)
-        (_a2 = inst._zod).check ?? (_a2.check = (payload) => {
+        (_a3 = inst._zod).check ?? (_a3.check = (payload) => {
           def.pattern.lastIndex = 0;
           if (def.pattern.test(payload.value))
             return;
@@ -1756,10 +6197,10 @@ var init_checks = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js
+// ../../node_modules/zod/v4/core/doc.js
 var Doc;
 var init_doc = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/doc.js"() {
+  "../../node_modules/zod/v4/core/doc.js"() {
     Doc = class {
       constructor(args = []) {
         this.content = [];
@@ -1797,22 +6238,24 @@ var init_doc = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js
+// ../../node_modules/zod/v4/core/versions.js
 var version;
 var init_versions = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/versions.js"() {
+  "../../node_modules/zod/v4/core/versions.js"() {
     version = {
       major: 4,
-      minor: 3,
-      patch: 6
+      minor: 4,
+      patch: 3
     };
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js
+// ../../node_modules/zod/v4/core/schemas.js
 function isValidBase64(data) {
   if (data === "")
     return true;
+  if (/\s/.test(data))
+    return false;
   if (data.length % 4 !== 0)
     return false;
   try {
@@ -1855,15 +6298,27 @@ function handleArrayResult(result, final, index2) {
   }
   final.value[index2] = result.value;
 }
-function handlePropertyResult(result, final, key, input, isOptionalOut) {
+function handlePropertyResult(result, final, key, input, isOptionalIn, isOptionalOut) {
+  const isPresent = key in input;
   if (result.issues.length) {
-    if (isOptionalOut && !(key in input)) {
+    if (isOptionalIn && isOptionalOut && !isPresent) {
       return;
     }
     final.issues.push(...prefixIssues(key, result.issues));
   }
+  if (!isPresent && !isOptionalIn) {
+    if (!result.issues.length) {
+      final.issues.push({
+        code: "invalid_type",
+        expected: "nonoptional",
+        input: void 0,
+        path: [key]
+      });
+    }
+    return;
+  }
   if (result.value === void 0) {
-    if (key in input) {
+    if (isPresent) {
       final.value[key] = void 0;
     }
   } else {
@@ -1891,8 +6346,11 @@ function handleCatchall(proms, input, payload, ctx, def, inst) {
   const keySet = def.keySet;
   const _catchall = def.catchall._zod;
   const t = _catchall.def.type;
+  const isOptionalIn = _catchall.optin === "optional";
   const isOptionalOut = _catchall.optout === "optional";
   for (const key in input) {
+    if (key === "__proto__")
+      continue;
     if (keySet.has(key))
       continue;
     if (t === "never") {
@@ -1901,9 +6359,9 @@ function handleCatchall(proms, input, payload, ctx, def, inst) {
     }
     const r = _catchall.run({ value: input[key], issues: [] }, ctx);
     if (r instanceof Promise) {
-      proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalOut)));
+      proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalIn, isOptionalOut)));
     } else {
-      handlePropertyResult(r, payload, key, input, isOptionalOut);
+      handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
     }
   }
   if (unrecognized.length) {
@@ -1971,7 +6429,7 @@ function mergeValues(a, b) {
   if (a instanceof Date && b instanceof Date && +a === +b) {
     return { valid: true, data: a };
   }
-  if (isPlainObject(a) && isPlainObject(b)) {
+  if (isPlainObject3(a) && isPlainObject3(b)) {
     const bKeys = Object.keys(b);
     const sharedKeys = Object.keys(a).filter((key) => bKeys.indexOf(key) !== -1);
     const newObj = { ...a, ...b };
@@ -2047,11 +6505,40 @@ function handleIntersectionResults(result, left, right) {
   result.value = merged.data;
   return result;
 }
+function getTupleOptStart(items, key) {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]._zod[key] !== "optional")
+      return i + 1;
+  }
+  return 0;
+}
 function handleTupleResult(result, final, index2) {
   if (result.issues.length) {
     final.issues.push(...prefixIssues(index2, result.issues));
   }
   final.value[index2] = result.value;
+}
+function handleTupleResults(itemResults, final, items, input, optoutStart) {
+  for (let i = 0; i < items.length; i++) {
+    const r = itemResults[i];
+    const isPresent = i < input.length;
+    if (r.issues.length) {
+      if (!isPresent && i >= optoutStart) {
+        final.value.length = i;
+        break;
+      }
+      final.issues.push(...prefixIssues(i, r.issues));
+    }
+    final.value[i] = r.value;
+  }
+  for (let i = final.value.length - 1; i >= input.length; i--) {
+    if (items[i]._zod.optout === "optional" && final.value[i] === void 0) {
+      final.value.length = i;
+    } else {
+      break;
+    }
+  }
+  return final;
 }
 function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
   if (keyResult.issues.length) {
@@ -2090,7 +6577,7 @@ function handleSetResult(result, final) {
   final.value.add(result.value);
 }
 function handleOptionalResult(result, input) {
-  if (result.issues.length && input === void 0) {
+  if (input === void 0 && (result.issues.length || result.fallback)) {
     return { issues: [], value: void 0 };
   }
   return result;
@@ -2117,7 +6604,7 @@ function handlePipeResult(left, next, ctx) {
     left.aborted = true;
     return left;
   }
-  return next._zod.run({ value: left.value, issues: left.issues }, ctx);
+  return next._zod.run({ value: left.value, issues: left.issues, fallback: left.fallback }, ctx);
 }
 function handleCodecAResult(result, def, ctx) {
   if (result.issues.length) {
@@ -2128,23 +6615,23 @@ function handleCodecAResult(result, def, ctx) {
   if (direction === "forward") {
     const transformed = def.transform(result.value, result);
     if (transformed instanceof Promise) {
-      return transformed.then((value2) => handleCodecTxResult(result, value2, def.out, ctx));
+      return transformed.then((value) => handleCodecTxResult(result, value, def.out, ctx));
     }
     return handleCodecTxResult(result, transformed, def.out, ctx);
   } else {
     const transformed = def.reverseTransform(result.value, result);
     if (transformed instanceof Promise) {
-      return transformed.then((value2) => handleCodecTxResult(result, value2, def.in, ctx));
+      return transformed.then((value) => handleCodecTxResult(result, value, def.in, ctx));
     }
     return handleCodecTxResult(result, transformed, def.in, ctx);
   }
 }
-function handleCodecTxResult(left, value2, nextSchema, ctx) {
+function handleCodecTxResult(left, value, nextSchema, ctx) {
   if (left.issues.length) {
     left.aborted = true;
     return left;
   }
-  return nextSchema._zod.run({ value: value2, issues: left.issues }, ctx);
+  return nextSchema._zod.run({ value, issues: left.issues }, ctx);
 }
 function handleReadonlyResult(payload) {
   payload.value = Object.freeze(payload.value);
@@ -2167,9 +6654,9 @@ function handleRefineResult(result, payload, input, inst) {
     payload.issues.push(issue(_iss));
   }
 }
-var $ZodType, $ZodString, $ZodStringFormat, $ZodGUID, $ZodUUID, $ZodEmail, $ZodURL, $ZodEmoji, $ZodNanoID, $ZodCUID, $ZodCUID2, $ZodULID, $ZodXID, $ZodKSUID, $ZodISODateTime, $ZodISODate, $ZodISOTime, $ZodISODuration, $ZodIPv4, $ZodIPv6, $ZodMAC, $ZodCIDRv4, $ZodCIDRv6, $ZodBase64, $ZodBase64URL, $ZodE164, $ZodJWT, $ZodCustomStringFormat, $ZodNumber, $ZodNumberFormat, $ZodBoolean, $ZodBigInt, $ZodBigIntFormat, $ZodSymbol, $ZodUndefined, $ZodNull, $ZodAny, $ZodUnknown, $ZodNever, $ZodVoid, $ZodDate, $ZodArray, $ZodObject, $ZodObjectJIT, $ZodUnion, $ZodXor, $ZodDiscriminatedUnion, $ZodIntersection, $ZodTuple, $ZodRecord, $ZodMap, $ZodSet, $ZodEnum, $ZodLiteral, $ZodFile, $ZodTransform, $ZodOptional, $ZodExactOptional, $ZodNullable, $ZodDefault, $ZodPrefault, $ZodNonOptional, $ZodSuccess, $ZodCatch, $ZodNaN, $ZodPipe, $ZodCodec, $ZodReadonly, $ZodTemplateLiteral, $ZodFunction, $ZodPromise, $ZodLazy, $ZodCustom;
+var $ZodType, $ZodString, $ZodStringFormat, $ZodGUID, $ZodUUID, $ZodEmail, $ZodURL, $ZodEmoji, $ZodNanoID, $ZodCUID, $ZodCUID2, $ZodULID, $ZodXID, $ZodKSUID, $ZodISODateTime, $ZodISODate, $ZodISOTime, $ZodISODuration, $ZodIPv4, $ZodIPv6, $ZodMAC, $ZodCIDRv4, $ZodCIDRv6, $ZodBase64, $ZodBase64URL, $ZodE164, $ZodJWT, $ZodCustomStringFormat, $ZodNumber, $ZodNumberFormat, $ZodBoolean, $ZodBigInt, $ZodBigIntFormat, $ZodSymbol, $ZodUndefined, $ZodNull, $ZodAny, $ZodUnknown, $ZodNever, $ZodVoid, $ZodDate, $ZodArray, $ZodObject, $ZodObjectJIT, $ZodUnion, $ZodXor, $ZodDiscriminatedUnion, $ZodIntersection, $ZodTuple, $ZodRecord, $ZodMap, $ZodSet, $ZodEnum, $ZodLiteral, $ZodFile, $ZodTransform, $ZodOptional, $ZodExactOptional, $ZodNullable, $ZodDefault, $ZodPrefault, $ZodNonOptional, $ZodSuccess, $ZodCatch, $ZodNaN, $ZodPipe, $ZodCodec, $ZodPreprocess, $ZodReadonly, $ZodTemplateLiteral, $ZodFunction, $ZodPromise, $ZodLazy, $ZodCustom;
 var init_schemas = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/schemas.js"() {
+  "../../node_modules/zod/v4/core/schemas.js"() {
     init_checks();
     init_core();
     init_doc();
@@ -2179,7 +6666,7 @@ var init_schemas = __esm({
     init_versions();
     init_util();
     $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
-      var _a2;
+      var _a3;
       inst ?? (inst = {});
       inst._zod.def = def;
       inst._zod.bag = inst._zod.bag || {};
@@ -2194,7 +6681,7 @@ var init_schemas = __esm({
         }
       }
       if (checks.length === 0) {
-        (_a2 = inst._zod).deferred ?? (_a2.deferred = []);
+        (_a3 = inst._zod).deferred ?? (_a3.deferred = []);
         inst._zod.deferred?.push(() => {
           inst._zod.run = inst._zod.parse;
         });
@@ -2204,6 +6691,8 @@ var init_schemas = __esm({
           let asyncResult;
           for (const ch of checks2) {
             if (ch._zod.def.when) {
+              if (explicitlyAborted(payload))
+                continue;
               const shouldRun = ch._zod.def.when(payload);
               if (!shouldRun)
                 continue;
@@ -2275,12 +6764,12 @@ var init_schemas = __esm({
         };
       }
       defineLazy(inst, "~standard", () => ({
-        validate: (value2) => {
+        validate: (value) => {
           try {
-            const r = safeParse(inst, value2);
+            const r = safeParse(inst, value);
             return r.success ? { value: r.data } : { issues: r.error?.issues };
           } catch (_) {
-            return safeParseAsync(inst, value2).then((r) => r.success ? { value: r.data } : { issues: r.error?.issues });
+            return safeParseAsync(inst, value).then((r) => r.success ? { value: r.data } : { issues: r.error?.issues });
           }
         },
         vendor: "zod",
@@ -2344,6 +6833,19 @@ var init_schemas = __esm({
       inst._zod.check = (payload) => {
         try {
           const trimmed = payload.value.trim();
+          if (!def.normalize && def.protocol?.source === httpProtocol.source) {
+            if (!/^https?:\/\//i.test(trimmed)) {
+              payload.issues.push({
+                code: "invalid_format",
+                format: "url",
+                note: "Invalid URL format",
+                input: payload.value,
+                inst,
+                continue: !def.abort
+              });
+              return;
+            }
+          }
           const url2 = new URL(trimmed);
           if (def.hostname) {
             def.hostname.lastIndex = 0;
@@ -2650,8 +7152,6 @@ var init_schemas = __esm({
       $ZodType.init(inst, def);
       inst._zod.pattern = _undefined;
       inst._zod.values = /* @__PURE__ */ new Set([void 0]);
-      inst._zod.optin = "optional";
-      inst._zod.optout = "optional";
       inst._zod.parse = (payload, _ctx) => {
         const input = payload.value;
         if (typeof input === "undefined")
@@ -2803,11 +7303,11 @@ var init_schemas = __esm({
         }
         return propValues;
       });
-      const isObject3 = isObject;
+      const isObject3 = isObject2;
       const catchall = def.catchall;
-      let value2;
+      let value;
       inst._zod.parse = (payload, ctx) => {
-        value2 ?? (value2 = _normalized.value);
+        value ?? (value = _normalized.value);
         const input = payload.value;
         if (!isObject3(input)) {
           payload.issues.push({
@@ -2820,15 +7320,16 @@ var init_schemas = __esm({
         }
         payload.value = {};
         const proms = [];
-        const shape = value2.shape;
-        for (const key of value2.keys) {
+        const shape = value.shape;
+        for (const key of value.keys) {
           const el = shape[key];
+          const isOptionalIn = el._zod.optin === "optional";
           const isOptionalOut = el._zod.optout === "optional";
           const r = el._zod.run({ value: input[key], issues: [] }, ctx);
           if (r instanceof Promise) {
-            proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalOut)));
+            proms.push(r.then((r2) => handlePropertyResult(r2, payload, key, input, isOptionalIn, isOptionalOut)));
           } else {
-            handlePropertyResult(r, payload, key, input, isOptionalOut);
+            handlePropertyResult(r, payload, key, input, isOptionalIn, isOptionalOut);
           }
         }
         if (!catchall) {
@@ -2859,9 +7360,10 @@ var init_schemas = __esm({
           const id = ids[key];
           const k = esc(key);
           const schema = shape[key];
+          const isOptionalIn = schema?._zod?.optin === "optional";
           const isOptionalOut = schema?._zod?.optout === "optional";
           doc.write(`const ${id} = ${parseStr(key)};`);
-          if (isOptionalOut) {
+          if (isOptionalIn && isOptionalOut) {
             doc.write(`
         if (${id}.issues.length) {
           if (${k} in input) {
@@ -2880,6 +7382,33 @@ var init_schemas = __esm({
           newResult[${k}] = ${id}.value;
         }
         
+      `);
+          } else if (!isOptionalIn) {
+            doc.write(`
+        const ${id}_present = ${k} in input;
+        if (${id}.issues.length) {
+          payload.issues = payload.issues.concat(${id}.issues.map(iss => ({
+            ...iss,
+            path: iss.path ? [${k}, ...iss.path] : [${k}]
+          })));
+        }
+        if (!${id}_present && !${id}.issues.length) {
+          payload.issues.push({
+            code: "invalid_type",
+            expected: "nonoptional",
+            input: undefined,
+            path: [${k}]
+          });
+        }
+
+        if (${id}_present) {
+          if (${id}.value === undefined) {
+            newResult[${k}] = undefined;
+          } else {
+            newResult[${k}] = ${id}.value;
+          }
+        }
+
       `);
           } else {
             doc.write(`
@@ -2907,14 +7436,14 @@ var init_schemas = __esm({
         return (payload, ctx) => fn(shape, payload, ctx);
       };
       let fastpass;
-      const isObject3 = isObject;
-      const jit = !globalConfig.jitless;
+      const isObject3 = isObject2;
+      const jit = !globalConfig2.jitless;
       const allowsEval2 = allowsEval;
       const fastEnabled = jit && allowsEval2.value;
       const catchall = def.catchall;
-      let value2;
+      let value;
       inst._zod.parse = (payload, ctx) => {
-        value2 ?? (value2 = _normalized.value);
+        value ?? (value = _normalized.value);
         const input = payload.value;
         if (!isObject3(input)) {
           payload.issues.push({
@@ -2931,7 +7460,7 @@ var init_schemas = __esm({
           payload = fastpass(payload, ctx);
           if (!catchall)
             return payload;
-          return handleCatchall([], input, payload, ctx, value2, inst);
+          return handleCatchall([], input, payload, ctx, value, inst);
         }
         return superParse(payload, ctx);
       };
@@ -2953,10 +7482,9 @@ var init_schemas = __esm({
         }
         return void 0;
       });
-      const single = def.options.length === 1;
-      const first = def.options[0]._zod.run;
+      const first = def.options.length === 1 ? def.options[0]._zod.run : null;
       inst._zod.parse = (payload, ctx) => {
-        if (single) {
+        if (first) {
           return first(payload, ctx);
         }
         let async = false;
@@ -2985,10 +7513,9 @@ var init_schemas = __esm({
     $ZodXor = /* @__PURE__ */ $constructor("$ZodXor", (inst, def) => {
       $ZodUnion.init(inst, def);
       def.inclusive = false;
-      const single = def.options.length === 1;
-      const first = def.options[0]._zod.run;
+      const first = def.options.length === 1 ? def.options[0]._zod.run : null;
       inst._zod.parse = (payload, ctx) => {
-        if (single) {
+        if (first) {
           return first(payload, ctx);
         }
         let async = false;
@@ -3050,7 +7577,7 @@ var init_schemas = __esm({
       });
       inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
-        if (!isObject(input)) {
+        if (!isObject2(input)) {
           payload.issues.push({
             code: "invalid_type",
             expected: "object",
@@ -3063,7 +7590,7 @@ var init_schemas = __esm({
         if (opt) {
           return opt._zod.run(payload, ctx);
         }
-        if (def.unionFallback) {
+        if (def.unionFallback || ctx.direction === "backward") {
           return _super(payload, ctx);
         }
         payload.issues.push({
@@ -3071,6 +7598,7 @@ var init_schemas = __esm({
           errors: [],
           note: "No matching discriminator",
           discriminator: def.discriminator,
+          options: Array.from(disc.value.keys()),
           input,
           path: [def.discriminator],
           inst
@@ -3109,63 +7637,66 @@ var init_schemas = __esm({
         }
         payload.value = [];
         const proms = [];
-        const reversedIndex = [...items].reverse().findIndex((item) => item._zod.optin !== "optional");
-        const optStart = reversedIndex === -1 ? 0 : items.length - reversedIndex;
+        const optinStart = getTupleOptStart(items, "optin");
+        const optoutStart = getTupleOptStart(items, "optout");
         if (!def.rest) {
-          const tooBig = input.length > items.length;
-          const tooSmall = input.length < optStart - 1;
-          if (tooBig || tooSmall) {
+          if (input.length < optinStart) {
             payload.issues.push({
-              ...tooBig ? { code: "too_big", maximum: items.length, inclusive: true } : { code: "too_small", minimum: items.length },
+              code: "too_small",
+              minimum: optinStart,
+              inclusive: true,
               input,
               inst,
               origin: "array"
             });
             return payload;
           }
-        }
-        let i = -1;
-        for (const item of items) {
-          i++;
-          if (i >= input.length) {
-            if (i >= optStart)
-              continue;
+          if (input.length > items.length) {
+            payload.issues.push({
+              code: "too_big",
+              maximum: items.length,
+              inclusive: true,
+              input,
+              inst,
+              origin: "array"
+            });
           }
-          const result = item._zod.run({
-            value: input[i],
-            issues: []
-          }, ctx);
-          if (result instanceof Promise) {
-            proms.push(result.then((result2) => handleTupleResult(result2, payload, i)));
+        }
+        const itemResults = new Array(items.length);
+        for (let i = 0; i < items.length; i++) {
+          const r = items[i]._zod.run({ value: input[i], issues: [] }, ctx);
+          if (r instanceof Promise) {
+            proms.push(r.then((rr) => {
+              itemResults[i] = rr;
+            }));
           } else {
-            handleTupleResult(result, payload, i);
+            itemResults[i] = r;
           }
         }
         if (def.rest) {
+          let i = items.length - 1;
           const rest = input.slice(items.length);
           for (const el of rest) {
             i++;
-            const result = def.rest._zod.run({
-              value: el,
-              issues: []
-            }, ctx);
+            const result = def.rest._zod.run({ value: el, issues: [] }, ctx);
             if (result instanceof Promise) {
-              proms.push(result.then((result2) => handleTupleResult(result2, payload, i)));
+              proms.push(result.then((r) => handleTupleResult(r, payload, i)));
             } else {
               handleTupleResult(result, payload, i);
             }
           }
         }
-        if (proms.length)
-          return Promise.all(proms).then(() => payload);
-        return payload;
+        if (proms.length) {
+          return Promise.all(proms).then(() => handleTupleResults(itemResults, payload, items, input, optoutStart));
+        }
+        return handleTupleResults(itemResults, payload, items, input, optoutStart);
       };
     });
     $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
       $ZodType.init(inst, def);
       inst._zod.parse = (payload, ctx) => {
         const input = payload.value;
-        if (!isPlainObject(input)) {
+        if (!isPlainObject3(input)) {
           payload.issues.push({
             expected: "record",
             code: "invalid_type",
@@ -3182,19 +7713,35 @@ var init_schemas = __esm({
           for (const key of values) {
             if (typeof key === "string" || typeof key === "number" || typeof key === "symbol") {
               recordKeys.add(typeof key === "number" ? key.toString() : key);
+              const keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx);
+              if (keyResult instanceof Promise) {
+                throw new Error("Async schemas not supported in object keys currently");
+              }
+              if (keyResult.issues.length) {
+                payload.issues.push({
+                  code: "invalid_key",
+                  origin: "record",
+                  issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config())),
+                  input: key,
+                  path: [key],
+                  inst
+                });
+                continue;
+              }
+              const outKey = keyResult.value;
               const result = def.valueType._zod.run({ value: input[key], issues: [] }, ctx);
               if (result instanceof Promise) {
                 proms.push(result.then((result2) => {
                   if (result2.issues.length) {
                     payload.issues.push(...prefixIssues(key, result2.issues));
                   }
-                  payload.value[key] = result2.value;
+                  payload.value[outKey] = result2.value;
                 }));
               } else {
                 if (result.issues.length) {
                   payload.issues.push(...prefixIssues(key, result.issues));
                 }
-                payload.value[key] = result.value;
+                payload.value[outKey] = result.value;
               }
             }
           }
@@ -3217,6 +7764,8 @@ var init_schemas = __esm({
           payload.value = {};
           for (const key of Reflect.ownKeys(input)) {
             if (key === "__proto__")
+              continue;
+            if (!Object.prototype.propertyIsEnumerable.call(input, key))
               continue;
             let keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx);
             if (keyResult instanceof Promise) {
@@ -3284,9 +7833,9 @@ var init_schemas = __esm({
         }
         const proms = [];
         payload.value = /* @__PURE__ */ new Map();
-        for (const [key, value2] of input) {
+        for (const [key, value] of input) {
           const keyResult = def.keyType._zod.run({ value: key, issues: [] }, ctx);
-          const valueResult = def.valueType._zod.run({ value: value2, issues: [] }, ctx);
+          const valueResult = def.valueType._zod.run({ value, issues: [] }, ctx);
           if (keyResult instanceof Promise || valueResult instanceof Promise) {
             proms.push(Promise.all([keyResult, valueResult]).then(([keyResult2, valueResult2]) => {
               handleMapResult(keyResult2, valueResult2, payload, key, input, inst, ctx);
@@ -3386,6 +7935,7 @@ var init_schemas = __esm({
     });
     $ZodTransform = /* @__PURE__ */ $constructor("$ZodTransform", (inst, def) => {
       $ZodType.init(inst, def);
+      inst._zod.optin = "optional";
       inst._zod.parse = (payload, ctx) => {
         if (ctx.direction === "backward") {
           throw new $ZodEncodeError(inst.constructor.name);
@@ -3395,6 +7945,7 @@ var init_schemas = __esm({
           const output = _out instanceof Promise ? _out : Promise.resolve(_out);
           return output.then((output2) => {
             payload.value = output2;
+            payload.fallback = true;
             return payload;
           });
         }
@@ -3402,6 +7953,7 @@ var init_schemas = __esm({
           throw new $ZodAsyncError();
         }
         payload.value = _out;
+        payload.fallback = true;
         return payload;
       };
     });
@@ -3418,10 +7970,11 @@ var init_schemas = __esm({
       });
       inst._zod.parse = (payload, ctx) => {
         if (def.innerType._zod.optin === "optional") {
+          const input = payload.value;
           const result = def.innerType._zod.run(payload, ctx);
           if (result instanceof Promise)
-            return result.then((r) => handleOptionalResult(r, payload.value));
-          return handleOptionalResult(result, payload.value);
+            return result.then((r) => handleOptionalResult(r, input));
+          return handleOptionalResult(result, input);
         }
         if (payload.value === void 0) {
           return payload;
@@ -3520,7 +8073,7 @@ var init_schemas = __esm({
     });
     $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
       $ZodType.init(inst, def);
-      defineLazy(inst._zod, "optin", () => def.innerType._zod.optin);
+      inst._zod.optin = "optional";
       defineLazy(inst._zod, "optout", () => def.innerType._zod.optout);
       defineLazy(inst._zod, "values", () => def.innerType._zod.values);
       inst._zod.parse = (payload, ctx) => {
@@ -3540,6 +8093,7 @@ var init_schemas = __esm({
                 input: payload.value
               });
               payload.issues = [];
+              payload.fallback = true;
             }
             return payload;
           });
@@ -3554,6 +8108,7 @@ var init_schemas = __esm({
             input: payload.value
           });
           payload.issues = [];
+          payload.fallback = true;
         }
         return payload;
       };
@@ -3616,6 +8171,9 @@ var init_schemas = __esm({
           return handleCodecAResult(right, def, ctx);
         }
       };
+    });
+    $ZodPreprocess = /* @__PURE__ */ $constructor("$ZodPreprocess", (inst, def) => {
+      $ZodPipe.init(inst, def);
     });
     $ZodReadonly = /* @__PURE__ */ $constructor("$ZodReadonly", (inst, def) => {
       $ZodType.init(inst, def);
@@ -3764,7 +8322,12 @@ var init_schemas = __esm({
     });
     $ZodLazy = /* @__PURE__ */ $constructor("$ZodLazy", (inst, def) => {
       $ZodType.init(inst, def);
-      defineLazy(inst._zod, "innerType", () => def.getter());
+      defineLazy(inst._zod, "innerType", () => {
+        const d = def;
+        if (!d._cachedInner)
+          d._cachedInner = def.getter();
+        return d._cachedInner;
+      });
       defineLazy(inst._zod, "pattern", () => inst._zod.innerType?._zod?.pattern);
       defineLazy(inst._zod, "propValues", () => inst._zod.innerType?._zod?.propValues);
       defineLazy(inst._zod, "optin", () => inst._zod.innerType?._zod?.optin ?? void 0);
@@ -3793,7 +8356,7 @@ var init_schemas = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js
+// ../../node_modules/zod/v4/locales/ar.js
 function ar_default() {
   return {
     localeError: error()
@@ -3801,7 +8364,7 @@ function ar_default() {
 }
 var error;
 var init_ar = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ar.js"() {
+  "../../node_modules/zod/v4/locales/ar.js"() {
     init_util();
     error = () => {
       const Sizable = {
@@ -3906,7 +8469,7 @@ var init_ar = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js
+// ../../node_modules/zod/v4/locales/az.js
 function az_default() {
   return {
     localeError: error2()
@@ -3914,7 +8477,7 @@ function az_default() {
 }
 var error2;
 var init_az = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/az.js"() {
+  "../../node_modules/zod/v4/locales/az.js"() {
     init_util();
     error2 = () => {
       const Sizable = {
@@ -4018,7 +8581,7 @@ var init_az = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js
+// ../../node_modules/zod/v4/locales/be.js
 function getBelarusianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -4041,7 +8604,7 @@ function be_default() {
 }
 var error3;
 var init_be = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/be.js"() {
+  "../../node_modules/zod/v4/locales/be.js"() {
     init_util();
     error3 = () => {
       const Sizable = {
@@ -4181,7 +8744,7 @@ var init_be = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js
+// ../../node_modules/zod/v4/locales/bg.js
 function bg_default() {
   return {
     localeError: error4()
@@ -4189,7 +8752,7 @@ function bg_default() {
 }
 var error4;
 var init_bg = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/bg.js"() {
+  "../../node_modules/zod/v4/locales/bg.js"() {
     init_util();
     error4 = () => {
       const Sizable = {
@@ -4308,7 +8871,7 @@ var init_bg = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js
+// ../../node_modules/zod/v4/locales/ca.js
 function ca_default() {
   return {
     localeError: error5()
@@ -4316,7 +8879,7 @@ function ca_default() {
 }
 var error5;
 var init_ca = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ca.js"() {
+  "../../node_modules/zod/v4/locales/ca.js"() {
     init_util();
     error5 = () => {
       const Sizable = {
@@ -4423,7 +8986,7 @@ var init_ca = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js
+// ../../node_modules/zod/v4/locales/cs.js
 function cs_default() {
   return {
     localeError: error6()
@@ -4431,7 +8994,7 @@ function cs_default() {
 }
 var error6;
 var init_cs = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/cs.js"() {
+  "../../node_modules/zod/v4/locales/cs.js"() {
     init_util();
     error6 = () => {
       const Sizable = {
@@ -4541,7 +9104,7 @@ var init_cs = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js
+// ../../node_modules/zod/v4/locales/da.js
 function da_default() {
   return {
     localeError: error7()
@@ -4549,7 +9112,7 @@ function da_default() {
 }
 var error7;
 var init_da = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/da.js"() {
+  "../../node_modules/zod/v4/locales/da.js"() {
     init_util();
     error7 = () => {
       const Sizable = {
@@ -4663,7 +9226,7 @@ var init_da = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js
+// ../../node_modules/zod/v4/locales/de.js
 function de_default() {
   return {
     localeError: error8()
@@ -4671,7 +9234,7 @@ function de_default() {
 }
 var error8;
 var init_de = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/de.js"() {
+  "../../node_modules/zod/v4/locales/de.js"() {
     init_util();
     error8 = () => {
       const Sizable = {
@@ -4778,17 +9341,133 @@ var init_de = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js
-function en_default() {
+// ../../node_modules/zod/v4/locales/el.js
+function el_default() {
   return {
     localeError: error9()
   };
 }
 var error9;
-var init_en = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/en.js"() {
+var init_el = __esm({
+  "../../node_modules/zod/v4/locales/el.js"() {
     init_util();
     error9 = () => {
+      const Sizable = {
+        string: { unit: "\u03C7\u03B1\u03C1\u03B1\u03BA\u03C4\u03AE\u03C1\u03B5\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
+        file: { unit: "bytes", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
+        array: { unit: "\u03C3\u03C4\u03BF\u03B9\u03C7\u03B5\u03AF\u03B1", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
+        set: { unit: "\u03C3\u03C4\u03BF\u03B9\u03C7\u03B5\u03AF\u03B1", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" },
+        map: { unit: "\u03BA\u03B1\u03C4\u03B1\u03C7\u03C9\u03C1\u03AE\u03C3\u03B5\u03B9\u03C2", verb: "\u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9" }
+      };
+      function getSizing(origin) {
+        return Sizable[origin] ?? null;
+      }
+      const FormatDictionary = {
+        regex: "\u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2",
+        email: "\u03B4\u03B9\u03B5\u03CD\u03B8\u03C5\u03BD\u03C3\u03B7 email",
+        url: "URL",
+        emoji: "emoji",
+        uuid: "UUID",
+        uuidv4: "UUIDv4",
+        uuidv6: "UUIDv6",
+        nanoid: "nanoid",
+        guid: "GUID",
+        cuid: "cuid",
+        cuid2: "cuid2",
+        ulid: "ULID",
+        xid: "XID",
+        ksuid: "KSUID",
+        datetime: "ISO \u03B7\u03BC\u03B5\u03C1\u03BF\u03BC\u03B7\u03BD\u03AF\u03B1 \u03BA\u03B1\u03B9 \u03CE\u03C1\u03B1",
+        date: "ISO \u03B7\u03BC\u03B5\u03C1\u03BF\u03BC\u03B7\u03BD\u03AF\u03B1",
+        time: "ISO \u03CE\u03C1\u03B1",
+        duration: "ISO \u03B4\u03B9\u03AC\u03C1\u03BA\u03B5\u03B9\u03B1",
+        ipv4: "\u03B4\u03B9\u03B5\u03CD\u03B8\u03C5\u03BD\u03C3\u03B7 IPv4",
+        ipv6: "\u03B4\u03B9\u03B5\u03CD\u03B8\u03C5\u03BD\u03C3\u03B7 IPv6",
+        mac: "\u03B4\u03B9\u03B5\u03CD\u03B8\u03C5\u03BD\u03C3\u03B7 MAC",
+        cidrv4: "\u03B5\u03CD\u03C1\u03BF\u03C2 IPv4",
+        cidrv6: "\u03B5\u03CD\u03C1\u03BF\u03C2 IPv6",
+        base64: "\u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC \u03BA\u03C9\u03B4\u03B9\u03BA\u03BF\u03C0\u03BF\u03B9\u03B7\u03BC\u03AD\u03BD\u03B7 \u03C3\u03B5 base64",
+        base64url: "\u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC \u03BA\u03C9\u03B4\u03B9\u03BA\u03BF\u03C0\u03BF\u03B9\u03B7\u03BC\u03AD\u03BD\u03B7 \u03C3\u03B5 base64url",
+        json_string: "\u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC JSON",
+        e164: "\u03B1\u03C1\u03B9\u03B8\u03BC\u03CC\u03C2 E.164",
+        jwt: "JWT",
+        template_literal: "\u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2"
+      };
+      const TypeDictionary = {
+        nan: "NaN"
+      };
+      return (issue2) => {
+        switch (issue2.code) {
+          case "invalid_type": {
+            const expected = TypeDictionary[issue2.expected] ?? issue2.expected;
+            const receivedType = parsedType(issue2.input);
+            const received = TypeDictionary[receivedType] ?? receivedType;
+            if (typeof issue2.expected === "string" && /^[A-Z]/.test(issue2.expected)) {
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD instanceof ${issue2.expected}, \u03BB\u03AE\u03C6\u03B8\u03B7\u03BA\u03B5 ${received}`;
+            }
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${expected}, \u03BB\u03AE\u03C6\u03B8\u03B7\u03BA\u03B5 ${received}`;
+          }
+          case "invalid_value":
+            if (issue2.values.length === 1)
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${stringifyPrimitive(issue2.values[0])}`;
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03C0\u03B9\u03BB\u03BF\u03B3\u03AE: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD \u03AD\u03BD\u03B1 \u03B1\u03C0\u03CC ${joinValues(issue2.values, "|")}`;
+          case "too_big": {
+            const adj = issue2.inclusive ? "<=" : "<";
+            const sizing = getSizing(issue2.origin);
+            if (sizing)
+              return `\u03A0\u03BF\u03BB\u03CD \u03BC\u03B5\u03B3\u03AC\u03BB\u03BF: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${issue2.origin ?? "\u03C4\u03B9\u03BC\u03AE"} \u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9 ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "\u03C3\u03C4\u03BF\u03B9\u03C7\u03B5\u03AF\u03B1"}`;
+            return `\u03A0\u03BF\u03BB\u03CD \u03BC\u03B5\u03B3\u03AC\u03BB\u03BF: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${issue2.origin ?? "\u03C4\u03B9\u03BC\u03AE"} \u03BD\u03B1 \u03B5\u03AF\u03BD\u03B1\u03B9 ${adj}${issue2.maximum.toString()}`;
+          }
+          case "too_small": {
+            const adj = issue2.inclusive ? ">=" : ">";
+            const sizing = getSizing(issue2.origin);
+            if (sizing) {
+              return `\u03A0\u03BF\u03BB\u03CD \u03BC\u03B9\u03BA\u03C1\u03CC: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${issue2.origin} \u03BD\u03B1 \u03AD\u03C7\u03B5\u03B9 ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+            }
+            return `\u03A0\u03BF\u03BB\u03CD \u03BC\u03B9\u03BA\u03C1\u03CC: \u03B1\u03BD\u03B1\u03BC\u03B5\u03BD\u03CC\u03C4\u03B1\u03BD ${issue2.origin} \u03BD\u03B1 \u03B5\u03AF\u03BD\u03B1\u03B9 ${adj}${issue2.minimum.toString()}`;
+          }
+          case "invalid_format": {
+            const _issue = issue2;
+            if (_issue.format === "starts_with") {
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC: \u03C0\u03C1\u03AD\u03C0\u03B5\u03B9 \u03BD\u03B1 \u03BE\u03B5\u03BA\u03B9\u03BD\u03AC \u03BC\u03B5 "${_issue.prefix}"`;
+            }
+            if (_issue.format === "ends_with")
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC: \u03C0\u03C1\u03AD\u03C0\u03B5\u03B9 \u03BD\u03B1 \u03C4\u03B5\u03BB\u03B5\u03B9\u03CE\u03BD\u03B5\u03B9 \u03BC\u03B5 "${_issue.suffix}"`;
+            if (_issue.format === "includes")
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC: \u03C0\u03C1\u03AD\u03C0\u03B5\u03B9 \u03BD\u03B1 \u03C0\u03B5\u03C1\u03B9\u03AD\u03C7\u03B5\u03B9 "${_issue.includes}"`;
+            if (_issue.format === "regex")
+              return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03C3\u03C5\u03BC\u03B2\u03BF\u03BB\u03BF\u03C3\u03B5\u03B9\u03C1\u03AC: \u03C0\u03C1\u03AD\u03C0\u03B5\u03B9 \u03BD\u03B1 \u03C4\u03B1\u03B9\u03C1\u03B9\u03AC\u03B6\u03B5\u03B9 \u03BC\u03B5 \u03C4\u03BF \u03BC\u03BF\u03C4\u03AF\u03B2\u03BF ${_issue.pattern}`;
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03BF: ${FormatDictionary[_issue.format] ?? issue2.format}`;
+          }
+          case "not_multiple_of":
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03BF\u03C2 \u03B1\u03C1\u03B9\u03B8\u03BC\u03CC\u03C2: \u03C0\u03C1\u03AD\u03C0\u03B5\u03B9 \u03BD\u03B1 \u03B5\u03AF\u03BD\u03B1\u03B9 \u03C0\u03BF\u03BB\u03BB\u03B1\u03C0\u03BB\u03AC\u03C3\u03B9\u03BF \u03C4\u03BF\u03C5 ${issue2.divisor}`;
+          case "unrecognized_keys":
+            return `\u0386\u03B3\u03BD\u03C9\u03C3\u03C4${issue2.keys.length > 1 ? "\u03B1" : "\u03BF"} \u03BA\u03BB\u03B5\u03B9\u03B4${issue2.keys.length > 1 ? "\u03B9\u03AC" : "\u03AF"}: ${joinValues(issue2.keys, ", ")}`;
+          case "invalid_key":
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03BF \u03BA\u03BB\u03B5\u03B9\u03B4\u03AF \u03C3\u03C4\u03BF ${issue2.origin}`;
+          case "invalid_union":
+            return "\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2";
+          case "invalid_element":
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03C4\u03B9\u03BC\u03AE \u03C3\u03C4\u03BF ${issue2.origin}`;
+          default:
+            return `\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03AF\u03C3\u03BF\u03B4\u03BF\u03C2`;
+        }
+      };
+    };
+  }
+});
+
+// ../../node_modules/zod/v4/locales/en.js
+function en_default() {
+  return {
+    localeError: error10()
+  };
+}
+var error10;
+var init_en = __esm({
+  "../../node_modules/zod/v4/locales/en.js"() {
+    init_util();
+    error10 = () => {
       const Sizable = {
         string: { unit: "characters", verb: "to have" },
         file: { unit: "bytes", verb: "to have" },
@@ -4882,6 +9561,10 @@ var init_en = __esm({
           case "invalid_key":
             return `Invalid key in ${issue2.origin}`;
           case "invalid_union":
+            if (issue2.options && Array.isArray(issue2.options) && issue2.options.length > 0) {
+              const opts = issue2.options.map((o) => `'${o}'`).join(" | ");
+              return `Invalid discriminator value. Expected ${opts}`;
+            }
             return "Invalid input";
           case "invalid_element":
             return `Invalid value in ${issue2.origin}`;
@@ -4893,17 +9576,17 @@ var init_en = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js
+// ../../node_modules/zod/v4/locales/eo.js
 function eo_default() {
   return {
-    localeError: error10()
+    localeError: error11()
   };
 }
-var error10;
+var error11;
 var init_eo = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/eo.js"() {
+  "../../node_modules/zod/v4/locales/eo.js"() {
     init_util();
-    error10 = () => {
+    error11 = () => {
       const Sizable = {
         string: { unit: "karaktrojn", verb: "havi" },
         file: { unit: "bajtojn", verb: "havi" },
@@ -5009,17 +9692,17 @@ var init_eo = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js
+// ../../node_modules/zod/v4/locales/es.js
 function es_default() {
   return {
-    localeError: error11()
+    localeError: error12()
   };
 }
-var error11;
+var error12;
 var init_es = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/es.js"() {
+  "../../node_modules/zod/v4/locales/es.js"() {
     init_util();
-    error11 = () => {
+    error12 = () => {
       const Sizable = {
         string: { unit: "caracteres", verb: "tener" },
         file: { unit: "bytes", verb: "tener" },
@@ -5148,17 +9831,17 @@ var init_es = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js
+// ../../node_modules/zod/v4/locales/fa.js
 function fa_default() {
   return {
-    localeError: error12()
+    localeError: error13()
   };
 }
-var error12;
+var error13;
 var init_fa = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fa.js"() {
+  "../../node_modules/zod/v4/locales/fa.js"() {
     init_util();
-    error12 = () => {
+    error13 = () => {
       const Sizable = {
         string: { unit: "\u06A9\u0627\u0631\u0627\u06A9\u062A\u0631", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
         file: { unit: "\u0628\u0627\u06CC\u062A", verb: "\u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F" },
@@ -5269,17 +9952,17 @@ var init_fa = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js
+// ../../node_modules/zod/v4/locales/fi.js
 function fi_default() {
   return {
-    localeError: error13()
+    localeError: error14()
   };
 }
-var error13;
+var error14;
 var init_fi = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fi.js"() {
+  "../../node_modules/zod/v4/locales/fi.js"() {
     init_util();
-    error13 = () => {
+    error14 = () => {
       const Sizable = {
         string: { unit: "merkki\xE4", subject: "merkkijonon" },
         file: { unit: "tavua", subject: "tiedoston" },
@@ -5388,17 +10071,17 @@ var init_fi = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js
+// ../../node_modules/zod/v4/locales/fr.js
 function fr_default() {
   return {
-    localeError: error14()
+    localeError: error15()
   };
 }
-var error14;
+var error15;
 var init_fr = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr.js"() {
+  "../../node_modules/zod/v4/locales/fr.js"() {
     init_util();
-    error14 = () => {
+    error15 = () => {
       const Sizable = {
         string: { unit: "caract\xE8res", verb: "avoir" },
         file: { unit: "octets", verb: "avoir" },
@@ -5439,9 +10122,27 @@ var init_fr = __esm({
         template_literal: "entr\xE9e"
       };
       const TypeDictionary = {
-        nan: "NaN",
+        string: "cha\xEEne",
         number: "nombre",
-        array: "tableau"
+        int: "entier",
+        boolean: "bool\xE9en",
+        bigint: "grand entier",
+        symbol: "symbole",
+        undefined: "ind\xE9fini",
+        null: "null",
+        never: "jamais",
+        void: "vide",
+        date: "date",
+        array: "tableau",
+        object: "objet",
+        tuple: "tuple",
+        record: "enregistrement",
+        map: "carte",
+        set: "ensemble",
+        file: "fichier",
+        nonoptional: "non-optionnel",
+        nan: "NaN",
+        function: "fonction"
       };
       return (issue2) => {
         switch (issue2.code) {
@@ -5462,16 +10163,15 @@ var init_fr = __esm({
             const adj = issue2.inclusive ? "<=" : "<";
             const sizing = getSizing(issue2.origin);
             if (sizing)
-              return `Trop grand : ${issue2.origin ?? "valeur"} doit ${sizing.verb} ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "\xE9l\xE9ment(s)"}`;
-            return `Trop grand : ${issue2.origin ?? "valeur"} doit \xEAtre ${adj}${issue2.maximum.toString()}`;
+              return `Trop grand : ${TypeDictionary[issue2.origin] ?? "valeur"} doit ${sizing.verb} ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "\xE9l\xE9ment(s)"}`;
+            return `Trop grand : ${TypeDictionary[issue2.origin] ?? "valeur"} doit \xEAtre ${adj}${issue2.maximum.toString()}`;
           }
           case "too_small": {
             const adj = issue2.inclusive ? ">=" : ">";
             const sizing = getSizing(issue2.origin);
-            if (sizing) {
-              return `Trop petit : ${issue2.origin} doit ${sizing.verb} ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
-            }
-            return `Trop petit : ${issue2.origin} doit \xEAtre ${adj}${issue2.minimum.toString()}`;
+            if (sizing)
+              return `Trop petit : ${TypeDictionary[issue2.origin] ?? "valeur"} doit ${sizing.verb} ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+            return `Trop petit : ${TypeDictionary[issue2.origin] ?? "valeur"} doit \xEAtre ${adj}${issue2.minimum.toString()}`;
           }
           case "invalid_format": {
             const _issue = issue2;
@@ -5503,17 +10203,17 @@ var init_fr = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js
+// ../../node_modules/zod/v4/locales/fr-CA.js
 function fr_CA_default() {
   return {
-    localeError: error15()
+    localeError: error16()
   };
 }
-var error15;
+var error16;
 var init_fr_CA = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/fr-CA.js"() {
+  "../../node_modules/zod/v4/locales/fr-CA.js"() {
     init_util();
-    error15 = () => {
+    error16 = () => {
       const Sizable = {
         string: { unit: "caract\xE8res", verb: "avoir" },
         file: { unit: "octets", verb: "avoir" },
@@ -5617,17 +10317,17 @@ var init_fr_CA = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js
+// ../../node_modules/zod/v4/locales/he.js
 function he_default() {
   return {
-    localeError: error16()
+    localeError: error17()
   };
 }
-var error16;
+var error17;
 var init_he = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/he.js"() {
+  "../../node_modules/zod/v4/locales/he.js"() {
     init_util();
-    error16 = () => {
+    error17 = () => {
       const TypeNames = {
         string: { label: "\u05DE\u05D7\u05E8\u05D5\u05D6\u05EA", gender: "f" },
         number: { label: "\u05DE\u05E1\u05E4\u05E8", gender: "m" },
@@ -5818,17 +10518,146 @@ var init_he = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js
-function hu_default() {
+// ../../node_modules/zod/v4/locales/hr.js
+function hr_default() {
   return {
-    localeError: error17()
+    localeError: error18()
   };
 }
-var error17;
-var init_hu = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hu.js"() {
+var error18;
+var init_hr = __esm({
+  "../../node_modules/zod/v4/locales/hr.js"() {
     init_util();
-    error17 = () => {
+    error18 = () => {
+      const Sizable = {
+        string: { unit: "znakova", verb: "imati" },
+        file: { unit: "bajtova", verb: "imati" },
+        array: { unit: "stavki", verb: "imati" },
+        set: { unit: "stavki", verb: "imati" }
+      };
+      function getSizing(origin) {
+        return Sizable[origin] ?? null;
+      }
+      const FormatDictionary = {
+        regex: "unos",
+        email: "email adresa",
+        url: "URL",
+        emoji: "emoji",
+        uuid: "UUID",
+        uuidv4: "UUIDv4",
+        uuidv6: "UUIDv6",
+        nanoid: "nanoid",
+        guid: "GUID",
+        cuid: "cuid",
+        cuid2: "cuid2",
+        ulid: "ULID",
+        xid: "XID",
+        ksuid: "KSUID",
+        datetime: "ISO datum i vrijeme",
+        date: "ISO datum",
+        time: "ISO vrijeme",
+        duration: "ISO trajanje",
+        ipv4: "IPv4 adresa",
+        ipv6: "IPv6 adresa",
+        cidrv4: "IPv4 raspon",
+        cidrv6: "IPv6 raspon",
+        base64: "base64 kodirani tekst",
+        base64url: "base64url kodirani tekst",
+        json_string: "JSON tekst",
+        e164: "E.164 broj",
+        jwt: "JWT",
+        template_literal: "unos"
+      };
+      const TypeDictionary = {
+        nan: "NaN",
+        string: "tekst",
+        number: "broj",
+        boolean: "boolean",
+        array: "niz",
+        object: "objekt",
+        set: "skup",
+        file: "datoteka",
+        date: "datum",
+        bigint: "bigint",
+        symbol: "simbol",
+        undefined: "undefined",
+        null: "null",
+        function: "funkcija",
+        map: "mapa"
+      };
+      return (issue2) => {
+        switch (issue2.code) {
+          case "invalid_type": {
+            const expected = TypeDictionary[issue2.expected] ?? issue2.expected;
+            const receivedType = parsedType(issue2.input);
+            const received = TypeDictionary[receivedType] ?? receivedType;
+            if (/^[A-Z]/.test(issue2.expected)) {
+              return `Neispravan unos: o\u010Dekuje se instanceof ${issue2.expected}, a primljeno je ${received}`;
+            }
+            return `Neispravan unos: o\u010Dekuje se ${expected}, a primljeno je ${received}`;
+          }
+          case "invalid_value":
+            if (issue2.values.length === 1)
+              return `Neispravna vrijednost: o\u010Dekivano ${stringifyPrimitive(issue2.values[0])}`;
+            return `Neispravna opcija: o\u010Dekivano jedno od ${joinValues(issue2.values, "|")}`;
+          case "too_big": {
+            const adj = issue2.inclusive ? "<=" : "<";
+            const sizing = getSizing(issue2.origin);
+            const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+            if (sizing)
+              return `Preveliko: o\u010Dekivano da ${origin ?? "vrijednost"} ima ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elemenata"}`;
+            return `Preveliko: o\u010Dekivano da ${origin ?? "vrijednost"} bude ${adj}${issue2.maximum.toString()}`;
+          }
+          case "too_small": {
+            const adj = issue2.inclusive ? ">=" : ">";
+            const sizing = getSizing(issue2.origin);
+            const origin = TypeDictionary[issue2.origin] ?? issue2.origin;
+            if (sizing) {
+              return `Premalo: o\u010Dekivano da ${origin} ima ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+            }
+            return `Premalo: o\u010Dekivano da ${origin} bude ${adj}${issue2.minimum.toString()}`;
+          }
+          case "invalid_format": {
+            const _issue = issue2;
+            if (_issue.format === "starts_with")
+              return `Neispravan tekst: mora zapo\u010Dinjati s "${_issue.prefix}"`;
+            if (_issue.format === "ends_with")
+              return `Neispravan tekst: mora zavr\u0161avati s "${_issue.suffix}"`;
+            if (_issue.format === "includes")
+              return `Neispravan tekst: mora sadr\u017Eavati "${_issue.includes}"`;
+            if (_issue.format === "regex")
+              return `Neispravan tekst: mora odgovarati uzorku ${_issue.pattern}`;
+            return `Neispravna ${FormatDictionary[_issue.format] ?? issue2.format}`;
+          }
+          case "not_multiple_of":
+            return `Neispravan broj: mora biti vi\u0161ekratnik od ${issue2.divisor}`;
+          case "unrecognized_keys":
+            return `Neprepoznat${issue2.keys.length > 1 ? "i klju\u010Devi" : " klju\u010D"}: ${joinValues(issue2.keys, ", ")}`;
+          case "invalid_key":
+            return `Neispravan klju\u010D u ${TypeDictionary[issue2.origin] ?? issue2.origin}`;
+          case "invalid_union":
+            return "Neispravan unos";
+          case "invalid_element":
+            return `Neispravna vrijednost u ${TypeDictionary[issue2.origin] ?? issue2.origin}`;
+          default:
+            return `Neispravan unos`;
+        }
+      };
+    };
+  }
+});
+
+// ../../node_modules/zod/v4/locales/hu.js
+function hu_default() {
+  return {
+    localeError: error19()
+  };
+}
+var error19;
+var init_hu = __esm({
+  "../../node_modules/zod/v4/locales/hu.js"() {
+    init_util();
+    error19 = () => {
       const Sizable = {
         string: { unit: "karakter", verb: "legyen" },
         file: { unit: "byte", verb: "legyen" },
@@ -5933,7 +10762,7 @@ var init_hu = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js
+// ../../node_modules/zod/v4/locales/hy.js
 function getArmenianPlural(count, one, many) {
   return Math.abs(count) === 1 ? one : many;
 }
@@ -5946,14 +10775,14 @@ function withDefiniteArticle(word) {
 }
 function hy_default() {
   return {
-    localeError: error18()
+    localeError: error20()
   };
 }
-var error18;
+var error20;
 var init_hy = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/hy.js"() {
+  "../../node_modules/zod/v4/locales/hy.js"() {
     init_util();
-    error18 = () => {
+    error20 = () => {
       const Sizable = {
         string: {
           unit: {
@@ -6087,17 +10916,17 @@ var init_hy = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js
+// ../../node_modules/zod/v4/locales/id.js
 function id_default() {
   return {
-    localeError: error19()
+    localeError: error21()
   };
 }
-var error19;
+var error21;
 var init_id = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/id.js"() {
+  "../../node_modules/zod/v4/locales/id.js"() {
     init_util();
-    error19 = () => {
+    error21 = () => {
       const Sizable = {
         string: { unit: "karakter", verb: "memiliki" },
         file: { unit: "byte", verb: "memiliki" },
@@ -6200,17 +11029,17 @@ var init_id = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js
+// ../../node_modules/zod/v4/locales/is.js
 function is_default() {
   return {
-    localeError: error20()
+    localeError: error22()
   };
 }
-var error20;
+var error22;
 var init_is = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/is.js"() {
+  "../../node_modules/zod/v4/locales/is.js"() {
     init_util();
-    error20 = () => {
+    error22 = () => {
       const Sizable = {
         string: { unit: "stafi", verb: "a\xF0 hafa" },
         file: { unit: "b\xE6ti", verb: "a\xF0 hafa" },
@@ -6316,17 +11145,17 @@ var init_is = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js
+// ../../node_modules/zod/v4/locales/it.js
 function it_default() {
   return {
-    localeError: error21()
+    localeError: error23()
   };
 }
-var error21;
+var error23;
 var init_it = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/it.js"() {
+  "../../node_modules/zod/v4/locales/it.js"() {
     init_util();
-    error21 = () => {
+    error23 = () => {
       const Sizable = {
         string: { unit: "caratteri", verb: "avere" },
         file: { unit: "byte", verb: "avere" },
@@ -6411,7 +11240,7 @@ var init_it = __esm({
               return `Stringa non valida: deve includere "${_issue.includes}"`;
             if (_issue.format === "regex")
               return `Stringa non valida: deve corrispondere al pattern ${_issue.pattern}`;
-            return `Invalid ${FormatDictionary[_issue.format] ?? issue2.format}`;
+            return `Input non valido: ${FormatDictionary[_issue.format] ?? issue2.format}`;
           }
           case "not_multiple_of":
             return `Numero non valido: deve essere un multiplo di ${issue2.divisor}`;
@@ -6431,17 +11260,17 @@ var init_it = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js
+// ../../node_modules/zod/v4/locales/ja.js
 function ja_default() {
   return {
-    localeError: error22()
+    localeError: error24()
   };
 }
-var error22;
+var error24;
 var init_ja = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ja.js"() {
+  "../../node_modules/zod/v4/locales/ja.js"() {
     init_util();
-    error22 = () => {
+    error24 = () => {
       const Sizable = {
         string: { unit: "\u6587\u5B57", verb: "\u3067\u3042\u308B" },
         file: { unit: "\u30D0\u30A4\u30C8", verb: "\u3067\u3042\u308B" },
@@ -6545,17 +11374,17 @@ var init_ja = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js
+// ../../node_modules/zod/v4/locales/ka.js
 function ka_default() {
   return {
-    localeError: error23()
+    localeError: error25()
   };
 }
-var error23;
+var error25;
 var init_ka = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ka.js"() {
+  "../../node_modules/zod/v4/locales/ka.js"() {
     init_util();
-    error23 = () => {
+    error25 = () => {
       const Sizable = {
         string: { unit: "\u10E1\u10D8\u10DB\u10D1\u10DD\u10DA\u10DD", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
         file: { unit: "\u10D1\u10D0\u10D8\u10E2\u10D8", verb: "\u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1" },
@@ -6588,9 +11417,9 @@ var init_ka = __esm({
         ipv6: "IPv6 \u10DB\u10D8\u10E1\u10D0\u10DB\u10D0\u10E0\u10D7\u10D8",
         cidrv4: "IPv4 \u10D3\u10D8\u10D0\u10DE\u10D0\u10D6\u10DD\u10DC\u10D8",
         cidrv6: "IPv6 \u10D3\u10D8\u10D0\u10DE\u10D0\u10D6\u10DD\u10DC\u10D8",
-        base64: "base64-\u10D9\u10DD\u10D3\u10D8\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8",
-        base64url: "base64url-\u10D9\u10DD\u10D3\u10D8\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8",
-        json_string: "JSON \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8",
+        base64: "base64-\u10D9\u10DD\u10D3\u10D8\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8 \u10D5\u10D4\u10DA\u10D8",
+        base64url: "base64url-\u10D9\u10DD\u10D3\u10D8\u10E0\u10D4\u10D1\u10E3\u10DA\u10D8 \u10D5\u10D4\u10DA\u10D8",
+        json_string: "JSON \u10D5\u10D4\u10DA\u10D8",
         e164: "E.164 \u10DC\u10DD\u10DB\u10D4\u10E0\u10D8",
         jwt: "JWT",
         template_literal: "\u10E8\u10D4\u10E7\u10D5\u10D0\u10DC\u10D0"
@@ -6598,7 +11427,7 @@ var init_ka = __esm({
       const TypeDictionary = {
         nan: "NaN",
         number: "\u10E0\u10D8\u10EA\u10EE\u10D5\u10D8",
-        string: "\u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8",
+        string: "\u10D5\u10D4\u10DA\u10D8",
         boolean: "\u10D1\u10E3\u10DA\u10D4\u10D0\u10DC\u10D8",
         function: "\u10E4\u10E3\u10DC\u10E5\u10EA\u10D8\u10D0",
         array: "\u10DB\u10D0\u10E1\u10D8\u10D5\u10D8"
@@ -6636,14 +11465,14 @@ var init_ka = __esm({
           case "invalid_format": {
             const _issue = issue2;
             if (_issue.format === "starts_with") {
-              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10D8\u10EC\u10E7\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 "${_issue.prefix}"-\u10D8\u10D7`;
+              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10D5\u10D4\u10DA\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10D8\u10EC\u10E7\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 "${_issue.prefix}"-\u10D8\u10D7`;
             }
             if (_issue.format === "ends_with")
-              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10DB\u10D7\u10D0\u10D5\u10E0\u10D3\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 "${_issue.suffix}"-\u10D8\u10D7`;
+              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10D5\u10D4\u10DA\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10DB\u10D7\u10D0\u10D5\u10E0\u10D3\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 "${_issue.suffix}"-\u10D8\u10D7`;
             if (_issue.format === "includes")
-              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1 "${_issue.includes}"-\u10E1`;
+              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10D5\u10D4\u10DA\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D8\u10EA\u10D0\u10D5\u10D3\u10D4\u10E1 "${_issue.includes}"-\u10E1`;
             if (_issue.format === "regex")
-              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10E1\u10E2\u10E0\u10D8\u10DC\u10D2\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D4\u10E1\u10D0\u10D1\u10D0\u10DB\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 \u10E8\u10D0\u10D1\u10DA\u10DD\u10DC\u10E1 ${_issue.pattern}`;
+              return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 \u10D5\u10D4\u10DA\u10D8: \u10E3\u10DC\u10D3\u10D0 \u10E8\u10D4\u10D4\u10E1\u10D0\u10D1\u10D0\u10DB\u10D4\u10D1\u10DD\u10D3\u10D4\u10E1 \u10E8\u10D0\u10D1\u10DA\u10DD\u10DC\u10E1 ${_issue.pattern}`;
             return `\u10D0\u10E0\u10D0\u10E1\u10EC\u10DD\u10E0\u10D8 ${FormatDictionary[_issue.format] ?? issue2.format}`;
           }
           case "not_multiple_of":
@@ -6664,17 +11493,17 @@ var init_ka = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js
+// ../../node_modules/zod/v4/locales/km.js
 function km_default() {
   return {
-    localeError: error24()
+    localeError: error26()
   };
 }
-var error24;
+var error26;
 var init_km = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/km.js"() {
+  "../../node_modules/zod/v4/locales/km.js"() {
     init_util();
-    error24 = () => {
+    error26 = () => {
       const Sizable = {
         string: { unit: "\u178F\u17BD\u17A2\u1780\u17D2\u179F\u179A", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
         file: { unit: "\u1794\u17C3", verb: "\u1782\u17BD\u179A\u1798\u17B6\u1793" },
@@ -6781,27 +11610,27 @@ var init_km = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js
+// ../../node_modules/zod/v4/locales/kh.js
 function kh_default() {
   return km_default();
 }
 var init_kh = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/kh.js"() {
+  "../../node_modules/zod/v4/locales/kh.js"() {
     init_km();
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js
+// ../../node_modules/zod/v4/locales/ko.js
 function ko_default() {
   return {
-    localeError: error25()
+    localeError: error27()
   };
 }
-var error25;
+var error27;
 var init_ko = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ko.js"() {
+  "../../node_modules/zod/v4/locales/ko.js"() {
     init_util();
-    error25 = () => {
+    error27 = () => {
       const Sizable = {
         string: { unit: "\uBB38\uC790", verb: "to have" },
         file: { unit: "\uBC14\uC774\uD2B8", verb: "to have" },
@@ -6909,7 +11738,7 @@ var init_ko = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js
+// ../../node_modules/zod/v4/locales/lt.js
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
   const last = abs % 10;
@@ -6922,17 +11751,17 @@ function getUnitTypeFromNumber(number4) {
 }
 function lt_default() {
   return {
-    localeError: error26()
+    localeError: error28()
   };
 }
-var capitalizeFirstCharacter, error26;
+var capitalizeFirstCharacter, error28;
 var init_lt = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/lt.js"() {
+  "../../node_modules/zod/v4/locales/lt.js"() {
     init_util();
     capitalizeFirstCharacter = (text2) => {
       return text2.charAt(0).toUpperCase() + text2.slice(1);
     };
-    error26 = () => {
+    error28 = () => {
       const Sizable = {
         string: {
           unit: {
@@ -7119,17 +11948,17 @@ var init_lt = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js
+// ../../node_modules/zod/v4/locales/mk.js
 function mk_default() {
   return {
-    localeError: error27()
+    localeError: error29()
   };
 }
-var error27;
+var error29;
 var init_mk = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/mk.js"() {
+  "../../node_modules/zod/v4/locales/mk.js"() {
     init_util();
-    error27 = () => {
+    error29 = () => {
       const Sizable = {
         string: { unit: "\u0437\u043D\u0430\u0446\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
         file: { unit: "\u0431\u0430\u0458\u0442\u0438", verb: "\u0434\u0430 \u0438\u043C\u0430\u0430\u0442" },
@@ -7235,17 +12064,17 @@ var init_mk = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js
+// ../../node_modules/zod/v4/locales/ms.js
 function ms_default() {
   return {
-    localeError: error28()
+    localeError: error30()
   };
 }
-var error28;
+var error30;
 var init_ms = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ms.js"() {
+  "../../node_modules/zod/v4/locales/ms.js"() {
     init_util();
-    error28 = () => {
+    error30 = () => {
       const Sizable = {
         string: { unit: "aksara", verb: "mempunyai" },
         file: { unit: "bait", verb: "mempunyai" },
@@ -7349,17 +12178,17 @@ var init_ms = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js
+// ../../node_modules/zod/v4/locales/nl.js
 function nl_default() {
   return {
-    localeError: error29()
+    localeError: error31()
   };
 }
-var error29;
+var error31;
 var init_nl = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/nl.js"() {
+  "../../node_modules/zod/v4/locales/nl.js"() {
     init_util();
-    error29 = () => {
+    error31 = () => {
       const Sizable = {
         string: { unit: "tekens", verb: "heeft" },
         file: { unit: "bytes", verb: "heeft" },
@@ -7466,17 +12295,17 @@ var init_nl = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js
+// ../../node_modules/zod/v4/locales/no.js
 function no_default() {
   return {
-    localeError: error30()
+    localeError: error32()
   };
 }
-var error30;
+var error32;
 var init_no = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/no.js"() {
+  "../../node_modules/zod/v4/locales/no.js"() {
     init_util();
-    error30 = () => {
+    error32 = () => {
       const Sizable = {
         string: { unit: "tegn", verb: "\xE5 ha" },
         file: { unit: "bytes", verb: "\xE5 ha" },
@@ -7581,17 +12410,17 @@ var init_no = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js
+// ../../node_modules/zod/v4/locales/ota.js
 function ota_default() {
   return {
-    localeError: error31()
+    localeError: error33()
   };
 }
-var error31;
+var error33;
 var init_ota = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ota.js"() {
+  "../../node_modules/zod/v4/locales/ota.js"() {
     init_util();
-    error31 = () => {
+    error33 = () => {
       const Sizable = {
         string: { unit: "harf", verb: "olmal\u0131d\u0131r" },
         file: { unit: "bayt", verb: "olmal\u0131d\u0131r" },
@@ -7697,17 +12526,17 @@ var init_ota = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js
+// ../../node_modules/zod/v4/locales/ps.js
 function ps_default() {
   return {
-    localeError: error32()
+    localeError: error34()
   };
 }
-var error32;
+var error34;
 var init_ps = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ps.js"() {
+  "../../node_modules/zod/v4/locales/ps.js"() {
     init_util();
-    error32 = () => {
+    error34 = () => {
       const Sizable = {
         string: { unit: "\u062A\u0648\u06A9\u064A", verb: "\u0648\u0644\u0631\u064A" },
         file: { unit: "\u0628\u0627\u06CC\u067C\u0633", verb: "\u0648\u0644\u0631\u064A" },
@@ -7818,17 +12647,17 @@ var init_ps = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js
+// ../../node_modules/zod/v4/locales/pl.js
 function pl_default() {
   return {
-    localeError: error33()
+    localeError: error35()
   };
 }
-var error33;
+var error35;
 var init_pl = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pl.js"() {
+  "../../node_modules/zod/v4/locales/pl.js"() {
     init_util();
-    error33 = () => {
+    error35 = () => {
       const Sizable = {
         string: { unit: "znak\xF3w", verb: "mie\u0107" },
         file: { unit: "bajt\xF3w", verb: "mie\u0107" },
@@ -7934,17 +12763,17 @@ var init_pl = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js
+// ../../node_modules/zod/v4/locales/pt.js
 function pt_default() {
   return {
-    localeError: error34()
+    localeError: error36()
   };
 }
-var error34;
+var error36;
 var init_pt = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/pt.js"() {
+  "../../node_modules/zod/v4/locales/pt.js"() {
     init_util();
-    error34 = () => {
+    error36 = () => {
       const Sizable = {
         string: { unit: "caracteres", verb: "ter" },
         file: { unit: "bytes", verb: "ter" },
@@ -8049,7 +12878,133 @@ var init_pt = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js
+// ../../node_modules/zod/v4/locales/ro.js
+function ro_default() {
+  return {
+    localeError: error37()
+  };
+}
+var error37;
+var init_ro = __esm({
+  "../../node_modules/zod/v4/locales/ro.js"() {
+    init_util();
+    error37 = () => {
+      const Sizable = {
+        string: { unit: "caractere", verb: "s\u0103 aib\u0103" },
+        file: { unit: "octe\u021Bi", verb: "s\u0103 aib\u0103" },
+        array: { unit: "elemente", verb: "s\u0103 aib\u0103" },
+        set: { unit: "elemente", verb: "s\u0103 aib\u0103" },
+        map: { unit: "intr\u0103ri", verb: "s\u0103 aib\u0103" }
+      };
+      function getSizing(origin) {
+        return Sizable[origin] ?? null;
+      }
+      const FormatDictionary = {
+        regex: "intrare",
+        email: "adres\u0103 de email",
+        url: "URL",
+        emoji: "emoji",
+        uuid: "UUID",
+        uuidv4: "UUIDv4",
+        uuidv6: "UUIDv6",
+        nanoid: "nanoid",
+        guid: "GUID",
+        cuid: "cuid",
+        cuid2: "cuid2",
+        ulid: "ULID",
+        xid: "XID",
+        ksuid: "KSUID",
+        datetime: "dat\u0103 \u0219i or\u0103 ISO",
+        date: "dat\u0103 ISO",
+        time: "or\u0103 ISO",
+        duration: "durat\u0103 ISO",
+        ipv4: "adres\u0103 IPv4",
+        ipv6: "adres\u0103 IPv6",
+        mac: "adres\u0103 MAC",
+        cidrv4: "interval IPv4",
+        cidrv6: "interval IPv6",
+        base64: "\u0219ir codat base64",
+        base64url: "\u0219ir codat base64url",
+        json_string: "\u0219ir JSON",
+        e164: "num\u0103r E.164",
+        jwt: "JWT",
+        template_literal: "intrare"
+      };
+      const TypeDictionary = {
+        nan: "NaN",
+        string: "\u0219ir",
+        number: "num\u0103r",
+        boolean: "boolean",
+        function: "func\u021Bie",
+        array: "matrice",
+        object: "obiect",
+        undefined: "nedefinit",
+        symbol: "simbol",
+        bigint: "num\u0103r mare",
+        void: "void",
+        never: "never",
+        map: "hart\u0103",
+        set: "set"
+      };
+      return (issue2) => {
+        switch (issue2.code) {
+          case "invalid_type": {
+            const expected = TypeDictionary[issue2.expected] ?? issue2.expected;
+            const receivedType = parsedType(issue2.input);
+            const received = TypeDictionary[receivedType] ?? receivedType;
+            return `Intrare invalid\u0103: a\u0219teptat ${expected}, primit ${received}`;
+          }
+          case "invalid_value":
+            if (issue2.values.length === 1)
+              return `Intrare invalid\u0103: a\u0219teptat ${stringifyPrimitive(issue2.values[0])}`;
+            return `Op\u021Biune invalid\u0103: a\u0219teptat una dintre ${joinValues(issue2.values, "|")}`;
+          case "too_big": {
+            const adj = issue2.inclusive ? "<=" : "<";
+            const sizing = getSizing(issue2.origin);
+            if (sizing)
+              return `Prea mare: a\u0219teptat ca ${issue2.origin ?? "valoarea"} ${sizing.verb} ${adj}${issue2.maximum.toString()} ${sizing.unit ?? "elemente"}`;
+            return `Prea mare: a\u0219teptat ca ${issue2.origin ?? "valoarea"} s\u0103 fie ${adj}${issue2.maximum.toString()}`;
+          }
+          case "too_small": {
+            const adj = issue2.inclusive ? ">=" : ">";
+            const sizing = getSizing(issue2.origin);
+            if (sizing) {
+              return `Prea mic: a\u0219teptat ca ${issue2.origin} ${sizing.verb} ${adj}${issue2.minimum.toString()} ${sizing.unit}`;
+            }
+            return `Prea mic: a\u0219teptat ca ${issue2.origin} s\u0103 fie ${adj}${issue2.minimum.toString()}`;
+          }
+          case "invalid_format": {
+            const _issue = issue2;
+            if (_issue.format === "starts_with") {
+              return `\u0218ir invalid: trebuie s\u0103 \xEEnceap\u0103 cu "${_issue.prefix}"`;
+            }
+            if (_issue.format === "ends_with")
+              return `\u0218ir invalid: trebuie s\u0103 se termine cu "${_issue.suffix}"`;
+            if (_issue.format === "includes")
+              return `\u0218ir invalid: trebuie s\u0103 includ\u0103 "${_issue.includes}"`;
+            if (_issue.format === "regex")
+              return `\u0218ir invalid: trebuie s\u0103 se potriveasc\u0103 cu modelul ${_issue.pattern}`;
+            return `Format invalid: ${FormatDictionary[_issue.format] ?? issue2.format}`;
+          }
+          case "not_multiple_of":
+            return `Num\u0103r invalid: trebuie s\u0103 fie multiplu de ${issue2.divisor}`;
+          case "unrecognized_keys":
+            return `Chei nerecunoscute: ${joinValues(issue2.keys, ", ")}`;
+          case "invalid_key":
+            return `Cheie invalid\u0103 \xEEn ${issue2.origin}`;
+          case "invalid_union":
+            return "Intrare invalid\u0103";
+          case "invalid_element":
+            return `Valoare invalid\u0103 \xEEn ${issue2.origin}`;
+          default:
+            return `Intrare invalid\u0103`;
+        }
+      };
+    };
+  }
+});
+
+// ../../node_modules/zod/v4/locales/ru.js
 function getRussianPlural(count, one, few, many) {
   const absCount = Math.abs(count);
   const lastDigit = absCount % 10;
@@ -8067,14 +13022,14 @@ function getRussianPlural(count, one, few, many) {
 }
 function ru_default() {
   return {
-    localeError: error35()
+    localeError: error38()
   };
 }
-var error35;
+var error38;
 var init_ru = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ru.js"() {
+  "../../node_modules/zod/v4/locales/ru.js"() {
     init_util();
-    error35 = () => {
+    error38 = () => {
       const Sizable = {
         string: {
           unit: {
@@ -8212,17 +13167,17 @@ var init_ru = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js
+// ../../node_modules/zod/v4/locales/sl.js
 function sl_default() {
   return {
-    localeError: error36()
+    localeError: error39()
   };
 }
-var error36;
+var error39;
 var init_sl = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sl.js"() {
+  "../../node_modules/zod/v4/locales/sl.js"() {
     init_util();
-    error36 = () => {
+    error39 = () => {
       const Sizable = {
         string: { unit: "znakov", verb: "imeti" },
         file: { unit: "bajtov", verb: "imeti" },
@@ -8328,17 +13283,17 @@ var init_sl = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js
+// ../../node_modules/zod/v4/locales/sv.js
 function sv_default() {
   return {
-    localeError: error37()
+    localeError: error40()
   };
 }
-var error37;
+var error40;
 var init_sv = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/sv.js"() {
+  "../../node_modules/zod/v4/locales/sv.js"() {
     init_util();
-    error37 = () => {
+    error40 = () => {
       const Sizable = {
         string: { unit: "tecken", verb: "att ha" },
         file: { unit: "bytes", verb: "att ha" },
@@ -8445,17 +13400,17 @@ var init_sv = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js
+// ../../node_modules/zod/v4/locales/ta.js
 function ta_default() {
   return {
-    localeError: error38()
+    localeError: error41()
   };
 }
-var error38;
+var error41;
 var init_ta = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ta.js"() {
+  "../../node_modules/zod/v4/locales/ta.js"() {
     init_util();
-    error38 = () => {
+    error41 = () => {
       const Sizable = {
         string: { unit: "\u0B8E\u0BB4\u0BC1\u0BA4\u0BCD\u0BA4\u0BC1\u0B95\u0BCD\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
         file: { unit: "\u0BAA\u0BC8\u0B9F\u0BCD\u0B9F\u0BC1\u0B95\u0BB3\u0BCD", verb: "\u0B95\u0BCA\u0BA3\u0BCD\u0B9F\u0BBF\u0BB0\u0BC1\u0B95\u0BCD\u0B95 \u0BB5\u0BC7\u0BA3\u0BCD\u0B9F\u0BC1\u0BAE\u0BCD" },
@@ -8562,17 +13517,17 @@ var init_ta = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js
+// ../../node_modules/zod/v4/locales/th.js
 function th_default() {
   return {
-    localeError: error39()
+    localeError: error42()
   };
 }
-var error39;
+var error42;
 var init_th = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/th.js"() {
+  "../../node_modules/zod/v4/locales/th.js"() {
     init_util();
-    error39 = () => {
+    error42 = () => {
       const Sizable = {
         string: { unit: "\u0E15\u0E31\u0E27\u0E2D\u0E31\u0E01\u0E29\u0E23", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
         file: { unit: "\u0E44\u0E1A\u0E15\u0E4C", verb: "\u0E04\u0E27\u0E23\u0E21\u0E35" },
@@ -8679,17 +13634,17 @@ var init_th = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js
+// ../../node_modules/zod/v4/locales/tr.js
 function tr_default() {
   return {
-    localeError: error40()
+    localeError: error43()
   };
 }
-var error40;
+var error43;
 var init_tr = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/tr.js"() {
+  "../../node_modules/zod/v4/locales/tr.js"() {
     init_util();
-    error40 = () => {
+    error43 = () => {
       const Sizable = {
         string: { unit: "karakter", verb: "olmal\u0131" },
         file: { unit: "bayt", verb: "olmal\u0131" },
@@ -8791,17 +13746,17 @@ var init_tr = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js
+// ../../node_modules/zod/v4/locales/uk.js
 function uk_default() {
   return {
-    localeError: error41()
+    localeError: error44()
   };
 }
-var error41;
+var error44;
 var init_uk = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uk.js"() {
+  "../../node_modules/zod/v4/locales/uk.js"() {
     init_util();
-    error41 = () => {
+    error44 = () => {
       const Sizable = {
         string: { unit: "\u0441\u0438\u043C\u0432\u043E\u043B\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
         file: { unit: "\u0431\u0430\u0439\u0442\u0456\u0432", verb: "\u043C\u0430\u0442\u0438\u043C\u0435" },
@@ -8906,27 +13861,27 @@ var init_uk = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js
+// ../../node_modules/zod/v4/locales/ua.js
 function ua_default() {
   return uk_default();
 }
 var init_ua = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ua.js"() {
+  "../../node_modules/zod/v4/locales/ua.js"() {
     init_uk();
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js
+// ../../node_modules/zod/v4/locales/ur.js
 function ur_default() {
   return {
-    localeError: error42()
+    localeError: error45()
   };
 }
-var error42;
+var error45;
 var init_ur = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/ur.js"() {
+  "../../node_modules/zod/v4/locales/ur.js"() {
     init_util();
-    error42 = () => {
+    error45 = () => {
       const Sizable = {
         string: { unit: "\u062D\u0631\u0648\u0641", verb: "\u06C1\u0648\u0646\u0627" },
         file: { unit: "\u0628\u0627\u0626\u0679\u0633", verb: "\u06C1\u0648\u0646\u0627" },
@@ -9033,22 +13988,23 @@ var init_ur = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js
+// ../../node_modules/zod/v4/locales/uz.js
 function uz_default() {
   return {
-    localeError: error43()
+    localeError: error46()
   };
 }
-var error43;
+var error46;
 var init_uz = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/uz.js"() {
+  "../../node_modules/zod/v4/locales/uz.js"() {
     init_util();
-    error43 = () => {
+    error46 = () => {
       const Sizable = {
         string: { unit: "belgi", verb: "bo\u2018lishi kerak" },
         file: { unit: "bayt", verb: "bo\u2018lishi kerak" },
         array: { unit: "element", verb: "bo\u2018lishi kerak" },
-        set: { unit: "element", verb: "bo\u2018lishi kerak" }
+        set: { unit: "element", verb: "bo\u2018lishi kerak" },
+        map: { unit: "yozuv", verb: "bo\u2018lishi kerak" }
       };
       function getSizing(origin) {
         return Sizable[origin] ?? null;
@@ -9149,17 +14105,17 @@ var init_uz = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js
+// ../../node_modules/zod/v4/locales/vi.js
 function vi_default() {
   return {
-    localeError: error44()
+    localeError: error47()
   };
 }
-var error44;
+var error47;
 var init_vi = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/vi.js"() {
+  "../../node_modules/zod/v4/locales/vi.js"() {
     init_util();
-    error44 = () => {
+    error47 = () => {
       const Sizable = {
         string: { unit: "k\xFD t\u1EF1", verb: "c\xF3" },
         file: { unit: "byte", verb: "c\xF3" },
@@ -9264,17 +14220,17 @@ var init_vi = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js
+// ../../node_modules/zod/v4/locales/zh-CN.js
 function zh_CN_default() {
   return {
-    localeError: error45()
+    localeError: error48()
   };
 }
-var error45;
+var error48;
 var init_zh_CN = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-CN.js"() {
+  "../../node_modules/zod/v4/locales/zh-CN.js"() {
     init_util();
-    error45 = () => {
+    error48 = () => {
       const Sizable = {
         string: { unit: "\u5B57\u7B26", verb: "\u5305\u542B" },
         file: { unit: "\u5B57\u8282", verb: "\u5305\u542B" },
@@ -9380,17 +14336,17 @@ var init_zh_CN = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js
+// ../../node_modules/zod/v4/locales/zh-TW.js
 function zh_TW_default() {
   return {
-    localeError: error46()
+    localeError: error49()
   };
 }
-var error46;
+var error49;
 var init_zh_TW = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/zh-TW.js"() {
+  "../../node_modules/zod/v4/locales/zh-TW.js"() {
     init_util();
-    error46 = () => {
+    error49 = () => {
       const Sizable = {
         string: { unit: "\u5B57\u5143", verb: "\u64C1\u6709" },
         file: { unit: "\u4F4D\u5143\u7D44", verb: "\u64C1\u6709" },
@@ -9494,17 +14450,17 @@ var init_zh_TW = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js
+// ../../node_modules/zod/v4/locales/yo.js
 function yo_default() {
   return {
-    localeError: error47()
+    localeError: error50()
   };
 }
-var error47;
+var error50;
 var init_yo = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/yo.js"() {
+  "../../node_modules/zod/v4/locales/yo.js"() {
     init_util();
-    error47 = () => {
+    error50 = () => {
       const Sizable = {
         string: { unit: "\xE0mi", verb: "n\xED" },
         file: { unit: "bytes", verb: "n\xED" },
@@ -9608,7 +14564,7 @@ var init_yo = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js
+// ../../node_modules/zod/v4/locales/index.js
 var locales_exports = {};
 __export(locales_exports, {
   ar: () => ar_default,
@@ -9619,6 +14575,7 @@ __export(locales_exports, {
   cs: () => cs_default,
   da: () => da_default,
   de: () => de_default,
+  el: () => el_default,
   en: () => en_default,
   eo: () => eo_default,
   es: () => es_default,
@@ -9627,6 +14584,7 @@ __export(locales_exports, {
   fr: () => fr_default,
   frCA: () => fr_CA_default,
   he: () => he_default,
+  hr: () => hr_default,
   hu: () => hu_default,
   hy: () => hy_default,
   id: () => id_default,
@@ -9646,6 +14604,7 @@ __export(locales_exports, {
   pl: () => pl_default,
   ps: () => ps_default,
   pt: () => pt_default,
+  ro: () => ro_default,
   ru: () => ru_default,
   sl: () => sl_default,
   sv: () => sv_default,
@@ -9662,7 +14621,7 @@ __export(locales_exports, {
   zhTW: () => zh_TW_default
 });
 var init_locales = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/locales/index.js"() {
+  "../../node_modules/zod/v4/locales/index.js"() {
     init_ar();
     init_az();
     init_be();
@@ -9671,6 +14630,7 @@ var init_locales = __esm({
     init_cs();
     init_da();
     init_de();
+    init_el();
     init_en();
     init_eo();
     init_es();
@@ -9679,6 +14639,7 @@ var init_locales = __esm({
     init_fr();
     init_fr_CA();
     init_he();
+    init_hr();
     init_hu();
     init_hy();
     init_id();
@@ -9698,6 +14659,7 @@ var init_locales = __esm({
     init_ps();
     init_pl();
     init_pt();
+    init_ro();
     init_ru();
     init_sl();
     init_sv();
@@ -9715,15 +14677,15 @@ var init_locales = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js
+// ../../node_modules/zod/v4/core/registries.js
 function registry() {
   return new $ZodRegistry();
 }
-var _a, $output, $input, $ZodRegistry, globalRegistry;
+var _a2, $output, $input, $ZodRegistry, globalRegistry;
 var init_registries = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/registries.js"() {
-    $output = Symbol("ZodOutput");
-    $input = Symbol("ZodInput");
+  "../../node_modules/zod/v4/core/registries.js"() {
+    $output = /* @__PURE__ */ Symbol("ZodOutput");
+    $input = /* @__PURE__ */ Symbol("ZodInput");
     $ZodRegistry = class {
       constructor() {
         this._map = /* @__PURE__ */ new WeakMap();
@@ -9764,12 +14726,12 @@ var init_registries = __esm({
         return this._map.has(schema);
       }
     };
-    (_a = globalThis).__zod_globalRegistry ?? (_a.__zod_globalRegistry = registry());
+    (_a2 = globalThis).__zod_globalRegistry ?? (_a2.__zod_globalRegistry = registry());
     globalRegistry = globalThis.__zod_globalRegistry;
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js
+// ../../node_modules/zod/v4/core/api.js
 // @__NO_SIDE_EFFECTS__
 function _string(Class2, params) {
   return new Class2({
@@ -10031,7 +14993,7 @@ function _isoDateTime(Class2, params) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _isoDate(Class2, params) {
+function _isoDate2(Class2, params) {
   return new Class2({
     type: "string",
     format: "date",
@@ -10245,38 +15207,38 @@ function _nan(Class2, params) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _lt(value2, params) {
+function _lt(value, params) {
   return new $ZodCheckLessThan({
     check: "less_than",
     ...normalizeParams(params),
-    value: value2,
+    value,
     inclusive: false
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _lte(value2, params) {
+function _lte(value, params) {
   return new $ZodCheckLessThan({
     check: "less_than",
     ...normalizeParams(params),
-    value: value2,
+    value,
     inclusive: true
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _gt(value2, params) {
+function _gt(value, params) {
   return new $ZodCheckGreaterThan({
     check: "greater_than",
     ...normalizeParams(params),
-    value: value2,
+    value,
     inclusive: false
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _gte(value2, params) {
+function _gte(value, params) {
   return new $ZodCheckGreaterThan({
     check: "greater_than",
     ...normalizeParams(params),
-    value: value2,
+    value,
     inclusive: true
   });
 }
@@ -10297,11 +15259,11 @@ function _nonnegative(params) {
   return /* @__PURE__ */ _gte(0, params);
 }
 // @__NO_SIDE_EFFECTS__
-function _multipleOf(value2, params) {
+function _multipleOf(value, params) {
   return new $ZodCheckMultipleOf({
     check: "multiple_of",
     ...normalizeParams(params),
-    value: value2
+    value
   });
 }
 // @__NO_SIDE_EFFECTS__
@@ -10549,10 +15511,10 @@ function _nativeEnum(Class2, entries, params) {
   });
 }
 // @__NO_SIDE_EFFECTS__
-function _literal(Class2, value2, params) {
+function _literal(Class2, value, params) {
   return new Class2({
     type: "literal",
-    values: Array.isArray(value2) ? value2 : [value2],
+    values: Array.isArray(value) ? value : [value],
     ...normalizeParams(params)
   });
 }
@@ -10677,7 +15639,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 // @__NO_SIDE_EFFECTS__
-function _superRefine(fn) {
+function _superRefine(fn, params) {
   const ch = /* @__PURE__ */ _check((payload) => {
     payload.addIssue = (issue2) => {
       if (typeof issue2 === "string") {
@@ -10694,7 +15656,7 @@ function _superRefine(fn) {
       }
     };
     return fn(payload.value, payload);
-  });
+  }, params);
   return ch;
 }
 // @__NO_SIDE_EFFECTS__
@@ -10801,8 +15763,8 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
   return inst;
 }
 var TimePrecision;
-var init_api = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/api.js"() {
+var init_api2 = __esm({
+  "../../node_modules/zod/v4/core/api.js"() {
     init_checks();
     init_registries();
     init_schemas();
@@ -10817,7 +15779,7 @@ var init_api = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js
+// ../../node_modules/zod/v4/core/to-json-schema.js
 function initializeContext(params) {
   let target = params?.target ?? "draft-2020-12";
   if (target === "draft-4")
@@ -10840,7 +15802,7 @@ function initializeContext(params) {
   };
 }
 function process2(schema, ctx, _params = { path: [], schemaPath: [] }) {
-  var _a2;
+  var _a3;
   const def = schema._zod.def;
   const seen = ctx.seen.get(schema);
   if (seen) {
@@ -10887,8 +15849,8 @@ function process2(schema, ctx, _params = { path: [], schemaPath: [] }) {
     delete result.schema.examples;
     delete result.schema.default;
   }
-  if (ctx.io === "input" && result.schema._prefault)
-    (_a2 = result.schema).default ?? (_a2.default = result.schema._prefault);
+  if (ctx.io === "input" && "_prefault" in result.schema)
+    (_a3 = result.schema).default ?? (_a3.default = result.schema._prefault);
   delete result.schema._prefault;
   const _result = ctx.seen.get(schema);
   return _result.schema;
@@ -11069,10 +16031,15 @@ function finalize(ctx, schema) {
     result.$id = ctx.external.uri(id);
   }
   Object.assign(result, root.def ?? root.schema);
+  const rootMetaId = ctx.metadataRegistry.get(schema)?.id;
+  if (rootMetaId !== void 0 && result.id === rootMetaId)
+    delete result.id;
   const defs = ctx.external?.defs ?? {};
   for (const entry of ctx.seen.entries()) {
     const seen = entry[1];
     if (seen.def && seen.defId) {
+      if (seen.def.id === seen.defId)
+        delete seen.def.id;
       defs[seen.defId] = seen.def;
     }
   }
@@ -11128,6 +16095,8 @@ function isTransforming(_schema, _ctx) {
     return isTransforming(def.keyType, ctx) || isTransforming(def.valueType, ctx);
   }
   if (def.type === "pipe") {
+    if (_schema._zod.traits.has("$ZodCodec"))
+      return true;
     return isTransforming(def.in, ctx) || isTransforming(def.out, ctx);
   }
   if (def.type === "object") {
@@ -11157,7 +16126,7 @@ function isTransforming(_schema, _ctx) {
 }
 var createToJSONSchemaMethod, createStandardJSONSchemaMethod;
 var init_to_json_schema = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/to-json-schema.js"() {
+  "../../node_modules/zod/v4/core/to-json-schema.js"() {
     init_registries();
     createToJSONSchemaMethod = (schema, processors = {}) => (params) => {
       const ctx = initializeContext({ ...params, processors });
@@ -11175,7 +16144,7 @@ var init_to_json_schema = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js
+// ../../node_modules/zod/v4/core/json-schema-processors.js
 function toJSONSchema(input, params) {
   if ("_idmap" in input) {
     const registry2 = input;
@@ -11212,7 +16181,7 @@ function toJSONSchema(input, params) {
 }
 var formatMap, stringProcessor, numberProcessor, booleanProcessor, bigintProcessor, symbolProcessor, nullProcessor, undefinedProcessor, voidProcessor, neverProcessor, anyProcessor, unknownProcessor, dateProcessor, enumProcessor, literalProcessor, nanProcessor, templateLiteralProcessor, fileProcessor, successProcessor, customProcessor, functionProcessor, transformProcessor, mapProcessor, setProcessor, arrayProcessor, objectProcessor, unionProcessor, intersectionProcessor, tupleProcessor, recordProcessor, nullableProcessor, nonoptionalProcessor, defaultProcessor, prefaultProcessor, catchProcessor, pipeProcessor, readonlyProcessor, promiseProcessor, optionalProcessor, lazyProcessor, allProcessors;
 var init_json_schema_processors = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-processors.js"() {
+  "../../node_modules/zod/v4/core/json-schema-processors.js"() {
     init_to_json_schema();
     init_util();
     formatMap = {
@@ -11262,39 +16231,28 @@ var init_json_schema_processors = __esm({
         json2.type = "integer";
       else
         json2.type = "number";
-      if (typeof exclusiveMinimum === "number") {
-        if (ctx.target === "draft-04" || ctx.target === "openapi-3.0") {
+      const exMin = typeof exclusiveMinimum === "number" && exclusiveMinimum >= (minimum ?? Number.NEGATIVE_INFINITY);
+      const exMax = typeof exclusiveMaximum === "number" && exclusiveMaximum <= (maximum ?? Number.POSITIVE_INFINITY);
+      const legacy = ctx.target === "draft-04" || ctx.target === "openapi-3.0";
+      if (exMin) {
+        if (legacy) {
           json2.minimum = exclusiveMinimum;
           json2.exclusiveMinimum = true;
         } else {
           json2.exclusiveMinimum = exclusiveMinimum;
         }
-      }
-      if (typeof minimum === "number") {
+      } else if (typeof minimum === "number") {
         json2.minimum = minimum;
-        if (typeof exclusiveMinimum === "number" && ctx.target !== "draft-04") {
-          if (exclusiveMinimum >= minimum)
-            delete json2.minimum;
-          else
-            delete json2.exclusiveMinimum;
-        }
       }
-      if (typeof exclusiveMaximum === "number") {
-        if (ctx.target === "draft-04" || ctx.target === "openapi-3.0") {
+      if (exMax) {
+        if (legacy) {
           json2.maximum = exclusiveMaximum;
           json2.exclusiveMaximum = true;
         } else {
           json2.exclusiveMaximum = exclusiveMaximum;
         }
-      }
-      if (typeof maximum === "number") {
+      } else if (typeof maximum === "number") {
         json2.maximum = maximum;
-        if (typeof exclusiveMaximum === "number" && ctx.target !== "draft-04") {
-          if (exclusiveMaximum <= maximum)
-            delete json2.maximum;
-          else
-            delete json2.exclusiveMaximum;
-        }
       }
       if (typeof multipleOf === "number")
         json2.multipleOf = multipleOf;
@@ -11466,7 +16424,10 @@ var init_json_schema_processors = __esm({
       if (typeof maximum === "number")
         json2.maxItems = maximum;
       json2.type = "array";
-      json2.items = process2(def.element, ctx, { ...params, path: [...params.path, "items"] });
+      json2.items = process2(def.element, ctx, {
+        ...params,
+        path: [...params.path, "items"]
+      });
     };
     objectProcessor = (schema, ctx, _json, params) => {
       const json2 = _json;
@@ -11659,7 +16620,8 @@ var init_json_schema_processors = __esm({
     };
     pipeProcessor = (schema, ctx, _json, params) => {
       const def = schema._zod.def;
-      const innerType = ctx.io === "input" ? def.in._zod.def.type === "transform" ? def.out : def.in : def.out;
+      const inIsTransform = def.in._zod.traits.has("$ZodTransform");
+      const innerType = ctx.io === "input" ? inIsTransform ? def.out : def.in : def.out;
       process2(innerType, ctx, params);
       const seen = ctx.seen.get(schema);
       seen.ref = innerType;
@@ -11733,10 +16695,10 @@ var init_json_schema_processors = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js
+// ../../node_modules/zod/v4/core/json-schema-generator.js
 var JSONSchemaGenerator;
 var init_json_schema_generator = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema-generator.js"() {
+  "../../node_modules/zod/v4/core/json-schema-generator.js"() {
     init_json_schema_processors();
     init_to_json_schema();
     JSONSchemaGenerator = class {
@@ -11764,8 +16726,8 @@ var init_json_schema_generator = __esm({
       get counter() {
         return this.ctx.counter;
       }
-      set counter(value2) {
-        this.ctx.counter = value2;
+      set counter(value) {
+        this.ctx.counter = value;
       }
       /** @deprecated Access via ctx instead */
       get seen() {
@@ -11815,14 +16777,14 @@ var init_json_schema_generator = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js
+// ../../node_modules/zod/v4/core/json-schema.js
 var json_schema_exports = {};
 var init_json_schema = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/json-schema.js"() {
+  "../../node_modules/zod/v4/core/json-schema.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js
+// ../../node_modules/zod/v4/core/index.js
 var core_exports2 = {};
 __export(core_exports2, {
   $ZodAny: () => $ZodAny,
@@ -11902,6 +16864,7 @@ __export(core_exports2, {
   $ZodOptional: () => $ZodOptional,
   $ZodPipe: () => $ZodPipe,
   $ZodPrefault: () => $ZodPrefault,
+  $ZodPreprocess: () => $ZodPreprocess,
   $ZodPromise: () => $ZodPromise,
   $ZodReadonly: () => $ZodReadonly,
   $ZodRealError: () => $ZodRealError,
@@ -11977,7 +16940,7 @@ __export(core_exports2, {
   _intersection: () => _intersection,
   _ipv4: () => _ipv4,
   _ipv6: () => _ipv6,
-  _isoDate: () => _isoDate,
+  _isoDate: () => _isoDate2,
   _isoDateTime: () => _isoDateTime,
   _isoDuration: () => _isoDuration,
   _isoTime: () => _isoTime,
@@ -12073,7 +17036,7 @@ __export(core_exports2, {
   finalize: () => finalize,
   flattenError: () => flattenError,
   formatError: () => formatError,
-  globalConfig: () => globalConfig,
+  globalConfig: () => globalConfig2,
   globalRegistry: () => globalRegistry,
   initializeContext: () => initializeContext,
   isValidBase64: () => isValidBase64,
@@ -12100,7 +17063,7 @@ __export(core_exports2, {
   version: () => version
 });
 var init_core2 = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/core/index.js"() {
+  "../../node_modules/zod/v4/core/index.js"() {
     init_core();
     init_parse();
     init_errors();
@@ -12112,7 +17075,7 @@ var init_core2 = __esm({
     init_locales();
     init_registries();
     init_doc();
-    init_api();
+    init_api2();
     init_to_json_schema();
     init_json_schema_processors();
     init_json_schema_generator();
@@ -12120,7 +17083,7 @@ var init_core2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js
+// ../../node_modules/zod/v4/classic/checks.js
 var checks_exports2 = {};
 __export(checks_exports2, {
   endsWith: () => _endsWith,
@@ -12154,12 +17117,12 @@ __export(checks_exports2, {
   uppercase: () => _uppercase
 });
 var init_checks2 = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/checks.js"() {
+  "../../node_modules/zod/v4/classic/checks.js"() {
     init_core2();
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js
+// ../../node_modules/zod/v4/classic/iso.js
 var iso_exports = {};
 __export(iso_exports, {
   ZodISODate: () => ZodISODate,
@@ -12175,7 +17138,7 @@ function datetime2(params) {
   return _isoDateTime(ZodISODateTime, params);
 }
 function date2(params) {
-  return _isoDate(ZodISODate, params);
+  return _isoDate2(ZodISODate, params);
 }
 function time2(params) {
   return _isoTime(ZodISOTime, params);
@@ -12185,7 +17148,7 @@ function duration2(params) {
 }
 var ZodISODateTime, ZodISODate, ZodISOTime, ZodISODuration;
 var init_iso = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/iso.js"() {
+  "../../node_modules/zod/v4/classic/iso.js"() {
     init_core2();
     init_schemas2();
     ZodISODateTime = /* @__PURE__ */ $constructor("ZodISODateTime", (inst, def) => {
@@ -12207,10 +17170,10 @@ var init_iso = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js
+// ../../node_modules/zod/v4/classic/errors.js
 var initializer2, ZodError, ZodRealError;
 var init_errors2 = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/errors.js"() {
+  "../../node_modules/zod/v4/classic/errors.js"() {
     init_core2();
     init_core2();
     init_util();
@@ -12248,17 +17211,17 @@ var init_errors2 = __esm({
         }
       });
     };
-    ZodError = $constructor("ZodError", initializer2);
-    ZodRealError = $constructor("ZodError", initializer2, {
+    ZodError = /* @__PURE__ */ $constructor("ZodError", initializer2);
+    ZodRealError = /* @__PURE__ */ $constructor("ZodError", initializer2, {
       Parent: Error
     });
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js
+// ../../node_modules/zod/v4/classic/parse.js
 var parse2, parseAsync2, safeParse2, safeParseAsync2, encode2, decode2, encodeAsync2, decodeAsync2, safeEncode2, safeDecode2, safeEncodeAsync2, safeDecodeAsync2;
 var init_parse2 = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/parse.js"() {
+  "../../node_modules/zod/v4/classic/parse.js"() {
     init_core2();
     init_errors2();
     parse2 = /* @__PURE__ */ _parse(ZodRealError);
@@ -12276,7 +17239,7 @@ var init_parse2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js
+// ../../node_modules/zod/v4/classic/schemas.js
 var schemas_exports2 = {};
 __export(schemas_exports2, {
   ZodAny: () => ZodAny,
@@ -12326,6 +17289,7 @@ __export(schemas_exports2, {
   ZodOptional: () => ZodOptional,
   ZodPipe: () => ZodPipe,
   ZodPrefault: () => ZodPrefault,
+  ZodPreprocess: () => ZodPreprocess,
   ZodPromise: () => ZodPromise,
   ZodReadonly: () => ZodReadonly,
   ZodRecord: () => ZodRecord,
@@ -12386,6 +17350,7 @@ __export(schemas_exports2, {
   int32: () => int32,
   int64: () => int64,
   intersection: () => intersection,
+  invertCodec: () => invertCodec,
   ipv4: () => ipv42,
   ipv6: () => ipv62,
   json: () => json,
@@ -12444,6 +17409,42 @@ __export(schemas_exports2, {
   xid: () => xid2,
   xor: () => xor
 });
+function _installLazyMethods(inst, group, methods) {
+  const proto = Object.getPrototypeOf(inst);
+  let installed = _installedGroups.get(proto);
+  if (!installed) {
+    installed = /* @__PURE__ */ new Set();
+    _installedGroups.set(proto, installed);
+  }
+  if (installed.has(group))
+    return;
+  installed.add(group);
+  for (const key in methods) {
+    const fn = methods[key];
+    Object.defineProperty(proto, key, {
+      configurable: true,
+      enumerable: false,
+      get() {
+        const bound = fn.bind(this);
+        Object.defineProperty(this, key, {
+          configurable: true,
+          writable: true,
+          enumerable: true,
+          value: bound
+        });
+        return bound;
+      },
+      set(v) {
+        Object.defineProperty(this, key, {
+          configurable: true,
+          writable: true,
+          enumerable: true,
+          value: v
+        });
+      }
+    });
+  }
+}
 function string2(params) {
   return _string(ZodString, params);
 }
@@ -12470,7 +17471,7 @@ function url(params) {
 }
 function httpUrl(params) {
   return _url(ZodURL, {
-    protocol: /^https?$/,
+    protocol: regexes_exports.httpProtocol,
     hostname: regexes_exports.domain,
     ...util_exports.normalizeParams(params)
   });
@@ -12667,6 +17668,14 @@ function tuple(items, _paramsOrRest, _params) {
   });
 }
 function record(keyType, valueType, params) {
+  if (!valueType || !valueType._zod) {
+    return new ZodRecord({
+      type: "record",
+      keyType: string2(),
+      valueType: keyType,
+      ...util_exports.normalizeParams(valueType)
+    });
+  }
   return new ZodRecord({
     type: "record",
     keyType,
@@ -12723,10 +17732,10 @@ function nativeEnum(entries, params) {
     ...util_exports.normalizeParams(params)
   });
 }
-function literal(value2, params) {
+function literal(value, params) {
   return new ZodLiteral({
     type: "literal",
-    values: Array.isArray(value2) ? value2 : [value2],
+    values: Array.isArray(value) ? value : [value],
     ...util_exports.normalizeParams(params)
   });
 }
@@ -12818,6 +17827,16 @@ function codec(in_, out, params) {
     reverseTransform: params.encode
   });
 }
+function invertCodec(codec2) {
+  const def = codec2._zod.def;
+  return new ZodCodec({
+    type: "pipe",
+    in: def.out,
+    out: def.in,
+    transform: def.reverseTransform,
+    reverseTransform: def.transform
+  });
+}
 function readonly(innerType) {
   return new ZodReadonly({
     type: "readonly",
@@ -12864,8 +17883,8 @@ function custom(fn, _params) {
 function refine(fn, _params = {}) {
   return _refine(ZodCustom, fn, _params);
 }
-function superRefine(fn) {
-  return _superRefine(fn);
+function superRefine(fn, params) {
+  return _superRefine(fn, params);
 }
 function _instanceof(cls, params = {}) {
   const inst = new ZodCustom({
@@ -12896,11 +17915,15 @@ function json(params) {
   return jsonSchema;
 }
 function preprocess(fn, schema) {
-  return pipe(transform(fn), schema);
+  return new ZodPreprocess({
+    type: "pipe",
+    in: transform(fn),
+    out: schema
+  });
 }
-var ZodType, _ZodString, ZodString, ZodStringFormat, ZodEmail, ZodGUID, ZodUUID, ZodURL, ZodEmoji, ZodNanoID, ZodCUID, ZodCUID2, ZodULID, ZodXID, ZodKSUID, ZodIPv4, ZodMAC, ZodIPv6, ZodCIDRv4, ZodCIDRv6, ZodBase64, ZodBase64URL, ZodE164, ZodJWT, ZodCustomStringFormat, ZodNumber, ZodNumberFormat, ZodBoolean, ZodBigInt, ZodBigIntFormat, ZodSymbol, ZodUndefined, ZodNull, ZodAny, ZodUnknown, ZodNever, ZodVoid, ZodDate, ZodArray, ZodObject, ZodUnion, ZodXor, ZodDiscriminatedUnion, ZodIntersection, ZodTuple, ZodRecord, ZodMap, ZodSet, ZodEnum, ZodLiteral, ZodFile, ZodTransform, ZodOptional, ZodExactOptional, ZodNullable, ZodDefault, ZodPrefault, ZodNonOptional, ZodSuccess, ZodCatch, ZodNaN, ZodPipe, ZodCodec, ZodReadonly, ZodTemplateLiteral, ZodLazy, ZodPromise, ZodFunction, ZodCustom, describe2, meta2, stringbool;
+var _installedGroups, ZodType, _ZodString, ZodString, ZodStringFormat, ZodEmail, ZodGUID, ZodUUID, ZodURL, ZodEmoji, ZodNanoID, ZodCUID, ZodCUID2, ZodULID, ZodXID, ZodKSUID, ZodIPv4, ZodMAC, ZodIPv6, ZodCIDRv4, ZodCIDRv6, ZodBase64, ZodBase64URL, ZodE164, ZodJWT, ZodCustomStringFormat, ZodNumber, ZodNumberFormat, ZodBoolean, ZodBigInt, ZodBigIntFormat, ZodSymbol, ZodUndefined, ZodNull, ZodAny, ZodUnknown, ZodNever, ZodVoid, ZodDate, ZodArray, ZodObject, ZodUnion, ZodXor, ZodDiscriminatedUnion, ZodIntersection, ZodTuple, ZodRecord, ZodMap, ZodSet, ZodEnum, ZodLiteral, ZodFile, ZodTransform, ZodOptional, ZodExactOptional, ZodNullable, ZodDefault, ZodPrefault, ZodNonOptional, ZodSuccess, ZodCatch, ZodNaN, ZodPipe, ZodCodec, ZodPreprocess, ZodReadonly, ZodTemplateLiteral, ZodLazy, ZodPromise, ZodFunction, ZodCustom, describe2, meta2, stringbool;
 var init_schemas2 = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/schemas.js"() {
+  "../../node_modules/zod/v4/classic/schemas.js"() {
     init_core2();
     init_core2();
     init_json_schema_processors();
@@ -12908,6 +17931,7 @@ var init_schemas2 = __esm({
     init_checks2();
     init_iso();
     init_parse2();
+    _installedGroups = /* @__PURE__ */ new WeakMap();
     ZodType = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
       $ZodType.init(inst, def);
       Object.assign(inst["~standard"], {
@@ -12920,23 +17944,6 @@ var init_schemas2 = __esm({
       inst.def = def;
       inst.type = def.type;
       Object.defineProperty(inst, "_def", { value: def });
-      inst.check = (...checks) => {
-        return inst.clone(util_exports.mergeDefs(def, {
-          checks: [
-            ...def.checks ?? [],
-            ...checks.map((ch) => typeof ch === "function" ? { _zod: { check: ch, def: { check: "custom" }, onattach: [] } } : ch)
-          ]
-        }), {
-          parent: true
-        });
-      };
-      inst.with = inst.check;
-      inst.clone = (def2, params) => clone(inst, def2, params);
-      inst.brand = () => inst;
-      inst.register = ((reg, meta3) => {
-        reg.add(inst, meta3);
-        return inst;
-      });
       inst.parse = (data, params) => parse2(inst, data, params, { callee: inst.parse });
       inst.safeParse = (data, params) => safeParse2(inst, data, params);
       inst.parseAsync = async (data, params) => parseAsync2(inst, data, params, { callee: inst.parseAsync });
@@ -12950,45 +17957,108 @@ var init_schemas2 = __esm({
       inst.safeDecode = (data, params) => safeDecode2(inst, data, params);
       inst.safeEncodeAsync = async (data, params) => safeEncodeAsync2(inst, data, params);
       inst.safeDecodeAsync = async (data, params) => safeDecodeAsync2(inst, data, params);
-      inst.refine = (check2, params) => inst.check(refine(check2, params));
-      inst.superRefine = (refinement) => inst.check(superRefine(refinement));
-      inst.overwrite = (fn) => inst.check(_overwrite(fn));
-      inst.optional = () => optional(inst);
-      inst.exactOptional = () => exactOptional(inst);
-      inst.nullable = () => nullable(inst);
-      inst.nullish = () => optional(nullable(inst));
-      inst.nonoptional = (params) => nonoptional(inst, params);
-      inst.array = () => array(inst);
-      inst.or = (arg) => union([inst, arg]);
-      inst.and = (arg) => intersection(inst, arg);
-      inst.transform = (tx) => pipe(inst, transform(tx));
-      inst.default = (def2) => _default2(inst, def2);
-      inst.prefault = (def2) => prefault(inst, def2);
-      inst.catch = (params) => _catch2(inst, params);
-      inst.pipe = (target) => pipe(inst, target);
-      inst.readonly = () => readonly(inst);
-      inst.describe = (description) => {
-        const cl = inst.clone();
-        globalRegistry.add(cl, { description });
-        return cl;
-      };
+      _installLazyMethods(inst, "ZodType", {
+        check(...chks) {
+          const def2 = this.def;
+          return this.clone(util_exports.mergeDefs(def2, {
+            checks: [
+              ...def2.checks ?? [],
+              ...chks.map((ch) => typeof ch === "function" ? { _zod: { check: ch, def: { check: "custom" }, onattach: [] } } : ch)
+            ]
+          }), { parent: true });
+        },
+        with(...chks) {
+          return this.check(...chks);
+        },
+        clone(def2, params) {
+          return clone(this, def2, params);
+        },
+        brand() {
+          return this;
+        },
+        register(reg, meta3) {
+          reg.add(this, meta3);
+          return this;
+        },
+        refine(check2, params) {
+          return this.check(refine(check2, params));
+        },
+        superRefine(refinement, params) {
+          return this.check(superRefine(refinement, params));
+        },
+        overwrite(fn) {
+          return this.check(_overwrite(fn));
+        },
+        optional() {
+          return optional(this);
+        },
+        exactOptional() {
+          return exactOptional(this);
+        },
+        nullable() {
+          return nullable(this);
+        },
+        nullish() {
+          return optional(nullable(this));
+        },
+        nonoptional(params) {
+          return nonoptional(this, params);
+        },
+        array() {
+          return array(this);
+        },
+        or(arg) {
+          return union([this, arg]);
+        },
+        and(arg) {
+          return intersection(this, arg);
+        },
+        transform(tx) {
+          return pipe(this, transform(tx));
+        },
+        default(d) {
+          return _default2(this, d);
+        },
+        prefault(d) {
+          return prefault(this, d);
+        },
+        catch(params) {
+          return _catch2(this, params);
+        },
+        pipe(target) {
+          return pipe(this, target);
+        },
+        readonly() {
+          return readonly(this);
+        },
+        describe(description) {
+          const cl = this.clone();
+          globalRegistry.add(cl, { description });
+          return cl;
+        },
+        meta(...args) {
+          if (args.length === 0)
+            return globalRegistry.get(this);
+          const cl = this.clone();
+          globalRegistry.add(cl, args[0]);
+          return cl;
+        },
+        isOptional() {
+          return this.safeParse(void 0).success;
+        },
+        isNullable() {
+          return this.safeParse(null).success;
+        },
+        apply(fn) {
+          return fn(this);
+        }
+      });
       Object.defineProperty(inst, "description", {
         get() {
           return globalRegistry.get(inst)?.description;
         },
         configurable: true
       });
-      inst.meta = (...args) => {
-        if (args.length === 0) {
-          return globalRegistry.get(inst);
-        }
-        const cl = inst.clone();
-        globalRegistry.add(cl, args[0]);
-        return cl;
-      };
-      inst.isOptional = () => inst.safeParse(void 0).success;
-      inst.isNullable = () => inst.safeParse(null).success;
-      inst.apply = (fn) => fn(inst);
       return inst;
     });
     _ZodString = /* @__PURE__ */ $constructor("_ZodString", (inst, def) => {
@@ -12999,21 +18069,53 @@ var init_schemas2 = __esm({
       inst.format = bag.format ?? null;
       inst.minLength = bag.minimum ?? null;
       inst.maxLength = bag.maximum ?? null;
-      inst.regex = (...args) => inst.check(_regex(...args));
-      inst.includes = (...args) => inst.check(_includes(...args));
-      inst.startsWith = (...args) => inst.check(_startsWith(...args));
-      inst.endsWith = (...args) => inst.check(_endsWith(...args));
-      inst.min = (...args) => inst.check(_minLength(...args));
-      inst.max = (...args) => inst.check(_maxLength(...args));
-      inst.length = (...args) => inst.check(_length(...args));
-      inst.nonempty = (...args) => inst.check(_minLength(1, ...args));
-      inst.lowercase = (params) => inst.check(_lowercase(params));
-      inst.uppercase = (params) => inst.check(_uppercase(params));
-      inst.trim = () => inst.check(_trim());
-      inst.normalize = (...args) => inst.check(_normalize(...args));
-      inst.toLowerCase = () => inst.check(_toLowerCase());
-      inst.toUpperCase = () => inst.check(_toUpperCase());
-      inst.slugify = () => inst.check(_slugify());
+      _installLazyMethods(inst, "_ZodString", {
+        regex(...args) {
+          return this.check(_regex(...args));
+        },
+        includes(...args) {
+          return this.check(_includes(...args));
+        },
+        startsWith(...args) {
+          return this.check(_startsWith(...args));
+        },
+        endsWith(...args) {
+          return this.check(_endsWith(...args));
+        },
+        min(...args) {
+          return this.check(_minLength(...args));
+        },
+        max(...args) {
+          return this.check(_maxLength(...args));
+        },
+        length(...args) {
+          return this.check(_length(...args));
+        },
+        nonempty(...args) {
+          return this.check(_minLength(1, ...args));
+        },
+        lowercase(params) {
+          return this.check(_lowercase(params));
+        },
+        uppercase(params) {
+          return this.check(_uppercase(params));
+        },
+        trim() {
+          return this.check(_trim());
+        },
+        normalize(...args) {
+          return this.check(_normalize(...args));
+        },
+        toLowerCase() {
+          return this.check(_toLowerCase());
+        },
+        toUpperCase() {
+          return this.check(_toUpperCase());
+        },
+        slugify() {
+          return this.check(_slugify());
+        }
+      });
     });
     ZodString = /* @__PURE__ */ $constructor("ZodString", (inst, def) => {
       $ZodString.init(inst, def);
@@ -13138,21 +18240,53 @@ var init_schemas2 = __esm({
       $ZodNumber.init(inst, def);
       ZodType.init(inst, def);
       inst._zod.processJSONSchema = (ctx, json2, params) => numberProcessor(inst, ctx, json2, params);
-      inst.gt = (value2, params) => inst.check(_gt(value2, params));
-      inst.gte = (value2, params) => inst.check(_gte(value2, params));
-      inst.min = (value2, params) => inst.check(_gte(value2, params));
-      inst.lt = (value2, params) => inst.check(_lt(value2, params));
-      inst.lte = (value2, params) => inst.check(_lte(value2, params));
-      inst.max = (value2, params) => inst.check(_lte(value2, params));
-      inst.int = (params) => inst.check(int(params));
-      inst.safe = (params) => inst.check(int(params));
-      inst.positive = (params) => inst.check(_gt(0, params));
-      inst.nonnegative = (params) => inst.check(_gte(0, params));
-      inst.negative = (params) => inst.check(_lt(0, params));
-      inst.nonpositive = (params) => inst.check(_lte(0, params));
-      inst.multipleOf = (value2, params) => inst.check(_multipleOf(value2, params));
-      inst.step = (value2, params) => inst.check(_multipleOf(value2, params));
-      inst.finite = () => inst;
+      _installLazyMethods(inst, "ZodNumber", {
+        gt(value, params) {
+          return this.check(_gt(value, params));
+        },
+        gte(value, params) {
+          return this.check(_gte(value, params));
+        },
+        min(value, params) {
+          return this.check(_gte(value, params));
+        },
+        lt(value, params) {
+          return this.check(_lt(value, params));
+        },
+        lte(value, params) {
+          return this.check(_lte(value, params));
+        },
+        max(value, params) {
+          return this.check(_lte(value, params));
+        },
+        int(params) {
+          return this.check(int(params));
+        },
+        safe(params) {
+          return this.check(int(params));
+        },
+        positive(params) {
+          return this.check(_gt(0, params));
+        },
+        nonnegative(params) {
+          return this.check(_gte(0, params));
+        },
+        negative(params) {
+          return this.check(_lt(0, params));
+        },
+        nonpositive(params) {
+          return this.check(_lte(0, params));
+        },
+        multipleOf(value, params) {
+          return this.check(_multipleOf(value, params));
+        },
+        step(value, params) {
+          return this.check(_multipleOf(value, params));
+        },
+        finite() {
+          return this;
+        }
+      });
       const bag = inst._zod.bag;
       inst.minValue = Math.max(bag.minimum ?? Number.NEGATIVE_INFINITY, bag.exclusiveMinimum ?? Number.NEGATIVE_INFINITY) ?? null;
       inst.maxValue = Math.min(bag.maximum ?? Number.POSITIVE_INFINITY, bag.exclusiveMaximum ?? Number.POSITIVE_INFINITY) ?? null;
@@ -13173,19 +18307,19 @@ var init_schemas2 = __esm({
       $ZodBigInt.init(inst, def);
       ZodType.init(inst, def);
       inst._zod.processJSONSchema = (ctx, json2, params) => bigintProcessor(inst, ctx, json2, params);
-      inst.gte = (value2, params) => inst.check(_gte(value2, params));
-      inst.min = (value2, params) => inst.check(_gte(value2, params));
-      inst.gt = (value2, params) => inst.check(_gt(value2, params));
-      inst.gte = (value2, params) => inst.check(_gte(value2, params));
-      inst.min = (value2, params) => inst.check(_gte(value2, params));
-      inst.lt = (value2, params) => inst.check(_lt(value2, params));
-      inst.lte = (value2, params) => inst.check(_lte(value2, params));
-      inst.max = (value2, params) => inst.check(_lte(value2, params));
+      inst.gte = (value, params) => inst.check(_gte(value, params));
+      inst.min = (value, params) => inst.check(_gte(value, params));
+      inst.gt = (value, params) => inst.check(_gt(value, params));
+      inst.gte = (value, params) => inst.check(_gte(value, params));
+      inst.min = (value, params) => inst.check(_gte(value, params));
+      inst.lt = (value, params) => inst.check(_lt(value, params));
+      inst.lte = (value, params) => inst.check(_lte(value, params));
+      inst.max = (value, params) => inst.check(_lte(value, params));
       inst.positive = (params) => inst.check(_gt(BigInt(0), params));
       inst.negative = (params) => inst.check(_lt(BigInt(0), params));
       inst.nonpositive = (params) => inst.check(_lte(BigInt(0), params));
       inst.nonnegative = (params) => inst.check(_gte(BigInt(0), params));
-      inst.multipleOf = (value2, params) => inst.check(_multipleOf(value2, params));
+      inst.multipleOf = (value, params) => inst.check(_multipleOf(value, params));
       const bag = inst._zod.bag;
       inst.minValue = bag.minimum ?? null;
       inst.maxValue = bag.maximum ?? null;
@@ -13234,8 +18368,8 @@ var init_schemas2 = __esm({
       $ZodDate.init(inst, def);
       ZodType.init(inst, def);
       inst._zod.processJSONSchema = (ctx, json2, params) => dateProcessor(inst, ctx, json2, params);
-      inst.min = (value2, params) => inst.check(_gte(value2, params));
-      inst.max = (value2, params) => inst.check(_lte(value2, params));
+      inst.min = (value, params) => inst.check(_gte(value, params));
+      inst.max = (value, params) => inst.check(_lte(value, params));
       const c = inst._zod.bag;
       inst.minDate = c.minimum ? new Date(c.minimum) : null;
       inst.maxDate = c.maximum ? new Date(c.maximum) : null;
@@ -13245,11 +18379,23 @@ var init_schemas2 = __esm({
       ZodType.init(inst, def);
       inst._zod.processJSONSchema = (ctx, json2, params) => arrayProcessor(inst, ctx, json2, params);
       inst.element = def.element;
-      inst.min = (minLength, params) => inst.check(_minLength(minLength, params));
-      inst.nonempty = (params) => inst.check(_minLength(1, params));
-      inst.max = (maxLength, params) => inst.check(_maxLength(maxLength, params));
-      inst.length = (len, params) => inst.check(_length(len, params));
-      inst.unwrap = () => inst.element;
+      _installLazyMethods(inst, "ZodArray", {
+        min(n, params) {
+          return this.check(_minLength(n, params));
+        },
+        nonempty(params) {
+          return this.check(_minLength(1, params));
+        },
+        max(n, params) {
+          return this.check(_maxLength(n, params));
+        },
+        length(n, params) {
+          return this.check(_length(n, params));
+        },
+        unwrap() {
+          return this.element;
+        }
+      });
     });
     ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
       $ZodObjectJIT.init(inst, def);
@@ -13258,23 +18404,47 @@ var init_schemas2 = __esm({
       util_exports.defineLazy(inst, "shape", () => {
         return def.shape;
       });
-      inst.keyof = () => _enum2(Object.keys(inst._zod.def.shape));
-      inst.catchall = (catchall) => inst.clone({ ...inst._zod.def, catchall });
-      inst.passthrough = () => inst.clone({ ...inst._zod.def, catchall: unknown() });
-      inst.loose = () => inst.clone({ ...inst._zod.def, catchall: unknown() });
-      inst.strict = () => inst.clone({ ...inst._zod.def, catchall: never() });
-      inst.strip = () => inst.clone({ ...inst._zod.def, catchall: void 0 });
-      inst.extend = (incoming) => {
-        return util_exports.extend(inst, incoming);
-      };
-      inst.safeExtend = (incoming) => {
-        return util_exports.safeExtend(inst, incoming);
-      };
-      inst.merge = (other) => util_exports.merge(inst, other);
-      inst.pick = (mask) => util_exports.pick(inst, mask);
-      inst.omit = (mask) => util_exports.omit(inst, mask);
-      inst.partial = (...args) => util_exports.partial(ZodOptional, inst, args[0]);
-      inst.required = (...args) => util_exports.required(ZodNonOptional, inst, args[0]);
+      _installLazyMethods(inst, "ZodObject", {
+        keyof() {
+          return _enum2(Object.keys(this._zod.def.shape));
+        },
+        catchall(catchall) {
+          return this.clone({ ...this._zod.def, catchall });
+        },
+        passthrough() {
+          return this.clone({ ...this._zod.def, catchall: unknown() });
+        },
+        loose() {
+          return this.clone({ ...this._zod.def, catchall: unknown() });
+        },
+        strict() {
+          return this.clone({ ...this._zod.def, catchall: never() });
+        },
+        strip() {
+          return this.clone({ ...this._zod.def, catchall: void 0 });
+        },
+        extend(incoming) {
+          return util_exports.extend(this, incoming);
+        },
+        safeExtend(incoming) {
+          return util_exports.safeExtend(this, incoming);
+        },
+        merge(other) {
+          return util_exports.merge(this, other);
+        },
+        pick(mask) {
+          return util_exports.pick(this, mask);
+        },
+        omit(mask) {
+          return util_exports.omit(this, mask);
+        },
+        partial(...args) {
+          return util_exports.partial(ZodOptional, this, args[0]);
+        },
+        required(...args) {
+          return util_exports.required(ZodNonOptional, this, args[0]);
+        }
+      });
     });
     ZodUnion = /* @__PURE__ */ $constructor("ZodUnion", (inst, def) => {
       $ZodUnion.init(inst, def);
@@ -13342,11 +18512,11 @@ var init_schemas2 = __esm({
       const keys = new Set(Object.keys(def.entries));
       inst.extract = (values, params) => {
         const newEntries = {};
-        for (const value2 of values) {
-          if (keys.has(value2)) {
-            newEntries[value2] = def.entries[value2];
+        for (const value of values) {
+          if (keys.has(value)) {
+            newEntries[value] = def.entries[value];
           } else
-            throw new Error(`Key ${value2} not found in enum`);
+            throw new Error(`Key ${value} not found in enum`);
         }
         return new ZodEnum({
           ...def,
@@ -13357,11 +18527,11 @@ var init_schemas2 = __esm({
       };
       inst.exclude = (values, params) => {
         const newEntries = { ...def.entries };
-        for (const value2 of values) {
-          if (keys.has(value2)) {
-            delete newEntries[value2];
+        for (const value of values) {
+          if (keys.has(value)) {
+            delete newEntries[value];
           } else
-            throw new Error(`Key ${value2} not found in enum`);
+            throw new Error(`Key ${value} not found in enum`);
         }
         return new ZodEnum({
           ...def,
@@ -13418,10 +18588,12 @@ var init_schemas2 = __esm({
         if (output instanceof Promise) {
           return output.then((output2) => {
             payload.value = output2;
+            payload.fallback = true;
             return payload;
           });
         }
         payload.value = output;
+        payload.fallback = true;
         return payload;
       };
     });
@@ -13491,6 +18663,10 @@ var init_schemas2 = __esm({
       ZodPipe.init(inst, def);
       $ZodCodec.init(inst, def);
     });
+    ZodPreprocess = /* @__PURE__ */ $constructor("ZodPreprocess", (inst, def) => {
+      ZodPipe.init(inst, def);
+      $ZodPreprocess.init(inst, def);
+    });
     ZodReadonly = /* @__PURE__ */ $constructor("ZodReadonly", (inst, def) => {
       $ZodReadonly.init(inst, def);
       ZodType.init(inst, def);
@@ -13534,7 +18710,7 @@ var init_schemas2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js
+// ../../node_modules/zod/v4/classic/compat.js
 function setErrorMap(map2) {
   config({
     customError: map2
@@ -13545,8 +18721,7 @@ function getErrorMap() {
 }
 var ZodIssueCode, ZodFirstPartyTypeKind;
 var init_compat = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/compat.js"() {
-    init_core2();
+  "../../node_modules/zod/v4/classic/compat.js"() {
     init_core2();
     ZodIssueCode = {
       invalid_type: "invalid_type",
@@ -13566,7 +18741,7 @@ var init_compat = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js
+// ../../node_modules/zod/v4/classic/from-json-schema.js
 function detectVersion(schema, defaultTarget) {
   const $schema = schema.$schema;
   if ($schema === "https://json-schema.org/draft/2020-12/schema") {
@@ -13584,13 +18759,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path3 = ref.slice(1).split("/").filter(Boolean);
-  if (path3.length === 0) {
+  const path5 = ref.slice(1).split("/").filter(Boolean);
+  if (path5.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path3[0] === defsKey) {
-    const key = path3[1];
+  if (path5[0] === defsKey) {
+    const key = path5[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -13882,12 +19057,6 @@ function convertBaseSchema(schema, ctx) {
     default:
       throw new Error(`Unsupported type: ${type}`);
   }
-  if (schema.description) {
-    zodSchema = zodSchema.describe(schema.description);
-  }
-  if (schema.default !== void 0) {
-    zodSchema = zodSchema.default(schema.default);
-  }
   return zodSchema;
 }
 function convertSchema(schema, ctx) {
@@ -13924,6 +19093,9 @@ function convertSchema(schema, ctx) {
   if (schema.readOnly === true) {
     baseSchema = z.readonly(baseSchema);
   }
+  if (schema.default !== void 0) {
+    baseSchema = baseSchema.default(schema.default);
+  }
   const extraMeta = {};
   const coreMetadataKeys = ["$id", "id", "$comment", "$anchor", "$vocabulary", "$dynamicRef", "$dynamicAnchor"];
   for (const key of coreMetadataKeys) {
@@ -13945,27 +19117,36 @@ function convertSchema(schema, ctx) {
   if (Object.keys(extraMeta).length > 0) {
     ctx.registry.add(baseSchema, extraMeta);
   }
+  if (schema.description) {
+    baseSchema = baseSchema.describe(schema.description);
+  }
   return baseSchema;
 }
 function fromJSONSchema(schema, params) {
   if (typeof schema === "boolean") {
     return schema ? z.any() : z.never();
   }
-  const version3 = detectVersion(schema, params?.defaultTarget);
-  const defs = schema.$defs || schema.definitions || {};
+  let normalized;
+  try {
+    normalized = JSON.parse(JSON.stringify(schema));
+  } catch {
+    throw new Error("fromJSONSchema input is not valid JSON (possibly cyclic); use $defs/$ref for recursive schemas");
+  }
+  const version3 = detectVersion(normalized, params?.defaultTarget);
+  const defs = normalized.$defs || normalized.definitions || {};
   const ctx = {
     version: version3,
     defs,
     refs: /* @__PURE__ */ new Map(),
     processing: /* @__PURE__ */ new Set(),
-    rootSchema: schema,
+    rootSchema: normalized,
     registry: params?.registry ?? globalRegistry
   };
-  return convertSchema(schema, ctx);
+  return convertSchema(normalized, ctx);
 }
 var z, RECOGNIZED_KEYS;
 var init_from_json_schema = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/from-json-schema.js"() {
+  "../../node_modules/zod/v4/classic/from-json-schema.js"() {
     init_registries();
     init_checks2();
     init_iso();
@@ -14049,7 +19230,7 @@ var init_from_json_schema = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js
+// ../../node_modules/zod/v4/classic/coerce.js
 var coerce_exports = {};
 __export(coerce_exports, {
   bigint: () => bigint3,
@@ -14074,13 +19255,13 @@ function date4(params) {
   return _coercedDate(ZodDate, params);
 }
 var init_coerce = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/coerce.js"() {
+  "../../node_modules/zod/v4/classic/coerce.js"() {
     init_core2();
     init_schemas2();
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js
+// ../../node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
   $brand: () => $brand,
@@ -14142,6 +19323,7 @@ __export(external_exports, {
   ZodOptional: () => ZodOptional,
   ZodPipe: () => ZodPipe,
   ZodPrefault: () => ZodPrefault,
+  ZodPreprocess: () => ZodPreprocess,
   ZodPromise: () => ZodPromise,
   ZodReadonly: () => ZodReadonly,
   ZodRealError: () => ZodRealError,
@@ -14220,6 +19402,7 @@ __export(external_exports, {
   int32: () => int32,
   int64: () => int64,
   intersection: () => intersection,
+  invertCodec: () => invertCodec,
   ipv4: () => ipv42,
   ipv6: () => ipv62,
   iso: () => iso_exports,
@@ -14321,7 +19504,7 @@ __export(external_exports, {
   xor: () => xor
 });
 var init_external = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/v4/classic/external.js"() {
+  "../../node_modules/zod/v4/classic/external.js"() {
     init_core2();
     init_schemas2();
     init_checks2();
@@ -14341,26 +19524,28 @@ var init_external = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js
+// ../../node_modules/zod/index.js
 var init_zod = __esm({
-  "../../node_modules/.pnpm/zod@4.3.6/node_modules/zod/index.js"() {
+  "../../node_modules/zod/index.js"() {
     init_external();
     init_external();
   }
 });
 
-// ../../packages/task-queue/src/schemas.ts
-var TaskKindSchema, TaskStatusSchema, TaskPrioritySchema, ErrorCategorySchema, TaskInputSchema, TaskOutputSchema, TaskProgressSchema, ClassifiedErrorSchema, TaskSchema, AddInputSchema, AddOutputSchema, TaskIdInputSchema, ListInputSchema, ListOutputSchema, StatsOutputSchema, SetMaxConcurrencyInputSchema, SetMaxPerGroupInputSchema, PauseInputSchema, RetryInputSchema, VoidOutputSchema;
+// ../../node_modules/@vidbee/task-queue/src/schemas.ts
+var TaskKindSchema, TaskStatusSchema, TaskPrioritySchema, ErrorCategorySchema, TaskInputSchema, TranscriptTaskResultSchema, SubtitleDownloadStatusSchema, TaskOutputSchema, TaskProgressSchema, ClassifiedErrorSchema, TaskSchema, AddInputSchema, AddOutputSchema, TaskIdInputSchema, ListInputSchema, ListOutputSchema, StatsOutputSchema, SetMaxConcurrencyInputSchema, SetMaxPerGroupInputSchema, PauseInputSchema, RetryInputSchema, VoidOutputSchema;
 var init_schemas3 = __esm({
-  "../../packages/task-queue/src/schemas.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/schemas.ts"() {
     init_zod();
     TaskKindSchema = external_exports.enum([
       "video",
       "audio",
       "playlist",
       "subscription-item",
-      "yt-dlp-forward"
+      "yt-dlp-forward",
+      "transcription",
+      "conversion",
+      "model-download"
     ]);
     TaskStatusSchema = external_exports.enum([
       "queued",
@@ -14372,11 +19557,7 @@ var init_schemas3 = __esm({
       "failed",
       "cancelled"
     ]);
-    TaskPrioritySchema = external_exports.union([
-      external_exports.literal(0),
-      external_exports.literal(10),
-      external_exports.literal(20)
-    ]);
+    TaskPrioritySchema = external_exports.union([external_exports.literal(0), external_exports.literal(10), external_exports.literal(20)]);
     ErrorCategorySchema = external_exports.enum([
       "http-429",
       "auth-required",
@@ -14403,11 +19584,31 @@ var init_schemas3 = __esm({
       rawArgs: external_exports.array(external_exports.string()).optional(),
       options: external_exports.record(external_exports.string(), external_exports.unknown()).optional()
     });
+    TranscriptTaskResultSchema = external_exports.object({
+      resultKind: external_exports.enum(["transcript", "no-speech"]),
+      transcriptId: external_exports.string().min(1)
+    });
+    SubtitleDownloadStatusSchema = external_exports.enum([
+      "downloaded",
+      "unavailable",
+      "skipped-auth",
+      "failed"
+    ]);
     TaskOutputSchema = external_exports.object({
       filePath: external_exports.string(),
       size: external_exports.number().int().nonnegative(),
       durationMs: external_exports.number().int().nullable(),
-      sha256: external_exports.string().nullable()
+      sha256: external_exports.string().nullable(),
+      formatId: external_exports.string().nullable().optional(),
+      subtitleStatus: SubtitleDownloadStatusSchema.optional(),
+      subtitleLanguages: external_exports.array(external_exports.string()).optional(),
+      subtitleAcquisition: external_exports.object({
+        id: external_exports.string(),
+        acquiredAt: external_exports.number(),
+        credentialsUsed: external_exports.boolean().optional(),
+        visibility: external_exports.enum(["public", "private", "unlisted"]).optional()
+      }).optional(),
+      transcript: TranscriptTaskResultSchema.optional()
     });
     TaskProgressSchema = external_exports.object({
       percent: external_exports.number().min(0).max(1).nullable(),
@@ -14458,6 +19659,8 @@ var init_schemas3 = __esm({
     AddOutputSchema = external_exports.object({ id: external_exports.string() });
     TaskIdInputSchema = external_exports.object({ id: external_exports.string() });
     ListInputSchema = external_exports.object({
+      query: external_exports.string().max(200).optional(),
+      kind: TaskKindSchema.optional(),
       status: TaskStatusSchema.optional(),
       groupKey: external_exports.string().optional(),
       parentId: external_exports.string().optional(),
@@ -14494,641 +19697,11 @@ var init_schemas3 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/@orpc+shared@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/shared/dist/index.mjs
-function resolveMaybeOptionalOptions(rest) {
-  return rest[0] ?? {};
-}
-function sequential(fn) {
-  let lastOperationPromise = Promise.resolve();
-  return (...args) => {
-    return lastOperationPromise = lastOperationPromise.catch(() => {
-    }).then(() => {
-      return fn(...args);
-    });
-  };
-}
-function getConstructor(value2) {
-  if (!isTypescriptObject(value2)) {
-    return null;
-  }
-  return Object.getPrototypeOf(value2)?.constructor;
-}
-function isTypescriptObject(value2) {
-  return !!value2 && (typeof value2 === "object" || typeof value2 === "function");
-}
-var ORPC_SHARED_PACKAGE_NAME, ORPC_SHARED_PACKAGE_VERSION, GLOBAL_OTEL_CONFIG_KEY, fallbackAsyncDisposeSymbol, asyncDisposeSymbol, AsyncIteratorClass;
-var init_dist = __esm({
-  "../../node_modules/.pnpm/@orpc+shared@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/shared/dist/index.mjs"() {
-    ORPC_SHARED_PACKAGE_NAME = "@orpc/shared";
-    ORPC_SHARED_PACKAGE_VERSION = "1.14.0";
-    GLOBAL_OTEL_CONFIG_KEY = `__${ORPC_SHARED_PACKAGE_NAME}@${ORPC_SHARED_PACKAGE_VERSION}/otel/config__`;
-    fallbackAsyncDisposeSymbol = Symbol.for("asyncDispose");
-    asyncDisposeSymbol = Symbol.asyncDispose ?? fallbackAsyncDisposeSymbol;
-    AsyncIteratorClass = class {
-      #isDone = false;
-      #isExecuteComplete = false;
-      #cleanup;
-      #next;
-      constructor(next, cleanup) {
-        this.#cleanup = cleanup;
-        this.#next = sequential(async () => {
-          if (this.#isDone) {
-            return { done: true, value: void 0 };
-          }
-          try {
-            const result = await next();
-            if (result.done) {
-              this.#isDone = true;
-            }
-            return result;
-          } catch (err) {
-            this.#isDone = true;
-            throw err;
-          } finally {
-            if (this.#isDone && !this.#isExecuteComplete) {
-              this.#isExecuteComplete = true;
-              await this.#cleanup("next");
-            }
-          }
-        });
-      }
-      next() {
-        return this.#next();
-      }
-      async return(value2) {
-        this.#isDone = true;
-        if (!this.#isExecuteComplete) {
-          this.#isExecuteComplete = true;
-          await this.#cleanup("return");
-        }
-        return { done: true, value: value2 };
-      }
-      async throw(err) {
-        this.#isDone = true;
-        if (!this.#isExecuteComplete) {
-          this.#isExecuteComplete = true;
-          await this.#cleanup("throw");
-        }
-        throw err;
-      }
-      /**
-       * asyncDispose symbol only available in esnext, we should fallback to Symbol.for('asyncDispose')
-       */
-      async [asyncDisposeSymbol]() {
-        this.#isDone = true;
-        if (!this.#isExecuteComplete) {
-          this.#isExecuteComplete = true;
-          await this.#cleanup("dispose");
-        }
-      }
-      [Symbol.asyncIterator]() {
-        return this;
-      }
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.KWZYf6QD.mjs
-function fallbackORPCErrorStatus(code, status) {
-  return status ?? COMMON_ORPC_ERROR_DEFS[code]?.status ?? 500;
-}
-function fallbackORPCErrorMessage(code, message) {
-  return message || COMMON_ORPC_ERROR_DEFS[code]?.message || code;
-}
-function isORPCErrorStatus(status) {
-  return status < 200 || status >= 400;
-}
-var ORPC_CLIENT_PACKAGE_NAME, ORPC_CLIENT_PACKAGE_VERSION, COMMON_ORPC_ERROR_DEFS, GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL, globalORPCErrorConstructors, ORPCError;
-var init_client_KWZYf6QD = __esm({
-  "../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.KWZYf6QD.mjs"() {
-    init_dist();
-    ORPC_CLIENT_PACKAGE_NAME = "@orpc/client";
-    ORPC_CLIENT_PACKAGE_VERSION = "1.14.0";
-    COMMON_ORPC_ERROR_DEFS = {
-      BAD_REQUEST: {
-        status: 400,
-        message: "Bad Request"
-      },
-      UNAUTHORIZED: {
-        status: 401,
-        message: "Unauthorized"
-      },
-      FORBIDDEN: {
-        status: 403,
-        message: "Forbidden"
-      },
-      NOT_FOUND: {
-        status: 404,
-        message: "Not Found"
-      },
-      METHOD_NOT_SUPPORTED: {
-        status: 405,
-        message: "Method Not Supported"
-      },
-      NOT_ACCEPTABLE: {
-        status: 406,
-        message: "Not Acceptable"
-      },
-      TIMEOUT: {
-        status: 408,
-        message: "Request Timeout"
-      },
-      CONFLICT: {
-        status: 409,
-        message: "Conflict"
-      },
-      PRECONDITION_FAILED: {
-        status: 412,
-        message: "Precondition Failed"
-      },
-      PAYLOAD_TOO_LARGE: {
-        status: 413,
-        message: "Payload Too Large"
-      },
-      UNSUPPORTED_MEDIA_TYPE: {
-        status: 415,
-        message: "Unsupported Media Type"
-      },
-      UNPROCESSABLE_CONTENT: {
-        status: 422,
-        message: "Unprocessable Content"
-      },
-      TOO_MANY_REQUESTS: {
-        status: 429,
-        message: "Too Many Requests"
-      },
-      CLIENT_CLOSED_REQUEST: {
-        status: 499,
-        message: "Client Closed Request"
-      },
-      INTERNAL_SERVER_ERROR: {
-        status: 500,
-        message: "Internal Server Error"
-      },
-      NOT_IMPLEMENTED: {
-        status: 501,
-        message: "Not Implemented"
-      },
-      BAD_GATEWAY: {
-        status: 502,
-        message: "Bad Gateway"
-      },
-      SERVICE_UNAVAILABLE: {
-        status: 503,
-        message: "Service Unavailable"
-      },
-      GATEWAY_TIMEOUT: {
-        status: 504,
-        message: "Gateway Timeout"
-      }
-    };
-    GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL = Symbol.for(`__${ORPC_CLIENT_PACKAGE_NAME}@${ORPC_CLIENT_PACKAGE_VERSION}/error/ORPC_ERROR_CONSTRUCTORS__`);
-    void (globalThis[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL] ??= /* @__PURE__ */ new WeakSet());
-    globalORPCErrorConstructors = globalThis[GLOBAL_ORPC_ERROR_CONSTRUCTORS_SYMBOL];
-    ORPCError = class extends Error {
-      defined;
-      code;
-      status;
-      data;
-      constructor(code, ...rest) {
-        const options = resolveMaybeOptionalOptions(rest);
-        if (options.status !== void 0 && !isORPCErrorStatus(options.status)) {
-          throw new Error("[ORPCError] Invalid error status code.");
-        }
-        const message = fallbackORPCErrorMessage(code, options.message);
-        super(message, options);
-        this.code = code;
-        this.status = fallbackORPCErrorStatus(code, options.status);
-        this.defined = options.defined ?? false;
-        this.data = options.data;
-      }
-      toJSON() {
-        return {
-          defined: this.defined,
-          code: this.code,
-          status: this.status,
-          message: this.message,
-          data: this.data
-        };
-      }
-      /**
-       * Workaround for Next.js where different contexts use separate
-       * dependency graphs, causing multiple ORPCError constructors existing and breaking
-       * `instanceof` checks across contexts.
-       *
-       * This is particularly problematic with "Optimized SSR", where orpc-client
-       * executes in one context but is invoked from another. When an error is thrown
-       * in the execution context, `instanceof ORPCError` checks fail in the
-       * invocation context due to separate class constructors.
-       *
-       * @todo Remove this and related code if Next.js resolves the multiple dependency graph issue.
-       */
-      static [Symbol.hasInstance](instance) {
-        if (globalORPCErrorConstructors.has(this)) {
-          const constructor = getConstructor(instance);
-          if (constructor && globalORPCErrorConstructors.has(constructor)) {
-            return true;
-          }
-        }
-        return super[Symbol.hasInstance](instance);
-      }
-    };
-    globalORPCErrorConstructors.add(ORPCError);
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+standard-server@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/standard-server/dist/index.mjs
-function decodeEventMessage(encoded) {
-  const lines = encoded.replace(/\n+$/, "").split(/\n/);
-  const message = {
-    data: void 0,
-    event: void 0,
-    id: void 0,
-    retry: void 0,
-    comments: []
-  };
-  for (const line of lines) {
-    const index2 = line.indexOf(":");
-    const key = index2 === -1 ? line : line.slice(0, index2);
-    const value2 = index2 === -1 ? "" : line.slice(index2 + 1).replace(/^\s/, "");
-    if (index2 === 0) {
-      message.comments.push(value2);
-    } else if (key === "data") {
-      message.data ??= "";
-      message.data += `${value2}
-`;
-    } else if (key === "event") {
-      message.event = value2;
-    } else if (key === "id") {
-      message.id = value2;
-    } else if (key === "retry") {
-      const maybeInteger = Number.parseInt(value2);
-      if (Number.isInteger(maybeInteger) && maybeInteger >= 0 && maybeInteger.toString() === value2) {
-        message.retry = maybeInteger;
-      }
-    }
-  }
-  message.data = message.data?.replace(/\n$/, "");
-  return message;
-}
-var EventDecoderError, EventDecoder, EventDecoderStream, EVENT_SOURCE_META_SYMBOL;
-var init_dist2 = __esm({
-  "../../node_modules/.pnpm/@orpc+standard-server@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/standard-server/dist/index.mjs"() {
-    init_dist();
-    EventDecoderError = class extends TypeError {
-    };
-    EventDecoder = class {
-      constructor(options = {}) {
-        this.options = options;
-      }
-      incomplete = "";
-      feed(chunk) {
-        this.incomplete += chunk;
-        const lastCompleteIndex = this.incomplete.lastIndexOf("\n\n");
-        if (lastCompleteIndex === -1) {
-          return;
-        }
-        const completes = this.incomplete.slice(0, lastCompleteIndex).split(/\n\n/);
-        this.incomplete = this.incomplete.slice(lastCompleteIndex + 2);
-        for (const encoded of completes) {
-          const message = decodeEventMessage(`${encoded}
-
-`);
-          if (this.options.onEvent) {
-            this.options.onEvent(message);
-          }
-        }
-      }
-      end() {
-        if (this.incomplete) {
-          throw new EventDecoderError("Event Iterator ended before complete");
-        }
-      }
-    };
-    EventDecoderStream = class extends TransformStream {
-      constructor() {
-        let decoder;
-        super({
-          start(controller) {
-            decoder = new EventDecoder({
-              onEvent: (event) => {
-                controller.enqueue(event);
-              }
-            });
-          },
-          transform(chunk) {
-            decoder.feed(chunk);
-          },
-          flush() {
-            decoder.end();
-          }
-        });
-      }
-    };
-    EVENT_SOURCE_META_SYMBOL = Symbol("ORPC_EVENT_SOURCE_META");
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.BLtwTQUg.mjs
-var init_client_BLtwTQUg = __esm({
-  "../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.BLtwTQUg.mjs"() {
-    init_dist();
-    init_dist2();
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/index.mjs
-var init_dist3 = __esm({
-  "../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/index.mjs"() {
-    init_dist();
-    init_dist();
-    init_client_KWZYf6QD();
-    init_client_KWZYf6QD();
-    init_client_BLtwTQUg();
-    init_dist2();
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+contract@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/contract/dist/shared/contract.D_dZrO__.mjs
-function mergeErrorMap(errorMap1, errorMap2) {
-  return { ...errorMap1, ...errorMap2 };
-}
-function isContractProcedure(item) {
-  if (item instanceof ContractProcedure) {
-    return true;
-  }
-  return (typeof item === "object" || typeof item === "function") && item !== null && "~orpc" in item && typeof item["~orpc"] === "object" && item["~orpc"] !== null && "errorMap" in item["~orpc"] && "route" in item["~orpc"] && "meta" in item["~orpc"];
-}
-var ContractProcedure;
-var init_contract_D_dZrO = __esm({
-  "../../node_modules/.pnpm/@orpc+contract@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/contract/dist/shared/contract.D_dZrO__.mjs"() {
-    init_dist3();
-    ContractProcedure = class {
-      /**
-       * This property holds the defined options for the contract procedure.
-       */
-      "~orpc";
-      constructor(def) {
-        if (def.route?.successStatus && isORPCErrorStatus(def.route.successStatus)) {
-          throw new Error("[ContractProcedure] Invalid successStatus.");
-        }
-        if (Object.values(def.errorMap).some((val) => val && val.status && !isORPCErrorStatus(val.status))) {
-          throw new Error("[ContractProcedure] Invalid error status code.");
-        }
-        this["~orpc"] = def;
-      }
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+standard-server-fetch@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/standard-server-fetch/dist/index.mjs
-var init_dist4 = __esm({
-  "../../node_modules/.pnpm/@orpc+standard-server-fetch@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/standard-server-fetch/dist/index.mjs"() {
-    init_dist();
-    init_dist2();
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.DrB9nq_G.mjs
-var init_client_DrB9nq_G = __esm({
-  "../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/shared/client.DrB9nq_G.mjs"() {
-    init_dist();
-    init_dist2();
-    init_client_KWZYf6QD();
-    init_dist4();
-    init_client_BLtwTQUg();
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/adapters/standard/index.mjs
-var init_standard = __esm({
-  "../../node_modules/.pnpm/@orpc+client@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/client/dist/adapters/standard/index.mjs"() {
-    init_client_DrB9nq_G();
-    init_dist();
-    init_dist2();
-    init_client_KWZYf6QD();
-    init_dist4();
-    init_client_BLtwTQUg();
-  }
-});
-
-// ../../node_modules/.pnpm/@orpc+contract@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/contract/dist/index.mjs
-function mergeMeta(meta1, meta22) {
-  return { ...meta1, ...meta22 };
-}
-function mergeRoute(a, b) {
-  return { ...a, ...b };
-}
-function prefixRoute(route, prefix) {
-  if (!route.path) {
-    return route;
-  }
-  return {
-    ...route,
-    path: `${prefix}${route.path}`
-  };
-}
-function unshiftTagRoute(route, tags) {
-  return {
-    ...route,
-    tags: [...tags, ...route.tags ?? []]
-  };
-}
-function mergePrefix(a, b) {
-  return a ? `${a}${b}` : b;
-}
-function mergeTags(a, b) {
-  return a ? [...a, ...b] : b;
-}
-function enhanceRoute(route, options) {
-  let router = route;
-  if (options.prefix) {
-    router = prefixRoute(router, options.prefix);
-  }
-  if (options.tags?.length) {
-    router = unshiftTagRoute(router, options.tags);
-  }
-  return router;
-}
-function enhanceContractRouter(router, options) {
-  if (isContractProcedure(router)) {
-    const enhanced2 = new ContractProcedure({
-      ...router["~orpc"],
-      errorMap: mergeErrorMap(options.errorMap, router["~orpc"].errorMap),
-      route: enhanceRoute(router["~orpc"].route, options)
-    });
-    return enhanced2;
-  }
-  if (typeof router !== "object" || router === null) {
-    return router;
-  }
-  const enhanced = {};
-  for (const key in router) {
-    enhanced[key] = enhanceContractRouter(router[key], options);
-  }
-  return enhanced;
-}
-var ContractBuilder, oc, EVENT_ITERATOR_DETAILS_SYMBOL;
-var init_dist5 = __esm({
-  "../../node_modules/.pnpm/@orpc+contract@1.14.0_@opentelemetry+api@1.9.1/node_modules/@orpc/contract/dist/index.mjs"() {
-    init_contract_D_dZrO();
-    init_contract_D_dZrO();
-    init_standard();
-    init_dist();
-    init_dist();
-    init_dist3();
-    init_dist3();
-    ContractBuilder = class _ContractBuilder extends ContractProcedure {
-      constructor(def) {
-        super(def);
-        this["~orpc"].prefix = def.prefix;
-        this["~orpc"].tags = def.tags;
-      }
-      /**
-       * Sets or overrides the initial meta.
-       *
-       * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
-       */
-      $meta(initialMeta) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          meta: initialMeta
-        });
-      }
-      /**
-       * Sets or overrides the initial route.
-       * This option is typically relevant when integrating with OpenAPI.
-       *
-       * @see {@link https://orpc.dev/docs/openapi/routing OpenAPI Routing Docs}
-       * @see {@link https://orpc.dev/docs/openapi/input-output-structure OpenAPI Input/Output Structure Docs}
-       */
-      $route(initialRoute) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          route: initialRoute
-        });
-      }
-      /**
-       * Sets or overrides the initial input schema.
-       *
-       * @see {@link https://orpc.dev/docs/procedure#initial-configuration Initial Procedure Configuration Docs}
-       */
-      $input(initialInputSchema) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          inputSchema: initialInputSchema
-        });
-      }
-      /**
-       * Adds type-safe custom errors to the contract.
-       * The provided errors are spared-merged with any existing errors in the contract.
-       *
-       * @see {@link https://orpc.dev/docs/error-handling#type%E2%80%90safe-error-handling Type-Safe Error Handling Docs}
-       */
-      errors(errors) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          errorMap: mergeErrorMap(this["~orpc"].errorMap, errors)
-        });
-      }
-      /**
-       * Sets or updates the metadata for the contract.
-       * The provided metadata is spared-merged with any existing metadata in the contract.
-       *
-       * @see {@link https://orpc.dev/docs/metadata Metadata Docs}
-       */
-      meta(meta3) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          meta: mergeMeta(this["~orpc"].meta, meta3)
-        });
-      }
-      /**
-       * Sets or updates the route definition for the contract.
-       * The provided route is spared-merged with any existing route in the contract.
-       * This option is typically relevant when integrating with OpenAPI.
-       *
-       * @see {@link https://orpc.dev/docs/openapi/routing OpenAPI Routing Docs}
-       * @see {@link https://orpc.dev/docs/openapi/input-output-structure OpenAPI Input/Output Structure Docs}
-       */
-      route(route) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          route: mergeRoute(this["~orpc"].route, route)
-        });
-      }
-      /**
-       * Defines the input validation schema for the contract.
-       *
-       * @see {@link https://orpc.dev/docs/procedure#input-output-validation Input Validation Docs}
-       */
-      input(schema) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          inputSchema: schema
-        });
-      }
-      /**
-       * Defines the output validation schema for the contract.
-       *
-       * @see {@link https://orpc.dev/docs/procedure#input-output-validation Output Validation Docs}
-       */
-      output(schema) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          outputSchema: schema
-        });
-      }
-      /**
-       * Prefixes all procedures in the contract router.
-       * The provided prefix is post-appended to any existing router prefix.
-       *
-       * @note This option does not affect procedures that do not define a path in their route definition.
-       *
-       * @see {@link https://orpc.dev/docs/openapi/routing#route-prefixes OpenAPI Route Prefixes Docs}
-       */
-      prefix(prefix) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          prefix: mergePrefix(this["~orpc"].prefix, prefix)
-        });
-      }
-      /**
-       * Adds tags to all procedures in the contract router.
-       * This helpful when you want to group procedures together in the OpenAPI specification.
-       *
-       * @see {@link https://orpc.dev/docs/openapi/openapi-specification#operation-metadata OpenAPI Operation Metadata Docs}
-       */
-      tag(...tags) {
-        return new _ContractBuilder({
-          ...this["~orpc"],
-          tags: mergeTags(this["~orpc"].tags, tags)
-        });
-      }
-      /**
-       * Applies all of the previously defined options to the specified contract router.
-       *
-       * @see {@link https://orpc.dev/docs/router#extending-router Extending Router Docs}
-       */
-      router(router) {
-        return enhanceContractRouter(router, this["~orpc"]);
-      }
-    };
-    oc = new ContractBuilder({
-      errorMap: {},
-      route: {},
-      meta: {}
-    });
-    EVENT_ITERATOR_DETAILS_SYMBOL = Symbol("ORPC_EVENT_ITERATOR_DETAILS");
-  }
-});
-
-// ../../packages/task-queue/src/contract.ts
+// ../../node_modules/@vidbee/task-queue/src/contract.ts
 var taskQueueContract;
 var init_contract = __esm({
-  "../../packages/task-queue/src/contract.ts"() {
-    "use strict";
-    init_dist5();
+  "../../node_modules/@vidbee/task-queue/src/contract.ts"() {
+    init_dist4();
     init_schemas3();
     taskQueueContract = {
       add: oc.input(AddInputSchema).output(AddOutputSchema),
@@ -15146,1304 +19719,63 @@ var init_contract = __esm({
   }
 });
 
-// ../../packages/task-queue/src/fsm/index.ts
-function isLegalTransition(from, to) {
-  return LEGAL_TRANSITIONS[from]?.has(to) ?? false;
-}
-function transition(task, to, ctx) {
-  const from = task.status;
-  if (TERMINAL_STATUSES.has(from) && from !== to) {
-  }
-  if (!isLegalTransition(from, to)) {
-    throw new IllegalTransitionError(from, to, ctx.trigger);
-  }
-  const now = ctx.now ?? Date.now();
-  const next = {
-    ...task,
-    prevStatus: from,
-    status: to,
-    statusReason: ctx.reason ?? null,
-    enteredStatusAt: now,
-    updatedAt: now
-  };
-  switch (to) {
-    case "running":
-      if (from === "queued" && task.attempt === 0) {
-        next.attempt = 1;
-      }
-      break;
-    case "queued":
-      if (ctx.trigger === "retry-tick") {
-        next.attempt = task.attempt + 1;
-        next.nextRetryAt = null;
-      } else if (ctx.trigger === "retry-manual") {
-        next.attempt = 0;
-        next.lastError = null;
-        next.nextRetryAt = null;
-      } else if (ctx.trigger === "requeue") {
-        next.lastError = null;
-        next.nextRetryAt = null;
-      } else if (ctx.trigger === "resume") {
-        next.nextRetryAt = null;
-      }
-      break;
-    case "completed": {
-      if (!ctx.output) {
-        throw new IllegalTransitionError(
-          from,
-          to,
-          "finalize-success requires output"
-        );
-      }
-      if (ctx.output.size <= 0) {
-        throw new IllegalTransitionError(
-          from,
-          to,
-          "completed requires output.size > 0"
-        );
-      }
-      next.output = ctx.output;
-      next.lastError = null;
-      next.pid = null;
-      next.pidStartedAt = null;
-      break;
-    }
-    case "failed": {
-      if (ctx.error) next.lastError = ctx.error;
-      next.pid = null;
-      next.pidStartedAt = null;
-      break;
-    }
-    case "cancelled": {
-      next.pid = null;
-      next.pidStartedAt = null;
-      break;
-    }
-    case "retry-scheduled": {
-      if (ctx.nextRetryAt == null || ctx.nextRetryAt <= 0) {
-        throw new IllegalTransitionError(
-          from,
-          to,
-          "retry-scheduled requires nextRetryAt"
-        );
-      }
-      if (ctx.error) next.lastError = ctx.error;
-      next.nextRetryAt = ctx.nextRetryAt;
-      next.pid = null;
-      next.pidStartedAt = null;
-      break;
-    }
-    case "paused": {
-      next.pid = null;
-      next.pidStartedAt = null;
-      break;
-    }
-    case "processing":
-      break;
-  }
-  return next;
-}
-var IllegalTransitionError, LEGAL_TRANSITIONS;
-var init_fsm = __esm({
-  "../../packages/task-queue/src/fsm/index.ts"() {
-    "use strict";
+// ../../node_modules/@vidbee/task-queue/src/executor/router.ts
+var ExecutorRouter;
+var init_router = __esm({
+  "../../node_modules/@vidbee/task-queue/src/executor/router.ts"() {
     init_types();
-    IllegalTransitionError = class extends Error {
-      from;
-      to;
-      reason;
-      constructor(from, to, reason) {
-        super(
-          `IllegalTransition: ${from} -> ${to}${reason ? ` (${reason})` : ""}`
-        );
-        this.name = "IllegalTransitionError";
-        this.from = from;
-        this.to = to;
-        this.reason = reason;
-      }
-    };
-    LEGAL_TRANSITIONS = {
-      queued: /* @__PURE__ */ new Set(["running", "paused", "cancelled"]),
-      running: /* @__PURE__ */ new Set([
-        "processing",
-        "completed",
-        "retry-scheduled",
-        "failed",
-        "paused",
-        "cancelled"
-      ]),
-      processing: /* @__PURE__ */ new Set([
-        "completed",
-        "retry-scheduled",
-        "failed",
-        "paused",
-        "cancelled"
-      ]),
-      paused: /* @__PURE__ */ new Set(["queued", "cancelled", "failed"]),
-      "retry-scheduled": /* @__PURE__ */ new Set(["queued", "paused", "cancelled"]),
-      failed: /* @__PURE__ */ new Set(["queued"]),
-      cancelled: /* @__PURE__ */ new Set(["queued"]),
-      completed: /* @__PURE__ */ new Set()
-    };
-  }
-});
-
-// ../../packages/task-queue/src/classifier/index.ts
-function getRuleForCategory(c) {
-  const r = RULE_BY_CATEGORY.get(c);
-  if (!r) throw new Error(`no rule for category ${c}`);
-  return r;
-}
-function sanitizeOutput(s) {
-  let out = s;
-  for (const re of SECRET_PATTERNS) {
-    out = out.replace(re, (_m, p1, _p2) => {
-      return typeof p1 === "string" ? `${p1}: <redacted>` : "<redacted>";
-    });
-  }
-  return out;
-}
-function takeStderrTail(s, bytes = STDERR_TAIL_BYTES) {
-  if (Buffer.byteLength(s, "utf8") <= bytes) return s;
-  while (Buffer.byteLength(s, "utf8") > bytes) {
-    s = s.slice(Math.floor(s.length * 0.1));
-  }
-  return s;
-}
-function parseRetryAfter(header) {
-  if (!header) return null;
-  const trimmed = header.trim();
-  if (!trimmed) return null;
-  if (/^\d+$/.test(trimmed)) {
-    const secs = Number.parseInt(trimmed, 10);
-    if (Number.isFinite(secs) && secs >= 0) return secs * 1e3;
-    return null;
-  }
-  const t = Date.parse(trimmed);
-  if (Number.isNaN(t)) return null;
-  const delta = t - Date.now();
-  return delta > 0 ? delta : 0;
-}
-function classify(input) {
-  const tail = takeStderrTail(input.stderr ?? "");
-  const sanitizedTail = sanitizeOutput(tail);
-  for (const rule of CLASSIFIER_RULES) {
-    if (!rule.regex) continue;
-    if (rule.regex.test(tail) || rule.exitCodeHint != null && input.exitCode === rule.exitCodeHint) {
-      return buildError(rule, sanitizedTail, input);
-    }
-  }
-  const unknown2 = getRuleForCategory("unknown");
-  return buildError(unknown2, sanitizedTail, input);
-}
-function virtualError(category, rawMessage) {
-  const rule = getRuleForCategory(category);
-  return {
-    category,
-    exitCode: null,
-    rawMessage,
-    uiMessageKey: rule.uiMessageKey,
-    uiActionHints: rule.uiActionHints,
-    retryable: rule.defaultMaxAttempts > 0,
-    suggestedRetryAfterMs: rule.defaultBackoffMs
-  };
-}
-function buildError(rule, sanitizedTail, input) {
-  let suggestedRetryAfterMs = rule.defaultBackoffMs;
-  if (rule.category === "http-429") {
-    const fromInput = parseRetryAfter(input.retryAfterHeader ?? null);
-    if (fromInput != null) {
-      suggestedRetryAfterMs = fromInput;
-    } else {
-      const m = sanitizedTail.match(RETRY_AFTER_REGEX);
-      if (m && m[1]) {
-        const fromTail = parseRetryAfter(m[1]);
-        if (fromTail != null) suggestedRetryAfterMs = fromTail;
-      }
-    }
-  }
-  return {
-    category: rule.category,
-    exitCode: input.exitCode ?? null,
-    rawMessage: sanitizedTail,
-    uiMessageKey: rule.uiMessageKey,
-    uiActionHints: rule.uiActionHints,
-    retryable: rule.defaultMaxAttempts > 0,
-    suggestedRetryAfterMs
-  };
-}
-function defaultMaxAttempts(c) {
-  return getRuleForCategory(c).defaultMaxAttempts;
-}
-var CLASSIFIER_RULES, RULE_BY_CATEGORY, STDERR_TAIL_BYTES, SECRET_PATTERNS, RETRY_AFTER_REGEX;
-var init_classifier = __esm({
-  "../../packages/task-queue/src/classifier/index.ts"() {
-    "use strict";
-    CLASSIFIER_RULES = [
-      {
-        category: "http-429",
-        regex: /HTTP Error 429|Too Many Requests/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 3,
-        defaultBackoffMs: 3e4,
-        uiActionHints: ["retry-later"],
-        uiMessageKey: "task.error.http429"
-      },
-      {
-        category: "auth-required",
-        regex: /Sign in to confirm|Login required|Private video|members-only|cookies are no longer valid/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["import-cookies"],
-        uiMessageKey: "task.error.authRequired"
-      },
-      {
-        category: "geo-blocked",
-        regex: /not available in your country|geo-restricted|geo restricted|content isn't available in your country/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["set-proxy"],
-        uiMessageKey: "task.error.geoBlocked"
-      },
-      {
-        category: "not-found",
-        regex: /HTTP Error 404|Video unavailable|This video has been removed|Requested format is not available/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["remove-task"],
-        uiMessageKey: "task.error.notFound"
-      },
-      {
-        category: "disk-full",
-        regex: /ENOSPC|No space left on device/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["open-folder", "free-disk"],
-        uiMessageKey: "task.error.diskFull"
-      },
-      {
-        category: "permission-denied",
-        regex: /EACCES|EPERM|Permission denied/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["choose-folder"],
-        uiMessageKey: "task.error.permissionDenied"
-      },
-      {
-        category: "binary-missing",
-        regex: /yt-dlp.*not found|ffmpeg.*not found|ffprobe.*not found/i,
-        exitCodeHint: 127,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["report-bug"],
-        uiMessageKey: "task.error.binaryMissing"
-      },
-      {
-        category: "ffmpeg",
-        regex: /ffmpeg|Postprocessing|Conversion failed/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 1,
-        defaultBackoffMs: 5e3,
-        uiActionHints: ["report-bug"],
-        uiMessageKey: "task.error.ffmpeg"
-      },
-      {
-        category: "network-transient",
-        regex: /socket hang up|ECONNRESET|ECONNREFUSED|getaddrinfo ENOTFOUND|Connection timed out|HTTP Error 5\d\d|Read timed out/i,
-        exitCodeHint: null,
-        defaultMaxAttempts: 5,
-        defaultBackoffMs: null,
-        uiActionHints: ["retry"],
-        uiMessageKey: "task.error.networkTransient"
-      },
-      // Virtual rules — produced by Watchdog/cancel; never matched against stderr.
-      {
-        category: "stalled",
-        regex: null,
-        exitCodeHint: null,
-        defaultMaxAttempts: 3,
-        defaultBackoffMs: 5e3,
-        uiActionHints: ["retry"],
-        uiMessageKey: "task.error.stalled"
-      },
-      {
-        category: "cancelled-by-user",
-        regex: null,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: [],
-        uiMessageKey: "task.error.cancelledByUser"
-      },
-      {
-        // Virtual: produced by `processing → completed` guard when the output
-        // file is missing or zero-byte. Non-retryable by default.
-        category: "output-missing",
-        regex: null,
-        exitCodeHint: null,
-        defaultMaxAttempts: 0,
-        defaultBackoffMs: null,
-        uiActionHints: ["report-bug"],
-        uiMessageKey: "task.error.outputMissing"
-      },
-      {
-        category: "unknown",
-        regex: null,
-        exitCodeHint: null,
-        defaultMaxAttempts: 1,
-        defaultBackoffMs: null,
-        uiActionHints: ["retry", "report-bug"],
-        uiMessageKey: "task.error.unknown"
-      }
-    ];
-    RULE_BY_CATEGORY = new Map(
-      CLASSIFIER_RULES.map((r) => [r.category, r])
-    );
-    STDERR_TAIL_BYTES = 8 * 1024;
-    SECRET_PATTERNS = [
-      // Authorization / cookie / api key headers
-      /(authorization|cookie|x-api-key|x-auth-token):\s*([^\r\n]+)/gi,
-      // Inline cookies/tokens that yt-dlp may print as flags
-      /(--cookies-from-browser\s+\S+\s+--cookies\s+\S+)/gi,
-      /token=([A-Za-z0-9_\-.]+)/gi,
-      /secret=([A-Za-z0-9_\-.]+)/gi,
-      /password=([^\s&]+)/gi
-    ];
-    RETRY_AFTER_REGEX = /Retry-After:\s*([^\r\n]+)/i;
-  }
-});
-
-// ../../packages/task-queue/src/events/index.ts
-var EventBus;
-var init_events = __esm({
-  "../../packages/task-queue/src/events/index.ts"() {
-    "use strict";
-    EventBus = class {
-      listeners = /* @__PURE__ */ new Map();
-      subscribe(listener) {
-        return this.subscribeFiltered("*", listener);
-      }
-      on(type, listener) {
-        return this.subscribeFiltered(type, listener);
-      }
-      emit(event) {
-        const typed = this.listeners.get(event.type);
-        if (typed) {
-          for (const l of typed) this.safeCall(l, event);
-        }
-        const wildcard = this.listeners.get("*");
-        if (wildcard) {
-          for (const l of wildcard) this.safeCall(l, event);
-        }
-      }
-      /** Number of subscribers; for tests/diagnostics. */
-      size() {
-        let n = 0;
-        for (const set2 of this.listeners.values()) n += set2.size;
-        return n;
-      }
-      subscribeFiltered(key, listener) {
-        let set2 = this.listeners.get(key);
-        if (!set2) {
-          set2 = /* @__PURE__ */ new Set();
-          this.listeners.set(key, set2);
-        }
-        set2.add(listener);
-        return () => {
-          set2.delete(listener);
-          if (set2.size === 0) this.listeners.delete(key);
-        };
-      }
-      safeCall(listener, event) {
-        try {
-          listener(event);
-        } catch (err) {
-          console.error("[task-queue] listener threw", err);
-        }
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/util/async-mutex.ts
-var AsyncMutex;
-var init_async_mutex = __esm({
-  "../../packages/task-queue/src/util/async-mutex.ts"() {
-    "use strict";
-    AsyncMutex = class {
-      locked = false;
-      waiters = [];
-      async acquire() {
-        if (!this.locked) {
-          this.locked = true;
-          return () => this.release();
-        }
-        await new Promise((resolve2) => this.waiters.push(resolve2));
-        this.locked = true;
-        return () => this.release();
-      }
-      async runExclusive(fn) {
-        const release = await this.acquire();
-        try {
-          return await fn();
-        } finally {
-          release();
-        }
-      }
-      release() {
-        if (!this.locked) {
-          throw new Error("AsyncMutex: release called while not locked");
-        }
-        this.locked = false;
-        const next = this.waiters.shift();
-        if (next) next();
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/util/min-heap.ts
-var MinHeap;
-var init_min_heap = __esm({
-  "../../packages/task-queue/src/util/min-heap.ts"() {
-    "use strict";
-    MinHeap = class {
-      constructor(cmp) {
-        this.cmp = cmp;
-      }
-      data = [];
-      size() {
-        return this.data.length;
-      }
-      peek() {
-        return this.data[0];
-      }
-      push(item) {
-        this.data.push(item);
-        this.siftUp(this.data.length - 1);
-      }
-      pop() {
-        if (this.data.length === 0) return void 0;
-        const top = this.data[0];
-        const last = this.data.pop();
-        if (this.data.length > 0) {
-          this.data[0] = last;
-          this.siftDown(0);
-        }
-        return top;
-      }
-      /**
-       * Remove the first element matching `pred`. O(n). Used for cancel/pause
-       * which are rare relative to dispatch.
-       */
-      remove(pred) {
-        const idx = this.data.findIndex(pred);
-        if (idx < 0) return void 0;
-        const removed = this.data[idx];
-        const last = this.data.pop();
-        if (idx < this.data.length) {
-          this.data[idx] = last;
-          this.siftDown(idx);
-          this.siftUp(idx);
-        }
-        return removed;
-      }
-      toArray() {
-        return this.data;
-      }
-      siftUp(idx) {
-        let i = idx;
-        while (i > 0) {
-          const parent = i - 1 >> 1;
-          if (this.cmp(this.data[i], this.data[parent]) >= 0) return;
-          [this.data[i], this.data[parent]] = [this.data[parent], this.data[i]];
-          i = parent;
-        }
-      }
-      siftDown(idx) {
-        const n = this.data.length;
-        let i = idx;
-        while (true) {
-          const l = i * 2 + 1;
-          const r = i * 2 + 2;
-          let smallest = i;
-          if (l < n && this.cmp(this.data[l], this.data[smallest]) < 0) smallest = l;
-          if (r < n && this.cmp(this.data[r], this.data[smallest]) < 0) smallest = r;
-          if (smallest === i) return;
-          [this.data[i], this.data[smallest]] = [
-            this.data[smallest],
-            this.data[i]
-          ];
-          i = smallest;
-        }
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/scheduler/scheduler.ts
-var Scheduler;
-var init_scheduler = __esm({
-  "../../packages/task-queue/src/scheduler/scheduler.ts"() {
-    "use strict";
-    init_async_mutex();
-    init_min_heap();
-    Scheduler = class {
+    ExecutorRouter = class {
+      defaultExecutor;
+      byKind;
       constructor(opts) {
-        this.opts = opts;
-        this.maxConcurrency = opts.maxConcurrency;
-        this.defaultMaxPerGroup = opts.defaultMaxPerGroup ?? null;
+        this.defaultExecutor = opts.defaultExecutor;
+        this.byKind = opts.byKind ?? {};
       }
-      readyHeap = new MinHeap(
-        (a, b) => a.priority !== b.priority ? a.priority - b.priority : a.seq - b.seq
-      );
-      /** taskId → 1 currently consuming a slot. */
-      running = /* @__PURE__ */ new Set();
-      /** groupKey → number of tasks currently consuming a slot. */
-      perGroupRunning = /* @__PURE__ */ new Map();
-      /** groupKey → explicit per-group cap. Null means unlimited. */
-      perGroupCap = /* @__PURE__ */ new Map();
-      mutex = new AsyncMutex();
-      seqCounter = 0;
-      maxConcurrency;
-      defaultMaxPerGroup;
-      // ─────────────── Public API ───────────────
-      async enqueue(taskId, priority) {
-        await this.mutex.runExclusive(() => {
-          this.readyHeap.push({
-            taskId,
-            priority,
-            seq: ++this.seqCounter
-          });
-        });
-        await this.tryDispatch();
-      }
-      /** Removes a task from the ready heap (does not touch running set). */
-      async dequeue(taskId) {
-        return this.mutex.runExclusive(() => {
-          const removed = this.readyHeap.remove((e) => e.taskId === taskId);
-          return removed != null;
-        });
-      }
-      /**
-       * Marker that a previously-dispatched task has reached a terminal/yielding
-       * status (completed/failed/cancelled/paused/retry-scheduled). Releases its
-       * slot and bumps dispatch.
-       */
-      async releaseSlot(taskId) {
-        await this.mutex.runExclusive(() => {
-          if (!this.running.has(taskId)) return;
-          this.running.delete(taskId);
-          const t = this.opts.getTask(taskId);
-          const groupKey = t?.groupKey;
-          if (groupKey) this.decGroup(groupKey);
-        });
-        await this.tryDispatch();
-      }
-      async setMaxConcurrency(n) {
-        if (!Number.isInteger(n) || n < 1) {
-          throw new Error(`maxConcurrency must be \u2265 1 integer, got ${n}`);
+      /** Route registered kinds and reject missing non-download executors. */
+      run(ctx, events) {
+        if (!(this.byKind[ctx.input.kind] || isDownloadTaskKind(ctx.input.kind))) {
+          throw new Error(`This host has no executor for ${ctx.input.kind} tasks`);
         }
-        const toDemote = [];
-        await this.mutex.runExclusive(() => {
-          this.maxConcurrency = n;
-          while (this.running.size > this.maxConcurrency) {
-            const victim = this.pickDemoteVictim();
-            if (!victim) break;
-            toDemote.push(victim);
-            this.running.delete(victim);
-            const t = this.opts.getTask(victim);
-            if (t?.groupKey) this.decGroup(t.groupKey);
-          }
-        });
-        for (const id of toDemote) {
-          try {
-            await this.opts.demote(id);
-          } catch (err) {
-            console.error("[task-queue] demote callback threw", err);
-          }
-        }
-        void this.tryDispatch();
-      }
-      async setMaxPerGroup(groupKey, n) {
-        await this.mutex.runExclusive(() => {
-          if (n == null) {
-            this.perGroupCap.delete(groupKey);
-          } else {
-            if (!Number.isInteger(n) || n < 1) {
-              throw new Error(`maxPerGroup must be null or \u2265 1 integer, got ${n}`);
-            }
-            this.perGroupCap.set(groupKey, n);
-          }
-        });
-        void this.tryDispatch();
-      }
-      setDefaultMaxPerGroup(n) {
-        this.defaultMaxPerGroup = n;
-      }
-      stats() {
-        const perGroup = {};
-        for (const [k, v] of this.perGroupRunning) perGroup[k] = v;
-        return {
-          running: this.running.size,
-          queued: this.readyHeap.size(),
-          capacity: this.maxConcurrency,
-          perGroup
-        };
-      }
-      // ─────────────── Internals ───────────────
-      /**
-       * Tries to fill open slots. Held under the mutex so two concurrent triggers
-       * cannot both consume the same slot. The dispatch callback is invoked
-       * outside the mutex (callbacks may do FSM transitions and IO).
-       */
-      async tryDispatch() {
-        const toDispatch = [];
-        await this.mutex.runExclusive(() => {
-          while (this.running.size < this.maxConcurrency && this.readyHeap.size() > 0) {
-            const candidate = this.popEligible();
-            if (!candidate) break;
-            const t = this.opts.getTask(candidate.taskId);
-            if (!t) continue;
-            this.running.add(candidate.taskId);
-            this.incGroup(t.groupKey);
-            toDispatch.push(candidate.taskId);
-          }
-        });
-        for (const id of toDispatch) {
-          let ok2 = false;
-          try {
-            ok2 = await this.opts.dispatch(id);
-          } catch (err) {
-            console.error("[task-queue] dispatch callback threw", err);
-          }
-          if (!ok2) {
-            await this.mutex.runExclusive(() => {
-              if (this.running.delete(id)) {
-                const t = this.opts.getTask(id);
-                if (t?.groupKey) this.decGroup(t.groupKey);
-              }
-            });
-          }
-        }
-      }
-      /**
-       * Pop the next entry that satisfies the per-group cap. Skipped entries are
-       * stashed and re-pushed at the end of the call so we do not lose them.
-       */
-      popEligible() {
-        const skipped = [];
-        let chosen;
-        while (this.readyHeap.size() > 0) {
-          const top = this.readyHeap.pop();
-          const task = this.opts.getTask(top.taskId);
-          if (!task) {
-            continue;
-          }
-          if (this.canRunInGroup(task.groupKey)) {
-            chosen = top;
-            break;
-          }
-          skipped.push(top);
-        }
-        for (const s of skipped) this.readyHeap.push(s);
-        return chosen;
-      }
-      canRunInGroup(groupKey) {
-        const cap = this.perGroupCap.has(groupKey) ? this.perGroupCap.get(groupKey) : this.defaultMaxPerGroup;
-        if (cap == null) return true;
-        const n = this.perGroupRunning.get(groupKey) ?? 0;
-        return n < cap;
-      }
-      pickDemoteVictim() {
-        let victim = null;
-        let victimPri = -1;
-        for (const id of this.running) {
-          const t = this.opts.getTask(id);
-          if (!t) continue;
-          if (t.priority > victimPri) {
-            victimPri = t.priority;
-            victim = id;
-          }
-        }
-        return victim;
-      }
-      incGroup(groupKey) {
-        this.perGroupRunning.set(groupKey, (this.perGroupRunning.get(groupKey) ?? 0) + 1);
-      }
-      decGroup(groupKey) {
-        const cur = this.perGroupRunning.get(groupKey) ?? 0;
-        if (cur <= 1) this.perGroupRunning.delete(groupKey);
-        else this.perGroupRunning.set(groupKey, cur - 1);
+        const executor = this.byKind[ctx.input.kind] ?? this.defaultExecutor;
+        return executor.run(ctx, events);
       }
     };
   }
 });
 
-// ../../packages/task-queue/src/scheduler/retry-scheduler.ts
-function computeBackoffMs(attempt, suggestedMs, rng = Math.random) {
-  if (suggestedMs != null && suggestedMs >= 0) return suggestedMs;
-  const base = 2e3;
-  const cap = 6e4;
-  const exp = Math.min(cap, base * 2 ** Math.max(0, attempt));
-  return Math.floor(rng() * exp);
-}
-var RetryScheduler;
-var init_retry_scheduler = __esm({
-  "../../packages/task-queue/src/scheduler/retry-scheduler.ts"() {
-    "use strict";
-    init_min_heap();
-    RetryScheduler = class {
-      heap = new MinHeap(
-        (a, b) => a.nextRetryAt !== b.nextRetryAt ? a.nextRetryAt - b.nextRetryAt : a.seq - b.seq
-      );
-      timer = null;
-      seqCounter = 0;
-      clock;
-      setTimer;
-      clearTimer;
-      onDue;
-      constructor(opts) {
-        this.clock = opts.clock ?? Date.now;
-        this.setTimer = opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
-        this.clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h));
-        this.onDue = opts.onDue;
-      }
-      size() {
-        return this.heap.size();
-      }
-      /**
-       * Add (or re-add — `enqueue` first removes any existing entry for the same
-       * id, since a task can only be retry-scheduled once at a time).
-       */
-      enqueue(taskId, nextRetryAt) {
-        this.heap.remove((it) => it.taskId === taskId);
-        this.heap.push({ taskId, nextRetryAt, seq: ++this.seqCounter });
-        this.rearm();
-      }
-      remove(taskId) {
-        const removed = this.heap.remove((it) => it.taskId === taskId);
-        this.rearm();
-        return removed != null;
-      }
-      /**
-       * Drain all items whose nextRetryAt <= now. Public for tests; in production
-       * the timer fires this. Bumping a per-item handler error is logged and the
-       * handler is retried on the next tick.
-       */
-      async tick() {
-        const now = this.clock();
-        while (true) {
-          const top = this.heap.peek();
-          if (!top || top.nextRetryAt > now) break;
-          const item = this.heap.pop();
-          try {
-            await this.onDue(item.taskId, now);
-          } catch (err) {
-            console.error("[task-queue] retry tick handler threw", err);
-            this.heap.push({
-              taskId: item.taskId,
-              nextRetryAt: now + 1e3,
-              seq: ++this.seqCounter
-            });
-          }
-        }
-        this.rearm();
-      }
-      /** Cancel any pending timer; tests use this between cases. */
-      stop() {
-        if (this.timer != null) {
-          this.clearTimer(this.timer);
-          this.timer = null;
-        }
-      }
-      rearm() {
-        if (this.timer != null) {
-          this.clearTimer(this.timer);
-          this.timer = null;
-        }
-        const top = this.heap.peek();
-        if (!top) return;
-        const wait = Math.max(0, top.nextRetryAt - this.clock());
-        this.timer = this.setTimer(() => {
-          this.timer = null;
-          void this.tick();
-        }, wait);
-      }
-    };
+// ../../node_modules/@vidbee/task-queue/src/executor/index.ts
+var init_executor = __esm({
+  "../../node_modules/@vidbee/task-queue/src/executor/index.ts"() {
+    init_router();
   }
 });
 
-// ../../packages/task-queue/src/scheduler/index.ts
-var init_scheduler2 = __esm({
-  "../../packages/task-queue/src/scheduler/index.ts"() {
-    "use strict";
-    init_scheduler();
-    init_retry_scheduler();
-  }
-});
-
-// ../../packages/task-queue/src/store/index.ts
-var STATUSES, TaskStore;
-var init_store = __esm({
-  "../../packages/task-queue/src/store/index.ts"() {
-    "use strict";
-    STATUSES = [
-      "queued",
-      "running",
-      "processing",
-      "paused",
-      "retry-scheduled",
-      "completed",
-      "failed",
-      "cancelled"
-    ];
-    TaskStore = class {
-      byId = /* @__PURE__ */ new Map();
-      byGroup = /* @__PURE__ */ new Map();
-      byStatus = /* @__PURE__ */ new Map();
-      constructor() {
-        for (const s of STATUSES) this.byStatus.set(s, /* @__PURE__ */ new Set());
-      }
-      has(id) {
-        return this.byId.has(id);
-      }
-      get(id) {
-        return this.byId.get(id);
-      }
-      /** Insert a new task. Throws if id already exists. */
-      insert(task) {
-        if (this.byId.has(task.id)) {
-          throw new Error(`TaskStore: duplicate id ${task.id}`);
-        }
-        this.byId.set(task.id, task);
-        this.bucket(this.byGroup, task.groupKey).add(task.id);
-        this.byStatus.get(task.status).add(task.id);
-      }
-      /**
-       * Replace the existing record. Maintains index consistency for status and
-       * groupKey transitions. Throws if the id is missing.
-       */
-      update(next) {
-        const prev = this.byId.get(next.id);
-        if (!prev) throw new Error(`TaskStore: missing id ${next.id}`);
-        if (prev.status !== next.status) {
-          this.byStatus.get(prev.status)?.delete(prev.id);
-          this.byStatus.get(next.status)?.add(next.id);
-        }
-        if (prev.groupKey !== next.groupKey) {
-          const oldBucket = this.byGroup.get(prev.groupKey);
-          oldBucket?.delete(prev.id);
-          if (oldBucket && oldBucket.size === 0) this.byGroup.delete(prev.groupKey);
-          this.bucket(this.byGroup, next.groupKey).add(next.id);
-        }
-        this.byId.set(next.id, next);
-      }
-      /** Remove a record (used by removeFromHistory). */
-      remove(id) {
-        const prev = this.byId.get(id);
-        if (!prev) return false;
-        this.byId.delete(id);
-        this.byStatus.get(prev.status)?.delete(id);
-        const groupSet = this.byGroup.get(prev.groupKey);
-        groupSet?.delete(id);
-        if (groupSet && groupSet.size === 0) this.byGroup.delete(prev.groupKey);
-        return true;
-      }
-      snapshot(id) {
-        const t = this.byId.get(id);
-        return t ? { task: t } : void 0;
-      }
-      list(opts) {
-        let candidates;
-        if (opts?.status) {
-          candidates = this.byStatus.get(opts.status) ?? [];
-        } else if (opts?.groupKey) {
-          candidates = this.byGroup.get(opts.groupKey) ?? [];
-        } else {
-          candidates = this.byId.keys();
-        }
-        const all = [];
-        for (const id of candidates) {
-          const t = this.byId.get(id);
-          if (!t) continue;
-          if (opts?.groupKey && t.groupKey !== opts.groupKey) continue;
-          if (opts?.parentId && t.parentId !== opts.parentId) continue;
-          all.push(t);
-        }
-        all.sort((a, b) => {
-          if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-          return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-        });
-        let startIdx = 0;
-        if (opts?.cursor) {
-          startIdx = all.findIndex((t) => t.id === opts.cursor);
-          startIdx = startIdx < 0 ? 0 : startIdx + 1;
-        }
-        const limit = opts?.limit ?? 100;
-        const slice = all.slice(startIdx, startIdx + limit);
-        const nextCursor = startIdx + slice.length < all.length && slice.length > 0 ? slice[slice.length - 1].id : null;
-        return { tasks: slice, nextCursor };
-      }
-      stats(capacity) {
-        const byStatus = {
-          queued: 0,
-          running: 0,
-          processing: 0,
-          paused: 0,
-          "retry-scheduled": 0,
-          completed: 0,
-          failed: 0,
-          cancelled: 0
-        };
-        for (const s of STATUSES) byStatus[s] = this.byStatus.get(s)?.size ?? 0;
-        const perGroup = {};
-        for (const [k, set2] of this.byGroup) perGroup[k] = set2.size;
-        return {
-          total: this.byId.size,
-          byStatus,
-          running: byStatus.running,
-          queued: byStatus.queued,
-          capacity,
-          perGroup
-        };
-      }
-      size() {
-        return this.byId.size;
-      }
-      bucket(map2, key) {
-        let s = map2.get(key);
-        if (!s) {
-          s = /* @__PURE__ */ new Set();
-          map2.set(key, s);
-        }
-        return s;
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/process/pid-start-time.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2, statSync } from "node:fs";
-import { execFileSync } from "node:child_process";
-function setReadPidStartTimeImpl(fn) {
-  impl = fn;
-}
-function readPidStartTime(pid) {
-  try {
-    return impl(pid);
-  } catch {
-    return null;
-  }
-}
-function defaultImpl(pid) {
-  if (process.platform === "linux") return readLinuxStart(pid);
-  if (process.platform === "darwin") return readDarwinStart(pid);
-  return null;
-}
-function readLinuxStart(pid) {
-  const path3 = `/proc/${pid}/stat`;
-  if (!existsSync2(path3)) return null;
-  const raw = readFileSync2(path3, "utf8");
-  const lastParen = raw.lastIndexOf(")");
-  if (lastParen < 0) return null;
-  const fields = raw.slice(lastParen + 2).split(" ");
-  const starttimeTicks = Number.parseInt(fields[19] ?? "", 10);
-  if (!Number.isFinite(starttimeTicks)) return null;
-  const stat = readFileSync2("/proc/stat", "utf8");
-  const btimeMatch = stat.match(/^btime\s+(\d+)/m);
-  if (!btimeMatch) return null;
-  const btime = Number.parseInt(btimeMatch[1] ?? "", 10);
-  const hz = readClockTickRate() ?? 100;
-  return (btime + starttimeTicks / hz) * 1e3;
-}
-function readDarwinStart(pid) {
-  try {
-    const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
-      stdio: ["ignore", "pipe", "ignore"],
-      encoding: "utf8"
-    }).trim();
-    if (!out) return null;
-    const t = Date.parse(out);
-    return Number.isNaN(t) ? null : t;
-  } catch {
-    return null;
-  }
-}
-function readClockTickRate() {
-  if (cachedHz !== void 0) return cachedHz;
-  try {
-    const out = execFileSync("getconf", ["CLK_TCK"], {
-      stdio: ["ignore", "pipe", "ignore"],
-      encoding: "utf8"
-    }).trim();
-    const n = Number.parseInt(out, 10);
-    cachedHz = Number.isFinite(n) ? n : null;
-  } catch {
-    cachedHz = null;
-  }
-  return cachedHz;
-}
-function isPidAlive2(pid) {
-  if (process.platform === "linux") return existsSync2(`/proc/${pid}`);
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err) {
-    const code = err.code;
-    return code === "EPERM";
-  }
-}
-var impl, cachedHz;
-var init_pid_start_time = __esm({
-  "../../packages/task-queue/src/process/pid-start-time.ts"() {
-    "use strict";
-    impl = defaultImpl;
-  }
-});
-
-// ../../packages/task-queue/src/process/registry.ts
-var ProcessRegistry;
-var init_registry = __esm({
-  "../../packages/task-queue/src/process/registry.ts"() {
-    "use strict";
-    init_pid_start_time();
-    ProcessRegistry = class {
-      constructor(deps) {
-        this.deps = deps;
-        this.clock = deps.clock ?? Date.now;
-        this.kill = deps.kill ?? ((pid, sig) => process.kill(pid, sig));
-        this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-        this.killGracePeriodMs = deps.killGracePeriodMs ?? 1e4;
-      }
-      handles = /* @__PURE__ */ new Map();
-      clock;
-      kill;
-      sleep;
-      killGracePeriodMs;
-      /** Record a spawn and append a journal row. */
-      async recordSpawn(handle) {
-        this.handles.set(this.key(handle.taskId, handle.attemptId), handle);
-        await this.deps.persist.appendJournal({
-          ts: handle.spawnedAt,
-          op: "spawn",
-          taskId: handle.taskId,
-          attemptId: handle.attemptId,
-          pid: handle.pid,
-          pidStartedAt: handle.pidStartedAt,
-          exitCode: null,
-          signal: null
-        });
-      }
-      /** Record a clean close (process exited under its own steam). */
-      async recordClose(taskId, attemptId, exitCode, signal) {
-        const handle = this.handles.get(this.key(taskId, attemptId));
-        this.handles.delete(this.key(taskId, attemptId));
-        await this.appendJournal("close", {
-          taskId,
-          attemptId,
-          pid: handle?.pid ?? -1,
-          pidStartedAt: handle?.pidStartedAt ?? null,
-          exitCode,
-          signal
-        });
-      }
-      /** Cancel: SIGTERM → 10s → SIGKILL → journal `killed`. */
-      async cancel(taskId, attemptId) {
-        const handle = this.handles.get(this.key(taskId, attemptId));
-        if (!handle) return;
-        try {
-          this.kill(handle.pid, "SIGTERM");
-        } catch {
-        }
-        await this.sleep(this.killGracePeriodMs);
-        if (isPidAlive2(handle.pid)) {
-          try {
-            this.kill(handle.pid, "SIGKILL");
-          } catch {
-          }
-        }
-        this.handles.delete(this.key(taskId, attemptId));
-        await this.appendJournal("killed", {
-          taskId,
-          attemptId,
-          pid: handle.pid,
-          pidStartedAt: handle.pidStartedAt,
-          exitCode: null,
-          signal: "SIGKILL"
-        });
-      }
-      /**
-       * Walk the journal for unclosed spawns. For each, verify the same process
-       * is still alive (pid + pidStartedAt match). If yes → kill it. Either way,
-       * append a `killed` row so the journal is reconciled.
-       *
-       * Returns the list of taskIds whose attempts the orchestrator must
-       * re-classify (typically: transition to `paused('crash-recovery')`).
-       */
-      async reconcile() {
-        const open = await this.deps.persist.findOpenSpawns();
-        const reconciled = [];
-        for (const row of open) {
-          const stillAlive = isPidAlive2(row.pid);
-          const startedAtNow = stillAlive ? readPidStartTime(row.pid) : null;
-          const sameProcess = stillAlive && (row.pidStartedAt == null || startedAtNow == null || Math.abs((startedAtNow ?? 0) - (row.pidStartedAt ?? 0)) < 2e3);
-          let killed = false;
-          if (sameProcess) {
-            try {
-              this.kill(row.pid, "SIGTERM");
-              await this.sleep(this.killGracePeriodMs);
-              if (isPidAlive2(row.pid)) this.kill(row.pid, "SIGKILL");
-              killed = true;
-            } catch {
-            }
-          }
-          await this.appendJournal("killed", {
-            taskId: row.taskId,
-            attemptId: row.attemptId,
-            pid: row.pid,
-            pidStartedAt: row.pidStartedAt,
-            exitCode: null,
-            signal: killed ? "SIGKILL" : null
-          });
-          reconciled.push({
-            taskId: row.taskId,
-            attemptId: row.attemptId,
-            pid: row.pid,
-            killed
-          });
-        }
-        return reconciled;
-      }
-      size() {
-        return this.handles.size;
-      }
-      key(taskId, attemptId) {
-        return `${taskId}:${attemptId}`;
-      }
-      async appendJournal(op, row) {
-        await this.deps.persist.appendJournal({
-          ts: this.clock(),
-          op,
-          taskId: row.taskId,
-          attemptId: row.attemptId,
-          pid: row.pid,
-          pidStartedAt: row.pidStartedAt,
-          exitCode: row.exitCode,
-          signal: row.signal
-        });
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/process/watchdog.ts
-var Watchdog;
-var init_watchdog = __esm({
-  "../../packages/task-queue/src/process/watchdog.ts"() {
-    "use strict";
-    Watchdog = class {
-      constructor(onStalled, config2 = {}) {
-        this.onStalled = onStalled;
-        this.runningIdleMs = config2.runningIdleMs ?? 6e4;
-        this.processingIdleMs = config2.processingIdleMs ?? 6e5;
-        this.setTimer = config2.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
-        this.clearTimer = config2.clearTimer ?? ((h) => clearTimeout(h));
-        this.clock = config2.clock ?? Date.now;
-      }
-      entries = /* @__PURE__ */ new Map();
-      runningIdleMs;
-      processingIdleMs;
-      setTimer;
-      clearTimer;
-      clock;
-      arm(taskId, status) {
-        this.disarm(taskId);
-        const entry = {
-          taskId,
-          status,
-          lastBumpAt: this.clock(),
-          timer: null
-        };
-        entry.timer = this.scheduleNext(entry);
-        this.entries.set(taskId, entry);
-      }
-      /**
-       * Move from `running` → `processing` thresholds, preserving lastBumpAt.
-       * Used when yt-dlp emits the Postprocess line.
-       */
-      promoteToProcessing(taskId) {
-        const e = this.entries.get(taskId);
-        if (!e) return;
-        if (e.timer) this.clearTimer(e.timer);
-        e.status = "processing";
-        e.lastBumpAt = this.clock();
-        e.timer = this.scheduleNext(e);
-      }
-      bump(taskId) {
-        const e = this.entries.get(taskId);
-        if (!e) return;
-        if (e.timer) this.clearTimer(e.timer);
-        e.lastBumpAt = this.clock();
-        e.timer = this.scheduleNext(e);
-      }
-      disarm(taskId) {
-        const e = this.entries.get(taskId);
-        if (!e) return;
-        if (e.timer) this.clearTimer(e.timer);
-        this.entries.delete(taskId);
-      }
-      size() {
-        return this.entries.size;
-      }
-      scheduleNext(entry) {
-        const idle = entry.status === "processing" ? this.processingIdleMs : this.runningIdleMs;
-        return this.setTimer(() => {
-          const cur = this.entries.get(entry.taskId);
-          if (!cur) return;
-          const elapsed = this.clock() - cur.lastBumpAt;
-          if (elapsed >= idle) {
-            this.entries.delete(entry.taskId);
-            try {
-              this.onStalled(entry.taskId);
-            } catch (err) {
-              console.error("[task-queue] watchdog handler threw", err);
-            }
-            return;
-          }
-          cur.timer = this.scheduleNext(cur);
-        }, idle);
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/process/index.ts
-var init_process = __esm({
-  "../../packages/task-queue/src/process/index.ts"() {
-    "use strict";
-    init_registry();
-    init_watchdog();
-    init_pid_start_time();
-  }
-});
-
-// ../../packages/task-queue/src/persist/memory.ts
-var MemoryPersistAdapter;
+// ../../node_modules/@vidbee/task-queue/src/persist/memory.ts
+var collectDescendantIds, MemoryPersistAdapter;
 var init_memory = __esm({
-  "../../packages/task-queue/src/persist/memory.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/persist/memory.ts"() {
+    collectDescendantIds = (tasks, rootId) => {
+      const out = [];
+      const walk = (parentId) => {
+        for (const [id, task] of tasks) {
+          if (task.parentId === parentId) {
+            walk(id);
+            out.push(id);
+          }
+        }
+      };
+      walk(rootId);
+      return out;
+    };
     MemoryPersistAdapter = class {
       tasks = /* @__PURE__ */ new Map();
       progress = /* @__PURE__ */ new Map();
       attempts = /* @__PURE__ */ new Map();
       journal = [];
       journalSeq = 0;
+      async hasTask(taskId) {
+        return this.tasks.has(taskId);
+      }
       async insertTask(task) {
         this.tasks.set(task.id, structuredClone(task));
         this.progress.set(task.id, structuredClone(task.progress));
@@ -16452,12 +19784,26 @@ var init_memory = __esm({
         this.tasks.set(input.task.id, structuredClone(input.task));
         this.progress.set(input.task.id, structuredClone(input.progress));
       }
+      /** Clone the entire batch before changing any stored task. */
+      async upsertTasks(inputs) {
+        const copies = structuredClone(inputs);
+        for (const { task, progress } of copies) {
+          this.tasks.set(task.id, task);
+          this.progress.set(task.id, progress);
+        }
+      }
       async upsertProgress(taskId, progress) {
         this.progress.set(taskId, structuredClone(progress));
         const t = this.tasks.get(taskId);
-        if (t) t.progress = structuredClone(progress);
+        if (t) {
+          t.progress = structuredClone(progress);
+        }
       }
       async deleteTask(taskId) {
+        for (const id of collectDescendantIds(this.tasks, taskId)) {
+          this.tasks.delete(id);
+          this.progress.delete(id);
+        }
         this.tasks.delete(taskId);
         this.progress.delete(taskId);
       }
@@ -16479,7 +19825,9 @@ var init_memory = __esm({
       }
       async closeAttempt(input) {
         const existing = this.attempts.get(input.attemptId);
-        if (!existing) return;
+        if (!existing) {
+          return;
+        }
         this.attempts.set(input.attemptId, {
           ...existing,
           endedAt: input.endedAt,
@@ -16511,8 +19859,12 @@ var init_memory = __esm({
         }
         const result = [];
         for (const row of this.journal) {
-          if (row.op !== "spawn") continue;
-          if (closed.has(this.journalKey(row))) continue;
+          if (row.op !== "spawn") {
+            continue;
+          }
+          if (closed.has(this.journalKey(row))) {
+            continue;
+          }
           result.push(row);
         }
         return result;
@@ -16523,8 +19875,12 @@ var init_memory = __esm({
       async loadLatestAttempt(taskId) {
         let best = null;
         for (const a of this.attempts.values()) {
-          if (a.taskId !== taskId) continue;
-          if (!best || a.attemptNumber > best.attemptNumber) best = a;
+          if (a.taskId !== taskId) {
+            continue;
+          }
+          if (!best || a.attemptNumber > best.attemptNumber) {
+            best = a;
+          }
         }
         return best;
       }
@@ -16539,13 +19895,17 @@ var init_memory = __esm({
   }
 });
 
-// ../../packages/task-queue/src/persist/sqlite.ts
+// ../../node_modules/@vidbee/task-queue/src/persist/sqlite.ts
 function rowToTask(r) {
+  const input = JSON.parse(r.input_json);
+  if (input.options?.startedAt == null && r.first_started_at != null) {
+    input.options = { ...input.options, startedAt: r.first_started_at };
+  }
   return {
     id: r.id,
     kind: r.kind,
     parentId: r.parent_id,
-    input: JSON.parse(r.input_json),
+    input,
     priority: r.priority,
     groupKey: r.group_key,
     status: r.status,
@@ -16571,21 +19931,39 @@ function rowToTask(r) {
     updatedAt: r.updated_at
   };
 }
-var DEFAULT_JOURNAL_AGE_MS, SqlitePersistAdapter, SQL_INSERT_TASK, SQL_UPSERT_TASK, SQL_UPSERT_PROGRESS, SQL_INSERT_ATTEMPT, SQL_CLOSE_ATTEMPT, SQL_APPEND_JOURNAL, SQL_FIND_OPEN_SPAWNS, SQL_LOAD_ALL_TASKS, SQL_LOAD_LATEST_ATTEMPT, SQL_AGE_JOURNAL;
+var DEFAULT_JOURNAL_AGE_MS, collectDescendantIds2, SqlitePersistAdapter, SQL_INSERT_TASK, SQL_UPSERT_TASK, SQL_UPSERT_PROGRESS, SQL_INSERT_ATTEMPT, SQL_CLOSE_ATTEMPT, SQL_APPEND_JOURNAL, SQL_FIND_OPEN_SPAWNS, SQL_HAS_TASK, SQL_LOAD_ALL_TASKS, SQL_LOAD_LATEST_ATTEMPT, SQL_AGE_JOURNAL;
 var init_sqlite = __esm({
-  "../../packages/task-queue/src/persist/sqlite.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/persist/sqlite.ts"() {
     DEFAULT_JOURNAL_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+    collectDescendantIds2 = (selectChildIds, rootId) => {
+      const out = [];
+      const walk = (id) => {
+        const rows = selectChildIds.all(id);
+        for (const row of rows) {
+          walk(row.id);
+          out.push(row.id);
+        }
+      };
+      walk(rootId);
+      return out;
+    };
     SqlitePersistAdapter = class {
       db;
       journalAgeMs;
+      ownsConnection;
       // Prepared statements (lazy on first use to allow construction before
       // migrations have run in some test setups).
       stmts;
       constructor(opts) {
         this.db = opts.db;
         this.journalAgeMs = opts.journalAgeMs ?? DEFAULT_JOURNAL_AGE_MS;
+        this.ownsConnection = opts.ownsConnection ?? true;
         this.applyPragmas();
+      }
+      async hasTask(taskId) {
+        this.ensureStmts();
+        const row = this.stmts.hasTask.get(taskId);
+        return row !== void 0;
       }
       async insertTask(task) {
         this.ensureStmts();
@@ -16602,6 +19980,17 @@ var init_sqlite = __esm({
         });
         tx.immediate(input.task, input.progress);
       }
+      /** Commit all source references together so retries never see a partially moved file. */
+      async upsertTasks(inputs) {
+        this.ensureStmts();
+        const tx = this.db.transaction(() => {
+          for (const { task, progress } of inputs) {
+            this.stmts.upsertTask.run(...this.bindTask(task));
+            this.stmts.upsertProgress.run(JSON.stringify(progress), task.id);
+          }
+        });
+        tx.immediate();
+      }
       async upsertProgress(taskId, progress) {
         this.ensureStmts();
         this.stmts.upsertProgress.run(JSON.stringify(progress), taskId);
@@ -16609,6 +19998,10 @@ var init_sqlite = __esm({
       async deleteTask(taskId) {
         this.ensureStmts();
         const tx = this.db.transaction((id) => {
+          for (const childId of collectDescendantIds2(this.stmts.selectChildIds, id)) {
+            this.stmts.deleteAttempts.run(childId);
+            this.stmts.deleteTask.run(childId);
+          }
           this.stmts.deleteAttempts.run(id);
           this.stmts.deleteTask.run(id);
         });
@@ -16673,7 +20066,9 @@ var init_sqlite = __esm({
       async loadLatestAttempt(taskId) {
         this.ensureStmts();
         const row = this.stmts.loadLatestAttempt.get(taskId);
-        if (!row) return null;
+        if (!row) {
+          return null;
+        }
         return {
           id: row.id,
           taskId: row.task_id,
@@ -16697,6 +20092,9 @@ var init_sqlite = __esm({
         }
       }
       close() {
+        if (!this.ownsConnection) {
+          return;
+        }
         try {
           this.db.close();
         } catch {
@@ -16711,17 +20109,21 @@ var init_sqlite = __esm({
         }
       }
       ensureStmts() {
-        if (this.stmts) return;
+        if (this.stmts) {
+          return;
+        }
         this.stmts = {
           insertTask: this.db.prepare(SQL_INSERT_TASK),
           upsertTask: this.db.prepare(SQL_UPSERT_TASK),
           upsertProgress: this.db.prepare(SQL_UPSERT_PROGRESS),
           deleteTask: this.db.prepare("DELETE FROM tasks WHERE id = ?"),
           deleteAttempts: this.db.prepare("DELETE FROM attempts WHERE task_id = ?"),
+          selectChildIds: this.db.prepare("SELECT id FROM tasks WHERE parent_id = ?"),
           insertAttempt: this.db.prepare(SQL_INSERT_ATTEMPT),
           closeAttempt: this.db.prepare(SQL_CLOSE_ATTEMPT),
           appendJournal: this.db.prepare(SQL_APPEND_JOURNAL),
           findOpenSpawns: this.db.prepare(SQL_FIND_OPEN_SPAWNS),
+          hasTask: this.db.prepare(SQL_HAS_TASK),
           loadAllTasks: this.db.prepare(SQL_LOAD_ALL_TASKS),
           loadLatestAttempt: this.db.prepare(SQL_LOAD_LATEST_ATTEMPT),
           ageJournal: this.db.prepare(SQL_AGE_JOURNAL),
@@ -16824,7 +20226,14 @@ WHERE s.op = 'spawn'
   )
 ORDER BY s.seq ASC
 `;
-    SQL_LOAD_ALL_TASKS = `SELECT * FROM tasks`;
+    SQL_HAS_TASK = `
+SELECT 1 AS present FROM tasks WHERE id = ?
+`;
+    SQL_LOAD_ALL_TASKS = `
+SELECT tasks.*, (
+  SELECT MIN(started_at) FROM attempts WHERE attempts.task_id = tasks.id
+) AS first_started_at
+FROM tasks`;
     SQL_LOAD_LATEST_ATTEMPT = `
 SELECT * FROM attempts
 WHERE task_id = ?
@@ -16837,642 +20246,15 @@ DELETE FROM process_journal WHERE ts < ?
   }
 });
 
-// ../../packages/task-queue/src/persist/index.ts
+// ../../node_modules/@vidbee/task-queue/src/persist/index.ts
 var init_persist = __esm({
-  "../../packages/task-queue/src/persist/index.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/persist/index.ts"() {
     init_memory();
     init_sqlite();
   }
 });
 
-// ../../packages/task-queue/src/api/index.ts
-import { createHash, randomUUID } from "node:crypto";
-import { existsSync as existsSync3, statSync as statSync2 } from "node:fs";
-function defaultGroupKey(input) {
-  if (input.subscriptionId) return `sub:${input.subscriptionId}`;
-  try {
-    return new URL(input.url).host || "unknown";
-  } catch {
-    return "unknown";
-  }
-}
-function hashRawArgs(args) {
-  if (!args || args.length === 0) return "sha256:none";
-  const h = createHash("sha256");
-  h.update(args.join(" "));
-  return `sha256:${h.digest("hex")}`;
-}
-var PROGRESS_DOWNSAMPLE_MS, TaskQueueAPI;
-var init_api2 = __esm({
-  "../../packages/task-queue/src/api/index.ts"() {
-    "use strict";
-    init_classifier();
-    init_events();
-    init_fsm();
-    init_process();
-    init_scheduler2();
-    init_store();
-    init_types();
-    PROGRESS_DOWNSAMPLE_MS = 1e3;
-    TaskQueueAPI = class {
-      bus = new EventBus();
-      store = new TaskStore();
-      scheduler;
-      retry;
-      watchdog;
-      processes;
-      persist;
-      executor;
-      clock;
-      filePresent;
-      rng;
-      active = /* @__PURE__ */ new Map();
-      progressLastWrite = /* @__PURE__ */ new Map();
-      progressDirty = /* @__PURE__ */ new Map();
-      started = false;
-      constructor(opts) {
-        this.persist = opts.persist;
-        this.executor = opts.executor;
-        this.clock = opts.clock ?? Date.now;
-        this.filePresent = opts.filePresent ?? ((p) => {
-          try {
-            return existsSync3(p) && statSync2(p).size > 0;
-          } catch {
-            return false;
-          }
-        });
-        this.rng = opts.rng ?? Math.random;
-        this.scheduler = new Scheduler({
-          maxConcurrency: opts.maxConcurrency ?? 4,
-          defaultMaxPerGroup: opts.defaultMaxPerGroup ?? null,
-          dispatch: (id) => this.dispatchOne(id),
-          demote: (id) => this.demoteOne(id),
-          getTask: (id) => this.store.get(id)
-        });
-        this.retry = new RetryScheduler({
-          clock: this.clock,
-          setTimer: opts.setTimer,
-          clearTimer: opts.clearTimer,
-          onDue: (id) => this.handleRetryDue(id)
-        });
-        this.watchdog = new Watchdog((id) => this.handleStalled(id), {
-          runningIdleMs: opts.runningIdleMs,
-          processingIdleMs: opts.processingIdleMs,
-          setTimer: opts.setTimer,
-          clearTimer: opts.clearTimer,
-          clock: this.clock
-        });
-        this.processes = new ProcessRegistry({
-          persist: this.persist,
-          clock: this.clock,
-          kill: opts.killProcess
-        });
-      }
-      // ───────────── Lifecycle ─────────────
-      /**
-       * Crash recovery + reconciliation. Per §11:
-       *  1. load tasks from persistence
-       *  2. reconcile process_journal: kill orphans, journal `killed`
-       *  3. running/processing → paused('crash-recovery'); preserve progress
-       *  4. queued → re-enqueue
-       *  5. retry-scheduled → re-arm RetryScheduler with original nextRetryAt
-       */
-      async start() {
-        if (this.started) return;
-        this.started = true;
-        const tasks = await this.persist.loadAllTasks();
-        for (const t of tasks) this.store.insert(t);
-        const orphans = await this.processes.reconcile();
-        for (const o of orphans) {
-          this.bus.emit({
-            type: "orphan-killed",
-            taskId: o.taskId,
-            pid: o.pid,
-            pidStartedAt: null,
-            signal: "SIGKILL",
-            at: this.clock()
-          });
-        }
-        for (const t of tasks) {
-          if (t.status === "running" || t.status === "processing") {
-            await this.applyTransition(t.id, "paused", {
-              trigger: "crash-recovery",
-              reason: "crash-recovery"
-            });
-          } else if (t.status === "queued") {
-            await this.scheduler.enqueue(t.id, t.priority);
-          } else if (t.status === "retry-scheduled" && t.nextRetryAt != null) {
-            this.retry.enqueue(t.id, t.nextRetryAt);
-          }
-        }
-      }
-      async stop() {
-        if (!this.started) return;
-        this.retry.stop();
-        for (const a of [...this.active.values()]) {
-          try {
-            await a.run.cancel(0);
-          } catch {
-          }
-        }
-        if (this.persist.close) await this.persist.close();
-        this.started = false;
-      }
-      // ───────────── RPC surface ─────────────
-      async add(req) {
-        const now = this.clock();
-        if (req.id) {
-          const existing = this.store.get(req.id);
-          if (existing) return { id: existing.id };
-        }
-        const id = req.id ?? randomUUID();
-        const task = {
-          id,
-          kind: req.input.kind,
-          parentId: req.parentId ?? null,
-          input: req.input,
-          priority: req.priority ?? PRIORITY_USER,
-          groupKey: req.groupKey ?? defaultGroupKey(req.input),
-          status: "queued",
-          prevStatus: null,
-          statusReason: null,
-          enteredStatusAt: now,
-          attempt: 0,
-          maxAttempts: req.maxAttempts ?? 5,
-          nextRetryAt: null,
-          progress: { ...EMPTY_PROGRESS },
-          output: null,
-          lastError: null,
-          pid: null,
-          pidStartedAt: null,
-          createdAt: now,
-          updatedAt: now
-        };
-        this.store.insert(task);
-        await this.persist.insertTask(task);
-        this.bus.emit({
-          type: "transition",
-          taskId: id,
-          from: null,
-          to: "queued",
-          reason: null,
-          attempt: 0,
-          at: now
-        });
-        this.bus.emit({
-          type: "snapshot-changed",
-          taskId: id,
-          task,
-          at: now
-        });
-        await this.scheduler.enqueue(id, task.priority);
-        return { id };
-      }
-      get(id) {
-        return this.store.get(id);
-      }
-      list(opts = {}) {
-        return this.store.list(opts);
-      }
-      async cancel(id, reason = "user") {
-        const t = this.store.get(id);
-        if (!t) return;
-        if (TERMINAL_STATUSES.has(t.status)) return;
-        if (t.status === "queued" || t.status === "paused") {
-          await this.scheduler.dequeue(id);
-          this.retry.remove(id);
-          await this.applyTransition(id, "cancelled", {
-            trigger: "cancel",
-            reason
-          });
-          return;
-        }
-        if (t.status === "retry-scheduled") {
-          this.retry.remove(id);
-          await this.applyTransition(id, "cancelled", {
-            trigger: "cancel",
-            reason
-          });
-          return;
-        }
-        const active = this.active.get(id);
-        if (active) {
-          try {
-            await active.run.cancel();
-          } catch (err) {
-            console.error("[task-queue] cancel run threw", err);
-          }
-        }
-      }
-      async pause(id, reason = "user") {
-        const t = this.store.get(id);
-        if (!t) return;
-        if (t.status === "queued") {
-          await this.scheduler.dequeue(id);
-          await this.applyTransition(id, "paused", { trigger: "pause", reason });
-          return;
-        }
-        if (t.status === "retry-scheduled") {
-          this.retry.remove(id);
-          await this.applyTransition(id, "paused", { trigger: "pause", reason });
-          return;
-        }
-        if (t.status === "running" || t.status === "processing") {
-          const active = this.active.get(id);
-          if (active) {
-            try {
-              await active.run.pause();
-            } catch (err) {
-              console.error("[task-queue] pause run threw", err);
-            }
-          }
-        }
-      }
-      async resume(id) {
-        const t = this.store.get(id);
-        if (!t || t.status !== "paused") return;
-        await this.applyTransition(id, "queued", { trigger: "resume", reason: "resume" });
-        await this.scheduler.enqueue(id, t.priority);
-      }
-      async retryManual(id) {
-        const t = this.store.get(id);
-        if (!t || t.status !== "failed" && t.status !== "cancelled") return;
-        await this.applyTransition(id, "queued", {
-          trigger: t.status === "failed" ? "retry-manual" : "requeue",
-          reason: "manual"
-        });
-        await this.scheduler.enqueue(id, t.priority);
-      }
-      async setMaxConcurrency(n) {
-        await this.scheduler.setMaxConcurrency(n);
-      }
-      async setMaxPerGroup(groupKey, n) {
-        await this.scheduler.setMaxPerGroup(groupKey, n);
-      }
-      async removeFromHistory(id) {
-        const t = this.store.get(id);
-        if (!t) return;
-        if (!TERMINAL_STATUSES.has(t.status)) {
-          throw new Error(`removeFromHistory: ${id} is not in a terminal state`);
-        }
-        this.store.remove(id);
-        await this.persist.deleteTask(id);
-      }
-      stats() {
-        const stats = this.store.stats(this.scheduler.stats().capacity);
-        const sStats = this.scheduler.stats();
-        stats.running = sStats.running;
-        stats.queued = sStats.queued;
-        stats.perGroup = { ...stats.perGroup, ...sStats.perGroup };
-        return stats;
-      }
-      subscribe(listener) {
-        return this.bus.subscribe(listener);
-      }
-      on(type, listener) {
-        return this.bus.on(type, listener);
-      }
-      // ───────────── Internal: dispatch + executor wiring ─────────────
-      async dispatchOne(id) {
-        const t = this.store.get(id);
-        if (!t || t.status !== "queued") return false;
-        const attemptId = randomUUID();
-        let next;
-        try {
-          next = await this.applyTransition(id, "running", {
-            trigger: "dispatch",
-            reason: null
-          });
-        } catch (err) {
-          if (err instanceof IllegalTransitionError) return false;
-          throw err;
-        }
-        await this.persist.insertAttempt({
-          taskId: id,
-          attemptId,
-          pid: -1,
-          pidStartedAt: null,
-          startedAt: this.clock(),
-          rawArgsHash: hashRawArgs(t.input.rawArgs)
-        });
-        let run2;
-        try {
-          run2 = this.executor.run(
-            {
-              taskId: id,
-              attemptId,
-              attemptNumber: next.attempt,
-              input: t.input
-            },
-            {
-              onSpawn: (e) => {
-                this.active.set(id, { taskId: id, attemptId, run: run2 });
-                void this.processes.recordSpawn({
-                  taskId: id,
-                  attemptId,
-                  pid: e.pid,
-                  pidStartedAt: e.pidStartedAt ?? readPidStartTime(e.pid),
-                  kind: e.kind,
-                  spawnedAt: e.spawnedAt
-                });
-                void this.persist.upsertTask({
-                  task: { ...next, pid: e.pid, pidStartedAt: e.pidStartedAt },
-                  progress: next.progress
-                });
-                this.watchdog.arm(id, "running");
-              },
-              onProgress: (e) => {
-                this.applyProgress(id, e.progress);
-                this.watchdog.bump(id);
-                if (e.enteredProcessing) {
-                  void this.applyTransition(id, "processing", {
-                    trigger: "progressing",
-                    reason: null
-                  });
-                  this.watchdog.promoteToProcessing(id);
-                }
-              },
-              onStd: () => {
-                this.watchdog.bump(id);
-              },
-              onFinish: (e) => {
-                void this.handleFinish(id, attemptId, e);
-              }
-            }
-          );
-          this.active.set(id, { taskId: id, attemptId, run: run2 });
-        } catch (err) {
-          const error48 = virtualError("unknown", String(err));
-          await this.applyTransition(id, "failed", {
-            trigger: "finalize-error",
-            reason: error48.category,
-            error: error48
-          });
-          await this.scheduler.releaseSlot(id);
-          return false;
-        }
-        return true;
-      }
-      async demoteOne(id) {
-        const a = this.active.get(id);
-        if (a) {
-          try {
-            await a.run.pause();
-          } catch (err) {
-            console.error("[task-queue] demote pause threw", err);
-          }
-        }
-      }
-      async handleFinish(id, attemptId, e) {
-        this.watchdog.disarm(id);
-        this.active.delete(id);
-        if (e.result.type === "success") {
-          const out = e.result.output;
-          const guardOk = out.filePath ? this.filePresent(out.filePath) && out.size > 0 : false;
-          if (guardOk) {
-            await this.persist.closeAttempt({
-              taskId: id,
-              attemptId,
-              endedAt: e.closedAt,
-              exitCode: 0,
-              errorCategory: null,
-              stdoutTail: e.stdoutTail,
-              stderrTail: e.stderrTail
-            });
-            await this.processes.recordClose(id, attemptId, 0, null);
-            await this.applyTransition(id, "completed", {
-              trigger: "finalize-success",
-              reason: null,
-              output: out
-            });
-          } else {
-            const err2 = virtualError(
-              "output-missing",
-              `output ${out.filePath} missing or empty`
-            );
-            await this.persist.closeAttempt({
-              taskId: id,
-              attemptId,
-              endedAt: e.closedAt,
-              exitCode: null,
-              errorCategory: "output-missing",
-              stdoutTail: e.stdoutTail,
-              stderrTail: e.stderrTail
-            });
-            await this.processes.recordClose(id, attemptId, null, null);
-            await this.applyTransition(id, "failed", {
-              trigger: "finalize-error",
-              reason: "output-missing",
-              error: err2
-            });
-          }
-          await this.scheduler.releaseSlot(id);
-          return;
-        }
-        if (e.result.type === "cancelled") {
-          await this.persist.closeAttempt({
-            taskId: id,
-            attemptId,
-            endedAt: e.closedAt,
-            exitCode: null,
-            errorCategory: "cancelled-by-user",
-            stdoutTail: e.stdoutTail,
-            stderrTail: e.stderrTail
-          });
-          await this.processes.recordClose(id, attemptId, null, "SIGTERM");
-          const t2 = this.store.get(id);
-          if (t2 && (t2.status === "running" || t2.status === "processing")) {
-            await this.applyTransition(id, "cancelled", {
-              trigger: "cancel",
-              reason: "user"
-            });
-          }
-          await this.scheduler.releaseSlot(id);
-          return;
-        }
-        const err = e.result.error;
-        const exitCode = e.result.exitCode ?? null;
-        await this.persist.closeAttempt({
-          taskId: id,
-          attemptId,
-          endedAt: e.closedAt,
-          exitCode,
-          errorCategory: err.category,
-          stdoutTail: e.stdoutTail,
-          stderrTail: e.stderrTail
-        });
-        await this.processes.recordClose(id, attemptId, exitCode, null);
-        this.bus.emit({
-          type: "error-classified",
-          taskId: id,
-          attempt: this.store.get(id)?.attempt ?? 0,
-          error: err,
-          at: this.clock()
-        });
-        const t = this.store.get(id);
-        const maxAttempts = Math.max(
-          t?.maxAttempts ?? 0,
-          defaultMaxAttempts(err.category)
-        );
-        const willRetry = err.retryable && (t?.attempt ?? 0) < maxAttempts;
-        if (willRetry) {
-          const wait = computeBackoffMs(
-            t?.attempt ?? 0,
-            err.suggestedRetryAfterMs,
-            this.rng
-          );
-          const nextRetryAt = this.clock() + wait;
-          await this.applyTransition(id, "retry-scheduled", {
-            trigger: "finalize-error",
-            reason: err.category,
-            error: err,
-            nextRetryAt
-          });
-          this.retry.enqueue(id, nextRetryAt);
-        } else {
-          await this.applyTransition(id, "failed", {
-            trigger: "finalize-error",
-            reason: err.category,
-            error: err
-          });
-        }
-        await this.scheduler.releaseSlot(id);
-      }
-      async handleRetryDue(id) {
-        const t = this.store.get(id);
-        if (!t || t.status !== "retry-scheduled") return;
-        const next = await this.applyTransition(id, "queued", {
-          trigger: "retry-tick",
-          reason: "retry"
-        });
-        await this.scheduler.enqueue(id, next.priority);
-      }
-      handleStalled(id) {
-        void (async () => {
-          const err = virtualError("stalled", "Watchdog: task idle exceeded");
-          const a = this.active.get(id);
-          if (a) {
-            try {
-              await a.run.cancel(0);
-            } catch {
-            }
-          }
-          const t = this.store.get(id);
-          if (!t) return;
-          const max = Math.max(t.maxAttempts, defaultMaxAttempts("stalled"));
-          if (t.attempt < max) {
-            const wait = computeBackoffMs(
-              t.attempt,
-              err.suggestedRetryAfterMs,
-              this.rng
-            );
-            const nextRetryAt = this.clock() + wait;
-            await this.applyTransition(id, "retry-scheduled", {
-              trigger: "finalize-error",
-              reason: "stalled",
-              error: err,
-              nextRetryAt
-            });
-            this.retry.enqueue(id, nextRetryAt);
-          } else {
-            await this.applyTransition(id, "failed", {
-              trigger: "finalize-error",
-              reason: "stalled",
-              error: err
-            });
-          }
-          await this.scheduler.releaseSlot(id);
-        })();
-      }
-      async applyTransition(id, to, ctx) {
-        const cur = this.store.get(id);
-        if (!cur) throw new Error(`applyTransition: missing task ${id}`);
-        let next;
-        try {
-          next = transition(cur, to, { ...ctx, now: this.clock() });
-        } catch (err) {
-          if (err instanceof IllegalTransitionError) {
-            await this.persist.appendJournal({
-              ts: this.clock(),
-              op: "panic",
-              taskId: id,
-              attemptId: null,
-              pid: cur.pid ?? -1,
-              pidStartedAt: cur.pidStartedAt,
-              exitCode: null,
-              signal: err.message
-            });
-            if (cur.status !== "completed" && cur.status !== "cancelled") {
-              const failedErr = virtualError("unknown", err.message);
-              const fallback = transition(cur, "failed", {
-                trigger: "finalize-error",
-                reason: "panic",
-                error: failedErr,
-                now: this.clock()
-              });
-              this.store.update(fallback);
-              await this.persist.upsertTask({
-                task: fallback,
-                progress: fallback.progress
-              });
-              this.bus.emit({
-                type: "transition",
-                taskId: id,
-                from: cur.status,
-                to: "failed",
-                reason: "panic",
-                attempt: fallback.attempt,
-                at: this.clock()
-              });
-            }
-            throw err;
-          }
-          throw err;
-        }
-        this.store.update(next);
-        await this.persist.upsertTask({ task: next, progress: next.progress });
-        this.bus.emit({
-          type: "transition",
-          taskId: id,
-          from: cur.status,
-          to: next.status,
-          reason: next.statusReason,
-          attempt: next.attempt,
-          at: next.updatedAt
-        });
-        this.bus.emit({
-          type: "snapshot-changed",
-          taskId: id,
-          task: next,
-          at: next.updatedAt
-        });
-        return next;
-      }
-      applyProgress(id, progress) {
-        const t = this.store.get(id);
-        if (!t) return;
-        const merged = { ...t, progress, updatedAt: this.clock() };
-        this.store.update(merged);
-        this.progressDirty.set(id, progress);
-        this.bus.emit({
-          type: "progress",
-          taskId: id,
-          progress,
-          at: merged.updatedAt
-        });
-        const last = this.progressLastWrite.get(id) ?? 0;
-        if (merged.updatedAt - last >= PROGRESS_DOWNSAMPLE_MS) {
-          this.progressLastWrite.set(id, merged.updatedAt);
-          void this.persist.upsertProgress(id, progress);
-          this.progressDirty.delete(id);
-        }
-      }
-    };
-  }
-});
-
-// ../../packages/task-queue/src/projection/index.ts
+// ../../node_modules/@vidbee/task-queue/src/projection/index.ts
 function legacyDownloadStatusOf(status) {
   switch (status) {
     case "queued":
@@ -17491,6 +20273,8 @@ function legacyDownloadStatusOf(status) {
       return "error";
     case "cancelled":
       return "cancelled";
+    default:
+      return status;
   }
 }
 function legacySubStatusOf(status) {
@@ -17514,7 +20298,7 @@ function projectTaskToLegacy(task) {
     url: task.input.url,
     title: task.input.title,
     thumbnail: task.input.thumbnail,
-    type: task.kind === "audio" ? "audio" : "video",
+    type: task.kind === "audio" || task.kind === "conversion" && task.input.options?.type === "audio" ? "audio" : "video",
     status,
     internalStatus: task.status,
     statusReason: task.statusReason,
@@ -17531,12 +20315,14 @@ function projectTaskToLegacy(task) {
     playlistSize: opts.playlistSize,
     fileSize: opts.fileSize,
     startedAt: opts.startedAt,
-    completedAt: opts.completedAt,
+    completedAt: opts.completedAt ?? (TERMINAL_STATUSES.has(task.status) ? task.enteredStatusAt : void 0),
     downloadPath: opts.downloadPath,
     attempt: task.attempt,
     maxAttempts: task.maxAttempts
   };
-  if (subStatus) proj.subStatus = subStatus;
+  if (subStatus) {
+    proj.subStatus = subStatus;
+  }
   if (task.progress.percent != null || task.progress.bytesDownloaded != null) {
     proj.progress = projectProgress(task.progress);
     if (task.progress.speedBps != null) {
@@ -17548,14 +20334,26 @@ function projectTaskToLegacy(task) {
     proj.fileSize = out.size;
     proj.savedFileName = basenameOf(out.filePath);
     proj.downloadPath = dirnameOf(out.filePath);
-    if (out.durationMs != null) proj.duration = Math.round(out.durationMs / 1e3);
-    if (out.formatId) proj.resolvedFormatId = out.formatId;
+    if (out.durationMs != null) {
+      proj.duration = Math.round(out.durationMs / 1e3);
+    }
+    if (out.formatId) {
+      proj.resolvedFormatId = out.formatId;
+    }
+    if (out.subtitleStatus) {
+      proj.subtitleStatus = out.subtitleStatus;
+    }
+    if (out.subtitleLanguages) {
+      proj.subtitleLanguages = [...out.subtitleLanguages];
+    }
   }
   if (task.lastError) {
     const err = task.lastError;
     proj.errorCategory = err.category;
     proj.uiMessageKey = err.uiMessageKey;
-    if (status === "error") proj.error = err.rawMessage;
+    if (status === "error") {
+      proj.error = err.rawMessage;
+    }
   }
   if (task.status === "retry-scheduled" && task.nextRetryAt != null) {
     proj.nextRetryAt = task.nextRetryAt;
@@ -17563,25 +20361,27 @@ function projectTaskToLegacy(task) {
   return proj;
 }
 function projectProgress(p) {
-  const percent = p.percent != null ? Math.max(0, Math.min(100, p.percent * 100)) : 0;
+  const percent = p.percent == null ? 0 : Math.max(0, Math.min(100, p.percent * 100));
   return {
     percent,
-    currentSpeed: p.speedBps != null ? formatSpeed(p.speedBps) : void 0,
-    eta: p.etaMs != null ? formatEta(p.etaMs) : void 0,
-    downloaded: p.bytesDownloaded != null ? formatBytes(p.bytesDownloaded) : void 0,
-    total: p.bytesTotal != null ? formatBytes(p.bytesTotal) : void 0
+    currentSpeed: p.speedBps == null ? void 0 : formatSpeed(p.speedBps),
+    eta: p.etaMs == null ? void 0 : formatEta(p.etaMs),
+    downloaded: p.bytesDownloaded == null ? void 0 : formatBytes(p.bytesDownloaded),
+    total: p.bytesTotal == null ? void 0 : formatBytes(p.bytesTotal)
   };
 }
 function formatBytes(n) {
-  if (n < 1024) return `${n}B`;
+  if (n < 1024) {
+    return `${n}B`;
+  }
   const units = ["KB", "MB", "GB", "TB"];
-  let value2 = n / 1024;
+  let value = n / 1024;
   let i = 0;
-  while (value2 >= 1024 && i < units.length - 1) {
-    value2 /= 1024;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
     i++;
   }
-  return `${value2.toFixed(2)}${units[i]}`;
+  return `${value.toFixed(2)}${units[i]}`;
 }
 function formatSpeed(bps) {
   return `${formatBytes(bps)}/s`;
@@ -17605,12 +20405,12 @@ function dirnameOf(p) {
   return i >= 0 ? p.slice(0, i) : "";
 }
 var init_projection = __esm({
-  "../../packages/task-queue/src/projection/index.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/task-queue/src/projection/index.ts"() {
+    init_types();
   }
 });
 
-// ../../packages/task-queue/src/index.ts
+// ../../node_modules/@vidbee/task-queue/src/index.ts
 var src_exports = {};
 __export(src_exports, {
   AddInputSchema: () => AddInputSchema,
@@ -17620,6 +20420,7 @@ __export(src_exports, {
   EMPTY_PROGRESS: () => EMPTY_PROGRESS,
   ErrorCategorySchema: () => ErrorCategorySchema,
   EventBus: () => EventBus,
+  ExecutorRouter: () => ExecutorRouter,
   IllegalTransitionError: () => IllegalTransitionError,
   LEGAL_TRANSITIONS: () => LEGAL_TRANSITIONS,
   ListInputSchema: () => ListInputSchema,
@@ -17637,7 +20438,10 @@ __export(src_exports, {
   SetMaxPerGroupInputSchema: () => SetMaxPerGroupInputSchema,
   SqlitePersistAdapter: () => SqlitePersistAdapter,
   StatsOutputSchema: () => StatsOutputSchema,
+  SubtitleDownloadStatusSchema: () => SubtitleDownloadStatusSchema,
   TERMINAL_STATUSES: () => TERMINAL_STATUSES,
+  TRANSCRIBABLE_TASK_KINDS: () => TRANSCRIBABLE_TASK_KINDS,
+  TRANSCRIPTION_GROUP_KEY: () => TRANSCRIPTION_GROUP_KEY,
   TaskIdInputSchema: () => TaskIdInputSchema,
   TaskInputSchema: () => TaskInputSchema,
   TaskKindSchema: () => TaskKindSchema,
@@ -17648,14 +20452,18 @@ __export(src_exports, {
   TaskSchema: () => TaskSchema,
   TaskStatusSchema: () => TaskStatusSchema,
   TaskStore: () => TaskStore,
+  TranscriptTaskResultSchema: () => TranscriptTaskResultSchema,
   VoidOutputSchema: () => VoidOutputSchema,
   Watchdog: () => Watchdog,
   classify: () => classify,
   computeBackoffMs: () => computeBackoffMs,
   defaultMaxAttempts: () => defaultMaxAttempts,
   getRuleForCategory: () => getRuleForCategory,
+  isDownloadTaskKind: () => isDownloadTaskKind,
   isLegalTransition: () => isLegalTransition,
-  isPidAlive: () => isPidAlive2,
+  isMediaTaskKind: () => isMediaTaskKind,
+  isOutputComplete: () => isOutputComplete,
+  isPidAlive: () => isPidAlive,
   legacyDownloadStatusOf: () => legacyDownloadStatusOf,
   legacySubStatusOf: () => legacySubStatusOf,
   parseRetryAfter: () => parseRetryAfter,
@@ -17669,39 +20477,39 @@ __export(src_exports, {
   virtualError: () => virtualError
 });
 var init_src = __esm({
-  "../../packages/task-queue/src/index.ts"() {
-    "use strict";
-    init_types();
-    init_schemas3();
-    init_contract();
-    init_fsm();
+  "../../node_modules/@vidbee/task-queue/src/index.ts"() {
+    init_api();
     init_classifier();
+    init_complete();
+    init_contract();
     init_events();
-    init_scheduler2();
-    init_store();
-    init_process();
+    init_executor();
+    init_fsm();
     init_persist();
-    init_api2();
+    init_process();
     init_projection();
+    init_scheduler2();
+    init_schemas3();
+    init_store();
+    init_types();
   }
 });
 
-// ../../packages/downloader-core/src/browser-cookies-setting.ts
+// ../../node_modules/@vidbee/downloader-core/src/browser-cookies-setting.ts
 var normalizeProfileInput, parseBrowserCookiesSetting, buildBrowserCookiesSetting;
 var init_browser_cookies_setting = __esm({
-  "../../packages/downloader-core/src/browser-cookies-setting.ts"() {
-    "use strict";
-    normalizeProfileInput = (value2) => value2.trim().replace(/^['"]|['"]$/g, "");
-    parseBrowserCookiesSetting = (value2) => {
-      if (!value2 || value2 === "none") {
+  "../../node_modules/@vidbee/downloader-core/src/browser-cookies-setting.ts"() {
+    normalizeProfileInput = (value) => value.trim().replace(/^['"]|['"]$/g, "");
+    parseBrowserCookiesSetting = (value) => {
+      if (!value || value === "none") {
         return { browser: "none", profile: "" };
       }
-      const separatorIndex = value2.indexOf(":");
+      const separatorIndex = value.indexOf(":");
       if (separatorIndex === -1) {
-        return { browser: value2, profile: "" };
+        return { browser: value, profile: "" };
       }
-      const browser = value2.slice(0, separatorIndex).trim();
-      const profile = normalizeProfileInput(value2.slice(separatorIndex + 1));
+      const browser = value.slice(0, separatorIndex).trim();
+      const profile = normalizeProfileInput(value.slice(separatorIndex + 1));
       return { browser: browser || "none", profile };
     };
     buildBrowserCookiesSetting = (browser, profile) => {
@@ -17715,12 +20523,100 @@ var init_browser_cookies_setting = __esm({
   }
 });
 
-// ../../packages/downloader-core/src/schemas.ts
-var DownloadTypeSchema, DownloadStatusSchema, DownloadProgressSchema, TaskQueueInternalStatusSchema, TaskQueueSubStatusSchema, TaskQueueErrorCategorySchema, DownloadTaskSchema, DownloadRuntimeSettingsSchema, OneClickQualityPresetSchema, OneClickContainerOptionSchema, ThemeValueSchema, WebAppSettingsSchema, CreateDownloadInputSchema, VideoInfoInputSchema, PlaylistInfoInputSchema, VideoFormatSchema, VideoInfoSchema, PlaylistEntrySchema, PlaylistInfoSchema, PlaylistDownloadInputSchema, PlaylistDownloadEntrySchema, PlaylistDownloadResultSchema, StatusOutputSchema, CreateDownloadOutputSchema, ListDownloadsOutputSchema, CancelDownloadInputSchema, CancelDownloadOutputSchema, ListHistoryOutputSchema, VideoInfoOutputSchema, PlaylistInfoOutputSchema, PlaylistDownloadOutputSchema, RemoveHistoryItemsInputSchema, RemoveHistoryByPlaylistInputSchema, RemoveHistoryOutputSchema, FilePathInputSchema, DirectoryListInputSchema, UploadSettingsFileKindSchema, UploadSettingsFileInputSchema, FileExistsOutputSchema, FileOperationOutputSchema, DirectoryEntrySchema, ListDirectoriesOutputSchema, UploadSettingsFileOutputSchema, GetWebSettingsOutputSchema, SetWebSettingsInputSchema;
+// ../../node_modules/@vidbee/downloader-core/src/subtitle-languages.ts
+var FOLLOW_INTERFACE_SUBTITLE_LANGUAGE, MAX_SUBTITLE_LANGUAGES, DEFAULT_SUBTITLE_LANGUAGES, SUBTITLE_LANGUAGE_CODE, SUBTITLE_LANGUAGE_ALIASES, interfaceSubtitleLanguage, normalizeSubtitleLanguages, resolveSubtitleLanguages, expandSubtitleLanguageAliases;
+var init_subtitle_languages = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/subtitle-languages.ts"() {
+    FOLLOW_INTERFACE_SUBTITLE_LANGUAGE = "interface";
+    MAX_SUBTITLE_LANGUAGES = 5;
+    DEFAULT_SUBTITLE_LANGUAGES = [FOLLOW_INTERFACE_SUBTITLE_LANGUAGE];
+    SUBTITLE_LANGUAGE_CODE = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i;
+    SUBTITLE_LANGUAGE_ALIASES = {
+      ar: ["ar-SA", "ar_SA", "ara"],
+      de: ["de-DE", "de_DE", "deu", "ger"],
+      en: ["en-US", "en_US", "en-GB", "en_GB", "eng"],
+      es: ["es-ES", "es_ES", "es-419", "es_419", "spa"],
+      fr: ["fr-FR", "fr_FR", "fra", "fre"],
+      id: ["id-ID", "id_ID", "ind"],
+      it: ["it-IT", "it_IT", "ita"],
+      ja: ["ja-JP", "ja_JP", "jpn"],
+      ko: ["ko-KR", "ko_KR", "kor"],
+      pt: ["pt-BR", "pt_BR", "pt-PT", "pt_PT", "por"],
+      ru: ["ru-RU", "ru_RU", "rus"],
+      tr: ["tr-TR", "tr_TR", "tur"],
+      "zh-hans": ["zh", "zh-CN", "zh_CN", "zho", "chi"],
+      "zh-hant": ["zh-TW", "zh_TW", "zh-HK", "zh_HK"]
+    };
+    interfaceSubtitleLanguage = (language) => {
+      const normalized = language?.trim().replaceAll("_", "-") || "en";
+      const lower = normalized.toLowerCase();
+      if (lower === "zh-tw" || lower === "zh-hk" || lower === "zh-mo" || lower === "zh-hant") {
+        return "zh-Hant";
+      }
+      if (lower === "zh" || lower === "zh-cn" || lower === "zh-sg" || lower === "zh-hans") {
+        return "zh-Hans";
+      }
+      return normalized;
+    };
+    normalizeSubtitleLanguages = (languages) => {
+      const normalized = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const language of languages ?? []) {
+        const trimmed = language.trim();
+        const isInterfaceLanguage = trimmed === FOLLOW_INTERFACE_SUBTITLE_LANGUAGE;
+        const isReservedAllPattern = trimmed.toLowerCase() === "all";
+        if (isReservedAllPattern || !(isInterfaceLanguage || SUBTITLE_LANGUAGE_CODE.test(trimmed))) {
+          continue;
+        }
+        const key = trimmed.toLowerCase();
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        normalized.push(trimmed);
+        if (normalized.length >= MAX_SUBTITLE_LANGUAGES) {
+          break;
+        }
+      }
+      return normalized.length > 0 ? normalized : [...DEFAULT_SUBTITLE_LANGUAGES];
+    };
+    resolveSubtitleLanguages = (languages, interfaceLanguage) => {
+      const resolved = [];
+      const seen = /* @__PURE__ */ new Set();
+      for (const preference of normalizeSubtitleLanguages(languages)) {
+        const language = interfaceSubtitleLanguage(
+          preference === FOLLOW_INTERFACE_SUBTITLE_LANGUAGE ? interfaceLanguage : preference
+        );
+        const key = language.toLowerCase();
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        resolved.push(language);
+      }
+      return resolved;
+    };
+    expandSubtitleLanguageAliases = (languages) => {
+      const expanded = /* @__PURE__ */ new Map();
+      for (const language of languages) {
+        expanded.set(language.toLowerCase(), language);
+        const key = language.trim().replaceAll("_", "-").toLowerCase();
+        const aliasKey = key.startsWith("zh-") ? key : key.split("-")[0] ?? key;
+        for (const alias of SUBTITLE_LANGUAGE_ALIASES[aliasKey] ?? []) {
+          expanded.set(alias.toLowerCase(), alias);
+        }
+      }
+      return [...expanded.values()];
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/schemas.ts
+var DownloadTypeSchema, DownloadStatusSchema, DownloadProgressSchema, TaskQueueInternalStatusSchema, TaskQueueSubStatusSchema, TaskQueueErrorCategorySchema, DownloadTaskSchema, DownloadRuntimeSettingsSchema, OneClickQualityPresetSchema, OneClickContainerOptionSchema, ThemeValueSchema, WebAppSettingsSchema, CreateDownloadInputSchema, VideoInfoInputSchema, PlaylistInfoInputSchema, VideoFormatSchema, VideoInfoSchema, PlaylistEntrySchema, PlaylistInfoSchema, PlaylistDownloadInputSchema, PlaylistDownloadEntrySchema, PlaylistDownloadResultSchema, StatusOutputSchema, EngineStatusSchema, CreateDownloadOutputSchema, ListDownloadsOutputSchema, CancelDownloadInputSchema, CancelDownloadOutputSchema, RetryDownloadInputSchema, RetryDownloadOutputSchema, PauseDownloadInputSchema, PauseDownloadOutputSchema, ResumeDownloadInputSchema, ResumeDownloadOutputSchema, ListHistoryOutputSchema, VideoInfoOutputSchema, PlaylistInfoOutputSchema, PlaylistDownloadOutputSchema, RemoveHistoryItemsInputSchema, RemoveHistoryByPlaylistInputSchema, RemoveHistoryOutputSchema, FilePathInputSchema, DirectoryListInputSchema, UploadSettingsFileKindSchema, UploadSettingsFileInputSchema, FileExistsOutputSchema, FileOperationOutputSchema, DirectoryEntrySchema, ListDirectoriesOutputSchema, UploadSettingsFileOutputSchema, GetWebSettingsOutputSchema, SetWebSettingsInputSchema;
 var init_schemas4 = __esm({
-  "../../packages/downloader-core/src/schemas.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/downloader-core/src/schemas.ts"() {
     init_zod();
+    init_subtitle_languages();
     DownloadTypeSchema = external_exports.enum(["video", "audio"]);
     DownloadStatusSchema = external_exports.enum([
       "pending",
@@ -17808,25 +20704,22 @@ var init_schemas4 = __esm({
       cookiesPath: external_exports.string().optional(),
       proxy: external_exports.string().optional(),
       configPath: external_exports.string().optional(),
+      downloadSubtitles: external_exports.boolean().optional(),
+      subtitleLanguages: external_exports.array(external_exports.string()).max(MAX_SUBTITLE_LANGUAGES).optional(),
+      interfaceLanguage: external_exports.string().optional(),
       embedSubs: external_exports.boolean().optional(),
+      writeAutoSubs: external_exports.boolean().optional(),
       embedThumbnail: external_exports.boolean().optional(),
       embedMetadata: external_exports.boolean().optional(),
-      embedChapters: external_exports.boolean().optional()
+      embedChapters: external_exports.boolean().optional(),
+      filenameStyle: external_exports.enum(["classic", "basic", "pretty", "nerdy"]).optional(),
+      filenameViaVidBee: external_exports.boolean().optional(),
+      shareWatermark: external_exports.boolean().optional(),
+      downloadWithoutChannelSubfolders: external_exports.boolean().optional(),
+      downloadMirror: external_exports.enum(["auto", "cn", "global"]).optional()
     });
-    OneClickQualityPresetSchema = external_exports.enum([
-      "best",
-      "good",
-      "normal",
-      "bad",
-      "worst"
-    ]);
-    OneClickContainerOptionSchema = external_exports.enum([
-      "auto",
-      "mp4",
-      "mkv",
-      "webm",
-      "original"
-    ]);
+    OneClickQualityPresetSchema = external_exports.enum(["best", "good", "normal", "bad", "worst"]);
+    OneClickContainerOptionSchema = external_exports.enum(["auto", "mp4", "mkv", "webm", "original"]);
     ThemeValueSchema = external_exports.enum(["light", "dark", "system"]);
     WebAppSettingsSchema = external_exports.object({
       downloadPath: external_exports.string(),
@@ -17835,7 +20728,6 @@ var init_schemas4 = __esm({
       cookiesPath: external_exports.string(),
       proxy: external_exports.string(),
       configPath: external_exports.string(),
-      betaProgram: external_exports.boolean(),
       language: external_exports.string(),
       theme: ThemeValueSchema,
       oneClickDownload: external_exports.boolean(),
@@ -17846,11 +20738,44 @@ var init_schemas4 = __esm({
       autoUpdate: external_exports.boolean(),
       subscriptionOnlyLatestDefault: external_exports.boolean(),
       enableAnalytics: external_exports.boolean(),
+      downloadSubtitles: external_exports.boolean().default(true),
+      subtitleLanguages: external_exports.preprocess(
+        (value) => normalizeSubtitleLanguages(
+          Array.isArray(value) ? value.filter((language) => typeof language === "string") : DEFAULT_SUBTITLE_LANGUAGES
+        ),
+        external_exports.array(external_exports.string()).max(MAX_SUBTITLE_LANGUAGES)
+      ),
       embedSubs: external_exports.boolean(),
+      writeAutoSubs: external_exports.boolean().default(true),
       embedThumbnail: external_exports.boolean(),
       embedMetadata: external_exports.boolean(),
       embedChapters: external_exports.boolean(),
-      shareWatermark: external_exports.boolean()
+      filenameStyle: external_exports.enum(["classic", "basic", "pretty", "nerdy"]).default("pretty"),
+      filenameViaVidBee: external_exports.boolean().default(true),
+      shareWatermark: external_exports.boolean(),
+      downloadWithoutChannelSubfolders: external_exports.boolean().default(false),
+      downloadMirror: external_exports.enum(["auto", "cn", "global"]).default("auto"),
+      enableDownloadNotifications: external_exports.boolean().default(true),
+      rememberLastAudioLanguage: external_exports.boolean().default(true),
+      preferredAudioLanguage: external_exports.string().default(""),
+      autoTranscribeAfterDownload: external_exports.boolean().default(true),
+      maxConcurrentTranscriptions: external_exports.number().int().min(1).max(4).default(1),
+      asrTier: external_exports.preprocess(
+        (value) => value === "paraformer-zh" ? "sense-voice" : value,
+        external_exports.enum([
+          "minimal",
+          "whisper-base",
+          "balanced",
+          "whisper-medium",
+          "whisper-turbo",
+          "sense-voice",
+          "sense-voice-2025",
+          "parakeet-v2",
+          "parakeet-v3",
+          "orukeet",
+          "quality"
+        ]).default("minimal")
+      )
     });
     CreateDownloadInputSchema = external_exports.object({
       url: external_exports.url(),
@@ -17870,6 +20795,7 @@ var init_schemas4 = __esm({
       playlistSize: external_exports.number().optional(),
       format: external_exports.string().optional(),
       audioFormat: external_exports.string().optional(),
+      audioBitrate: external_exports.number().int().min(64).max(320).optional(),
       audioFormatIds: external_exports.array(external_exports.string()).optional(),
       startTime: external_exports.string().optional(),
       endTime: external_exports.string().optional(),
@@ -17935,6 +20861,7 @@ var init_schemas4 = __esm({
       type: DownloadTypeSchema,
       format: external_exports.string().optional(),
       audioFormat: external_exports.string().optional(),
+      audioBitrate: external_exports.number().int().min(64).max(320).optional(),
       audioFormatIds: external_exports.array(external_exports.string()).optional(),
       customDownloadPath: external_exports.string().optional(),
       customFilenameTemplate: external_exports.string().optional(),
@@ -17965,7 +20892,19 @@ var init_schemas4 = __esm({
       ok: external_exports.boolean(),
       version: external_exports.string(),
       active: external_exports.number(),
-      pending: external_exports.number()
+      pending: external_exports.number(),
+      downloadDir: external_exports.string().optional(),
+      dataDir: external_exports.string().optional(),
+      dbPath: external_exports.string().optional()
+    });
+    EngineStatusSchema = external_exports.object({
+      error: external_exports.string().nullable(),
+      ffmpegVersion: external_exports.string().nullable(),
+      latestYtDlpVersion: external_exports.string().nullable(),
+      nodeVersion: external_exports.string(),
+      state: external_exports.enum(["checking", "installing", "up-to-date", "unavailable", "update-available"]),
+      ytDlpPath: external_exports.string().nullable(),
+      ytDlpVersion: external_exports.string().nullable()
     });
     CreateDownloadOutputSchema = external_exports.object({
       download: DownloadTaskSchema
@@ -17978,6 +20917,18 @@ var init_schemas4 = __esm({
     });
     CancelDownloadOutputSchema = external_exports.object({
       cancelled: external_exports.boolean()
+    });
+    RetryDownloadInputSchema = CancelDownloadInputSchema;
+    RetryDownloadOutputSchema = external_exports.object({
+      retried: external_exports.boolean()
+    });
+    PauseDownloadInputSchema = CancelDownloadInputSchema;
+    PauseDownloadOutputSchema = external_exports.object({
+      paused: external_exports.boolean()
+    });
+    ResumeDownloadInputSchema = CancelDownloadInputSchema;
+    ResumeDownloadOutputSchema = external_exports.object({
+      resumed: external_exports.boolean()
     });
     ListHistoryOutputSchema = external_exports.object({
       history: external_exports.array(DownloadTaskSchema)
@@ -18039,12 +20990,11 @@ var init_schemas4 = __esm({
   }
 });
 
-// ../../packages/downloader-core/src/contract.ts
+// ../../node_modules/@vidbee/downloader-core/src/contract.ts
 var downloaderContract;
 var init_contract2 = __esm({
-  "../../packages/downloader-core/src/contract.ts"() {
-    "use strict";
-    init_dist5();
+  "../../node_modules/@vidbee/downloader-core/src/contract.ts"() {
+    init_dist4();
     init_schemas4();
     downloaderContract = {
       status: oc.output(StatusOutputSchema),
@@ -18056,7 +21006,10 @@ var init_contract2 = __esm({
       downloads: {
         create: oc.input(CreateDownloadInputSchema).output(CreateDownloadOutputSchema),
         list: oc.output(ListDownloadsOutputSchema),
-        cancel: oc.input(CancelDownloadInputSchema).output(CancelDownloadOutputSchema)
+        cancel: oc.input(CancelDownloadInputSchema).output(CancelDownloadOutputSchema),
+        pause: oc.input(PauseDownloadInputSchema).output(PauseDownloadOutputSchema),
+        resume: oc.input(ResumeDownloadInputSchema).output(ResumeDownloadOutputSchema),
+        retry: oc.input(RetryDownloadInputSchema).output(RetryDownloadOutputSchema)
       },
       history: {
         list: oc.output(ListHistoryOutputSchema),
@@ -18075,37 +21028,723 @@ var init_contract2 = __esm({
       settings: {
         get: oc.output(GetWebSettingsOutputSchema),
         set: oc.input(SetWebSettingsInputSchema).output(GetWebSettingsOutputSchema)
+      },
+      engines: {
+        status: oc.output(EngineStatusSchema),
+        check: oc.output(EngineStatusSchema),
+        update: oc.output(EngineStatusSchema)
       }
     };
   }
 });
 
-// ../../packages/downloader-core/src/yt-dlp-args.ts
-import os from "node:os";
+// ../../node_modules/@vidbee/downloader-core/src/cookie-browser-paths.ts
 import path from "node:path";
-var YOUTUBE_HOST_SUFFIXES, YOUTUBE_SAFE_PLAYER_CLIENTS, DEFAULT_FILENAME_TEMPLATE, WINDOWS_FILENAME_TRIM_LENGTH, DEFAULT_RETRIES, DEFAULT_FRAGMENT_RETRIES, DEFAULT_RETRY_SLEEP, DEFAULT_SOCKET_TIMEOUT, appendNetworkResilienceArgs, hasYouTubeHost, trim, normalizeBrowserCookiesSettingForYtDlp, isBilibiliUrl, resolvePathWithHome, sanitizeFilenameTemplate, appendPlatformFilenameSafetyArgs, isYouTubeUrl, appendYouTubeSafeExtractorArgs, formatYtDlpCommand, resolveFfmpegLocationFromPath, resolveVideoFormatSelector, resolveAudioFormatSelector, buildDownloadArgs, buildVideoInfoArgs, buildPlaylistInfoArgs;
+var pathForPlatform, getBrowserProfileBaseDirs, getBrowserProfileCandidates, getBrowserCookieDatabaseName, getBrowserCookieDatabaseRelativeSegments;
+var init_cookie_browser_paths = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/cookie-browser-paths.ts"() {
+    pathForPlatform = (platform2) => platform2 === "win32" ? path.win32 : path.posix;
+    getBrowserProfileBaseDirs = (platform2, homeDir, browser) => {
+      const join4 = pathForPlatform(platform2).join;
+      if (platform2 === "win32") {
+        if (browser === "edge") {
+          return [join4(homeDir, "AppData", "Local", "Microsoft", "Edge", "User Data")];
+        }
+        if (browser === "chrome") {
+          return [join4(homeDir, "AppData", "Local", "Google", "Chrome", "User Data")];
+        }
+        if (browser === "chromium") {
+          return [join4(homeDir, "AppData", "Local", "Chromium", "User Data")];
+        }
+        if (browser === "brave") {
+          return [join4(homeDir, "AppData", "Local", "BraveSoftware", "Brave-Browser", "User Data")];
+        }
+        if (browser === "vivaldi") {
+          return [join4(homeDir, "AppData", "Local", "Vivaldi", "User Data")];
+        }
+        if (browser === "whale") {
+          return [join4(homeDir, "AppData", "Local", "Naver", "Whale", "User Data")];
+        }
+        if (browser === "opera") {
+          return [join4(homeDir, "AppData", "Roaming", "Opera Software", "Opera Stable")];
+        }
+        if (browser === "firefox") {
+          return [join4(homeDir, "AppData", "Roaming", "Mozilla", "Firefox", "Profiles")];
+        }
+      }
+      if (platform2 === "darwin") {
+        if (browser === "edge") {
+          return [join4(homeDir, "Library", "Application Support", "Microsoft Edge")];
+        }
+        if (browser === "chrome") {
+          return [join4(homeDir, "Library", "Application Support", "Google", "Chrome")];
+        }
+        if (browser === "chromium") {
+          return [join4(homeDir, "Library", "Application Support", "Chromium")];
+        }
+        if (browser === "brave") {
+          return [join4(homeDir, "Library", "Application Support", "BraveSoftware", "Brave-Browser")];
+        }
+        if (browser === "vivaldi") {
+          return [join4(homeDir, "Library", "Application Support", "Vivaldi")];
+        }
+        if (browser === "whale") {
+          return [
+            join4(homeDir, "Library", "Application Support", "Whale"),
+            join4(homeDir, "Library", "Application Support", "Naver Whale")
+          ];
+        }
+        if (browser === "opera") {
+          return [
+            join4(homeDir, "Library", "Application Support", "com.operasoftware.Opera"),
+            join4(homeDir, "Library", "Application Support", "Opera Software", "Opera Stable")
+          ];
+        }
+        if (browser === "firefox") {
+          return [join4(homeDir, "Library", "Application Support", "Firefox", "Profiles")];
+        }
+        if (browser === "safari") {
+          return [join4(homeDir, "Library", "Safari")];
+        }
+      }
+      if (platform2 === "linux") {
+        if (browser === "edge") {
+          return [join4(homeDir, ".config", "microsoft-edge")];
+        }
+        if (browser === "chrome") {
+          return [join4(homeDir, ".config", "google-chrome")];
+        }
+        if (browser === "chromium") {
+          return [join4(homeDir, ".config", "chromium")];
+        }
+        if (browser === "brave") {
+          return [join4(homeDir, ".config", "BraveSoftware", "Brave-Browser")];
+        }
+        if (browser === "vivaldi") {
+          return [join4(homeDir, ".config", "vivaldi")];
+        }
+        if (browser === "whale") {
+          return [join4(homeDir, ".config", "naver-whale")];
+        }
+        if (browser === "opera") {
+          return [join4(homeDir, ".config", "opera")];
+        }
+        if (browser === "firefox") {
+          return [join4(homeDir, ".mozilla", "firefox")];
+        }
+      }
+      if (platform2 === "freebsd" && browser === "firefox") {
+        return [join4(homeDir, ".mozilla", "firefox")];
+      }
+      return [];
+    };
+    getBrowserProfileCandidates = (platform2, homeDir, browser) => {
+      const join4 = pathForPlatform(platform2).join;
+      const baseDirs = getBrowserProfileBaseDirs(platform2, homeDir, browser);
+      if (browser === "firefox" || browser === "safari") {
+        return baseDirs;
+      }
+      const candidates = [];
+      for (const baseDir of baseDirs) {
+        if (browser === "opera") {
+          candidates.push(baseDir, join4(baseDir, "Default"), join4(baseDir, "Profile 1"));
+          continue;
+        }
+        candidates.push(join4(baseDir, "Default"), join4(baseDir, "Profile 1"));
+      }
+      return candidates;
+    };
+    getBrowserCookieDatabaseName = (browser) => {
+      if (browser === "firefox") {
+        return "cookies.sqlite";
+      }
+      if (browser === "safari") {
+        return "Cookies.binarycookies";
+      }
+      return "Cookies";
+    };
+    getBrowserCookieDatabaseRelativeSegments = (browser) => {
+      if (browser === "firefox") {
+        return [["cookies.sqlite"]];
+      }
+      if (browser === "safari") {
+        return [["Cookies.binarycookies"]];
+      }
+      return [["Cookies"], ["Network", "Cookies"]];
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/cookie-setup.ts
+function cookieDomainMatches(host, domain2) {
+  const normalized = host.toLowerCase().replace(/^\./, "");
+  const normalizedDomain = domain2.toLowerCase().replace(/^\./, "");
+  return Boolean(normalizedDomain) && (normalized === normalizedDomain || normalized.endsWith(`.${normalizedDomain}`));
+}
+var COOKIE_BROWSER_IDS, MACOS_BROWSER_COOKIE_PERMISSION_MESSAGE, COOKIES_GUIDE_URL, COOKIES_CHROME_EXTENSION_URL, COOKIES_FIREFOX_EXTENSION_URL, VIDBEE_EXTENSION_ID, VIDBEE_EXTENSION_ORIGIN, VIDBEE_EXTENSION_CHROME_URL, CHROMIUM_FAMILY_BROWSERS, BROWSER_PREFERENCE, COOKIE_SITE_SPECS, HTTPONLY_DOMAIN_PREFIX, MAX_COOKIES_FILE_BYTES, NEEDED_PATTERNS, STALE_PATTERNS, BROWSER_LOCKED_PATTERNS, COOKIE_DB_MISSING_PATTERN, COOKIE_DB_MISSING_PATTERNS, BROWSER_DECRYPT_PATTERNS, FILE_INVALID_PATTERNS, LINUX_KEYRING_PATTERNS, isBrowserCookieReadSupported, isCookieBrowserId, listSelectableCookieBrowsers, isWindowsBlockedCookieBrowser, recommendCookieSetup, hasConfiguredCookieSettings, unconfiguredCookieHealth, inspectNetscapeCookies, matchCookieSites, cookieDomainsForUrl, serializeNetscapeCookies, sanitizeNetscapeField, looksLikeNetscapeCookies, getMaxCookiesFileBytes, looksLikeMacosCookiePath, isCookieDatabaseMissingError, getCookieSetupFailureKind, parseNetscapeCookieLines;
+var init_cookie_setup = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/cookie-setup.ts"() {
+    COOKIE_BROWSER_IDS = [
+      "chrome",
+      "chromium",
+      "firefox",
+      "edge",
+      "safari",
+      "brave",
+      "opera",
+      "vivaldi",
+      "whale"
+    ];
+    MACOS_BROWSER_COOKIE_PERMISSION_MESSAGE = "macOS Files & Folders permission is required to read browser cookies";
+    COOKIES_GUIDE_URL = "https://vidbee.org/docs/cookies/";
+    COOKIES_CHROME_EXTENSION_URL = "https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc";
+    COOKIES_FIREFOX_EXTENSION_URL = "https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/";
+    VIDBEE_EXTENSION_ID = "kpelcaehdkgleenlldpipjpoopnacehk";
+    VIDBEE_EXTENSION_ORIGIN = `chrome-extension://${VIDBEE_EXTENSION_ID}`;
+    VIDBEE_EXTENSION_CHROME_URL = `https://chromewebstore.google.com/detail/${VIDBEE_EXTENSION_ID}`;
+    CHROMIUM_FAMILY_BROWSERS = /* @__PURE__ */ new Set([
+      "chrome",
+      "chromium",
+      "edge",
+      "brave",
+      "opera",
+      "vivaldi",
+      "whale"
+    ]);
+    BROWSER_PREFERENCE = [
+      "chrome",
+      "edge",
+      "brave",
+      "firefox",
+      "chromium",
+      "vivaldi",
+      "whale",
+      "opera",
+      "safari"
+    ];
+    COOKIE_SITE_SPECS = [
+      {
+        id: "youtube",
+        label: "YouTube",
+        domainIncludes: ["youtube.com", "google.com"],
+        cookieNames: ["SID", "LOGIN_INFO", "SAPISID", "__Secure-1PSID", "__Secure-3PSID"]
+      },
+      {
+        id: "bilibili",
+        label: "Bilibili",
+        domainIncludes: ["bilibili.com"],
+        cookieNames: ["SESSDATA", "DedeUserID"]
+      },
+      {
+        id: "instagram",
+        label: "Instagram",
+        domainIncludes: ["instagram.com"],
+        cookieNames: ["sessionid", "ds_user_id"]
+      },
+      {
+        id: "twitter",
+        label: "X",
+        domainIncludes: ["x.com", "twitter.com"],
+        cookieNames: ["auth_token", "ct0"]
+      },
+      {
+        id: "tiktok",
+        label: "TikTok",
+        domainIncludes: ["tiktok.com"],
+        cookieNames: ["sessionid", "sid_guard", "sessionid_ss"]
+      },
+      {
+        id: "facebook",
+        label: "Facebook",
+        domainIncludes: ["facebook.com"],
+        cookieNames: ["c_user", "xs"]
+      },
+      {
+        id: "twitch",
+        label: "Twitch",
+        domainIncludes: ["twitch.tv"],
+        cookieNames: ["auth-token"]
+      },
+      {
+        id: "reddit",
+        label: "Reddit",
+        domainIncludes: ["reddit.com"],
+        cookieNames: ["reddit_session"]
+      },
+      {
+        id: "douyin",
+        label: "Douyin",
+        domainIncludes: ["douyin.com"],
+        cookieNames: ["sessionid", "sid_guard"]
+      }
+    ];
+    HTTPONLY_DOMAIN_PREFIX = "#HttpOnly_";
+    MAX_COOKIES_FILE_BYTES = 2e6;
+    NEEDED_PATTERNS = [
+      "sign in to confirm your age",
+      "sign in to confirm you're not a bot",
+      "sign in to confirm you\u2019re not a bot",
+      "login required",
+      "private video",
+      "members-only",
+      "please log in",
+      "please sign in"
+    ];
+    STALE_PATTERNS = ["cookies are no longer valid", "http error 403: forbidden"];
+    BROWSER_LOCKED_PATTERNS = [
+      "could not copy chrome cookie database",
+      "could not copy chromium cookie database",
+      "could not copy edge cookie database"
+    ];
+    COOKIE_DB_MISSING_PATTERN = /could not find [a-z]+ cookies database/;
+    COOKIE_DB_MISSING_PATTERNS = [
+      "custom safari cookies database not found",
+      "could not find chrome cookies database",
+      "could not find chromium cookies database",
+      "could not find firefox cookies database",
+      "could not find edge cookies database",
+      "could not find safari cookies database",
+      "could not find brave cookies database",
+      "could not find opera cookies database",
+      "could not find vivaldi cookies database",
+      "could not find whale cookies database"
+    ];
+    BROWSER_DECRYPT_PATTERNS = ["failed to decrypt with dpapi"];
+    FILE_INVALID_PATTERNS = [
+      "utf-8' codec can't decode byte",
+      "cookies file must be netscape formatted",
+      "does not look like a netscape format cookies file"
+    ];
+    LINUX_KEYRING_PATTERNS = ["secretstorage not available"];
+    isBrowserCookieReadSupported = (platform2, browser) => {
+      if (!browser || browser === "none") {
+        return false;
+      }
+      if (!isCookieBrowserId(browser)) {
+        return false;
+      }
+      if (browser === "safari") {
+        return platform2 === "darwin";
+      }
+      if (platform2 === "win32") {
+        return browser === "firefox";
+      }
+      return true;
+    };
+    isCookieBrowserId = (value) => COOKIE_BROWSER_IDS.includes(value);
+    listSelectableCookieBrowsers = (platform2) => COOKIE_BROWSER_IDS.filter((id) => isBrowserCookieReadSupported(platform2, id));
+    isWindowsBlockedCookieBrowser = (browser) => isCookieBrowserId(browser) && CHROMIUM_FAMILY_BROWSERS.has(browser);
+    recommendCookieSetup = (input) => {
+      const supportedInstalled = input.installedBrowsers.filter((entry) => entry.supported && isBrowserCookieReadSupported(input.platform, entry.id)).map((entry) => entry.id);
+      if (input.platform === "win32") {
+        if (supportedInstalled.includes("firefox")) {
+          return { method: "browser", browser: "firefox", reason: "windows-firefox" };
+        }
+        return { method: "file", reason: "windows-file" };
+      }
+      for (const browser of BROWSER_PREFERENCE) {
+        if (supportedInstalled.includes(browser)) {
+          return { method: "browser", browser, reason: "detected-browser" };
+        }
+      }
+      return { method: "file", reason: "file-fallback" };
+    };
+    hasConfiguredCookieSettings = (browserForCookies, cookiesPath) => {
+      const trimmedPath = cookiesPath?.trim();
+      if (trimmedPath) {
+        return true;
+      }
+      const trimmedBrowser = browserForCookies?.trim();
+      return Boolean(trimmedBrowser && trimmedBrowser !== "none");
+    };
+    unconfiguredCookieHealth = () => ({
+      source: "none",
+      status: "unconfigured",
+      sites: []
+    });
+    inspectNetscapeCookies = (text2, cookiesPath) => {
+      if (!looksLikeNetscapeCookies(text2)) {
+        return {
+          cookiesPath,
+          reason: "invalid-format",
+          source: "file",
+          status: "invalid",
+          sites: []
+        };
+      }
+      const cookies = parseNetscapeCookieLines(text2);
+      if (cookies.length === 0) {
+        return {
+          cookiesPath,
+          reason: "no-session",
+          source: "file",
+          status: "empty",
+          sites: []
+        };
+      }
+      const sites = matchCookieSites(cookies);
+      if (sites.some((site) => !site.expired)) {
+        return {
+          cookiesPath,
+          source: "file",
+          status: "ok",
+          sites: sites.filter((site) => !site.expired)
+        };
+      }
+      if (sites.some((site) => site.expired)) {
+        return {
+          cookiesPath,
+          reason: "expired",
+          source: "file",
+          status: "expired",
+          sites
+        };
+      }
+      return {
+        cookiesPath,
+        reason: "no-session",
+        source: "file",
+        status: "empty",
+        sites: []
+      };
+    };
+    matchCookieSites = (cookies) => {
+      const nowSeconds = Math.floor(Date.now() / 1e3);
+      const sites = [];
+      for (const spec of COOKIE_SITE_SPECS) {
+        const matches = cookies.filter(
+          (cookie) => spec.domainIncludes.some((domain2) => cookieDomainMatches(cookie.domain, domain2)) && spec.cookieNames.some((name) => name === cookie.name)
+        );
+        if (matches.length === 0) {
+          continue;
+        }
+        const hasFresh = matches.some((cookie) => cookie.expires === 0 || cookie.expires > nowSeconds);
+        sites.push({ expired: !hasFresh, id: spec.id, label: spec.label });
+      }
+      return sites;
+    };
+    cookieDomainsForUrl = (url2) => {
+      let hostname3 = "";
+      try {
+        const parsed = new URL(url2);
+        if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+          return [];
+        }
+        hostname3 = parsed.hostname.toLowerCase();
+      } catch {
+        return [];
+      }
+      if (!hostname3) {
+        return [];
+      }
+      const domains = /* @__PURE__ */ new Set();
+      for (const spec of COOKIE_SITE_SPECS) {
+        if (spec.domainIncludes.some((domain2) => cookieDomainMatches(hostname3, domain2))) {
+          for (const fragment of spec.domainIncludes) {
+            domains.add(fragment);
+          }
+        }
+      }
+      if (domains.size > 0) {
+        return [...domains];
+      }
+      return [hostname3];
+    };
+    serializeNetscapeCookies = (cookies) => {
+      const lines = ["# Netscape HTTP Cookie File", "# This file was generated by VidBee", ""];
+      for (const cookie of cookies) {
+        const name = sanitizeNetscapeField(cookie.name);
+        const value = sanitizeNetscapeField(cookie.value);
+        if (!name) {
+          continue;
+        }
+        const rawDomain = cookie.domain.trim().toLowerCase();
+        if (!rawDomain) {
+          continue;
+        }
+        const dotted = cookie.hostOnly || rawDomain.startsWith(".") ? rawDomain : `.${rawDomain}`;
+        const includeSubdomains = dotted.startsWith(".") ? "TRUE" : "FALSE";
+        const domainField = cookie.httpOnly ? `${HTTPONLY_DOMAIN_PREFIX}${dotted}` : dotted;
+        const expires = cookie.session || !cookie.expirationDate ? "0" : String(Math.floor(cookie.expirationDate));
+        const path5 = cookie.path?.trim() || "/";
+        const secure = cookie.secure ? "TRUE" : "FALSE";
+        lines.push([domainField, includeSubdomains, path5, secure, expires, name, value].join("	"));
+      }
+      return `${lines.join("\n")}
+`;
+    };
+    sanitizeNetscapeField = (value) => value.replace(/[\t\r\n]/g, "");
+    looksLikeNetscapeCookies = (text2) => {
+      const sample = text2.slice(0, 4096);
+      return sample.includes("# Netscape HTTP Cookie File") || sample.includes("# HTTP Cookie File") || /^(?:#HttpOnly_)?[^\s\t]+\t(?:TRUE|FALSE)\t/im.test(sample);
+    };
+    getMaxCookiesFileBytes = () => MAX_COOKIES_FILE_BYTES;
+    looksLikeMacosCookiePath = (normalized) => normalized.includes("/library/application support/") || normalized.includes("/library/containers/") || normalized.includes("/library/safari") || normalized.includes("/library/cookies");
+    isCookieDatabaseMissingError = (normalized) => COOKIE_DB_MISSING_PATTERN.test(normalized) || COOKIE_DB_MISSING_PATTERNS.some((pattern) => normalized.includes(pattern));
+    getCookieSetupFailureKind = (rawError) => {
+      const normalized = rawError?.trim().toLowerCase() ?? "";
+      if (!normalized) {
+        return null;
+      }
+      if (LINUX_KEYRING_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+        return "linux-keyring";
+      }
+      if (BROWSER_DECRYPT_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+        return "browser-decrypt";
+      }
+      if (normalized.includes("files & folders permission is required") || isCookieDatabaseMissingError(normalized) && looksLikeMacosCookiePath(normalized)) {
+        return "macos-files-permission";
+      }
+      if (BROWSER_LOCKED_PATTERNS.some((pattern) => normalized.includes(pattern)) || isCookieDatabaseMissingError(normalized)) {
+        return "browser-locked";
+      }
+      if (FILE_INVALID_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+        return "file-invalid";
+      }
+      if (STALE_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+        return "stale";
+      }
+      if (NEEDED_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+        return "needed";
+      }
+      return null;
+    };
+    parseNetscapeCookieLines = (text2) => {
+      const cookies = [];
+      for (const rawLine of text2.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith("#") && !line.startsWith(HTTPONLY_DOMAIN_PREFIX)) {
+          continue;
+        }
+        const fields = line.split("	");
+        const domainField = fields[0];
+        const expiresField = fields[4];
+        const nameField = fields[5];
+        if (fields.length < 7 || domainField === void 0 || nameField === void 0) {
+          continue;
+        }
+        const domain2 = domainField.startsWith(HTTPONLY_DOMAIN_PREFIX) ? domainField.slice(HTTPONLY_DOMAIN_PREFIX.length) : domainField;
+        const expires = Number.parseInt(expiresField ?? "", 10);
+        cookies.push({
+          domain: domain2.toLowerCase(),
+          expires: Number.isFinite(expires) ? expires : 0,
+          name: nameField
+        });
+      }
+      return cookies;
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/filename-style.ts
+var FILENAME_STYLES, DEFAULT_FILENAME_STYLE, DEFAULT_FILENAME_VIA_VIDBEE, VIA_VIDBEE_LABEL, DEFAULT_FILENAME_TEMPLATE, SHARED_FILENAME_TEMPLATE, VIA_VIDBEE_SUFFIX, YTDLP_EXT_TOKEN, AUTHOR_FIELD, FILENAME_STYLE_TEMPLATES, FILENAME_STYLE_PREVIEWS, isFilenameStyle, applyViaVidBeeFilename, resolveFilenameTemplate;
+var init_filename_style = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/filename-style.ts"() {
+    FILENAME_STYLES = ["classic", "basic", "pretty", "nerdy"];
+    DEFAULT_FILENAME_STYLE = "pretty";
+    DEFAULT_FILENAME_VIA_VIDBEE = true;
+    VIA_VIDBEE_LABEL = "via VidBee";
+    DEFAULT_FILENAME_TEMPLATE = "%(title)s.%(ext)s";
+    SHARED_FILENAME_TEMPLATE = `%(title)s ${VIA_VIDBEE_LABEL}.%(ext)s`;
+    VIA_VIDBEE_SUFFIX = ` ${VIA_VIDBEE_LABEL}`;
+    YTDLP_EXT_TOKEN = ".%(ext)s";
+    AUTHOR_FIELD = "%(uploader,creator,channel,uploader_id)s";
+    FILENAME_STYLE_TEMPLATES = {
+      basic: {
+        audio: `%(title)s - ${AUTHOR_FIELD}.%(ext)s`,
+        video: `%(title)s - ${AUTHOR_FIELD} (%(height)sp, %(vcodec)s).%(ext)s`
+      },
+      classic: {
+        audio: "%(extractor)s_%(id)s_audio.%(ext)s",
+        video: "%(extractor)s_%(id)s_%(width)sx%(height)s_%(vcodec)s.%(ext)s"
+      },
+      nerdy: {
+        audio: `%(title)s - ${AUTHOR_FIELD} (%(extractor)s, %(id)s).%(ext)s`,
+        video: `%(title)s - ${AUTHOR_FIELD} (%(height)sp, %(vcodec)s, %(extractor)s, %(id)s).%(ext)s`
+      },
+      pretty: {
+        audio: `%(title)s - ${AUTHOR_FIELD} (%(extractor)s).%(ext)s`,
+        video: `%(title)s - ${AUTHOR_FIELD} (%(height)sp, %(vcodec)s, %(extractor)s).%(ext)s`
+      }
+    };
+    FILENAME_STYLE_PREVIEWS = {
+      basic: {
+        audio: "Audio Title - Audio Author.mp3",
+        video: "Video Title - Video Author (1080p, h264).mp4"
+      },
+      classic: {
+        audio: "youtube_dQw4w9WgXcQ_audio.mp3",
+        video: "youtube_dQw4w9WgXcQ_1920x1080_h264.mp4"
+      },
+      nerdy: {
+        audio: "Audio Title - Audio Author (youtube, dQw4w9WgXcQ).mp3",
+        video: "Video Title - Video Author (1080p, h264, youtube, dQw4w9WgXcQ).mp4"
+      },
+      pretty: {
+        audio: "Audio Title - Audio Author (youtube).mp3",
+        video: "Video Title - Video Author (1080p, h264, youtube).mp4"
+      }
+    };
+    isFilenameStyle = (value) => typeof value === "string" && FILENAME_STYLES.includes(value);
+    applyViaVidBeeFilename = (value, enabled = DEFAULT_FILENAME_VIA_VIDBEE) => {
+      if (!enabled || value.includes(VIA_VIDBEE_LABEL)) {
+        return value;
+      }
+      if (value.endsWith(YTDLP_EXT_TOKEN)) {
+        return `${value.slice(0, -YTDLP_EXT_TOKEN.length)}${VIA_VIDBEE_SUFFIX}${YTDLP_EXT_TOKEN}`;
+      }
+      const lastDot = value.lastIndexOf(".");
+      if (lastDot > 0) {
+        return `${value.slice(0, lastDot)}${VIA_VIDBEE_SUFFIX}${value.slice(lastDot)}`;
+      }
+      return `${value}${VIA_VIDBEE_SUFFIX}`;
+    };
+    resolveFilenameTemplate = (style, type, shareWatermark = false, filenameViaVidBee = DEFAULT_FILENAME_VIA_VIDBEE) => {
+      if (shareWatermark) {
+        return SHARED_FILENAME_TEMPLATE;
+      }
+      const resolvedStyle = isFilenameStyle(style) ? style : DEFAULT_FILENAME_STYLE;
+      return applyViaVidBeeFilename(FILENAME_STYLE_TEMPLATES[resolvedStyle][type], filenameViaVidBee);
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/yt-dlp-args.ts
+import { existsSync as existsSync4 } from "node:fs";
+import os from "node:os";
+import path2 from "node:path";
+var YOUTUBE_HOST_SUFFIXES, BILIBILI_AUTO_SUBTITLE_PREFIX, YOUTUBE_SAFE_PLAYER_CLIENTS, VIDBEE_OUTPUT_PATH_PREFIX, WINDOWS_FILENAME_TRIM_LENGTH, DIRECT_MEDIA_SEGMENT_EXTENSION, DEFAULT_RETRIES, DEFAULT_FRAGMENT_RETRIES, DEFAULT_EXTRACTOR_RETRIES, DEFAULT_RETRY_SLEEP, DEFAULT_SOCKET_TIMEOUT, resolveDownloadSubtitleLanguages, appendNetworkResilienceArgs, appendMetadataNetworkResilienceArgs, METADATA_NETWORK_ATTEMPTS, METADATA_NETWORK_RETRY_DELAY_MS, isTransientYtDlpNetworkError, networkErrorMessage, delayMetadataRetry, retryTransientYtDlpNetworkError, hasYouTubeHost, trim, trimWindowsFilenameSegmentEnd, parseDownloadTimecode, validateDownloadTimeRange, isDirectMediaSegmentUrl, assertDownloadSourceUrl, normalizeBrowserCookiesSettingForYtDlp, hostMatchesDomain, isBilibiliUrl, isTwitchUrl, isTikTokUrl, resolveSubtitleDownloadSkipReason, resolvePathWithHome, sanitizeFilenameTemplate, appendPlatformFilenameSafetyArgs, isYouTubeUrl, appendYouTubeSafeExtractorArgs, formatYtDlpCommand, resolveFfmpegLocationFromPath, BEST_FORMAT_FALLBACK, withBestFallback, resolveVideoFormatSelector, UNSUPPORTED_THUMBNAIL_EMBED_ERROR, THUMBNAIL_EMBED_UNSUPPORTED_LOG, resolveThumbnailDownloadArgs, isUnsupportedThumbnailEmbedOnlyFailure, resolveAudioFormatSelector, buildDownloadArgs, buildVideoInfoArgs, buildCaptionExtractArgs, buildPlaylistInfoArgs;
 var init_yt_dlp_args = __esm({
-  "../../packages/downloader-core/src/yt-dlp-args.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/downloader-core/src/yt-dlp-args.ts"() {
     init_browser_cookies_setting();
+    init_filename_style();
+    init_subtitle_languages();
     YOUTUBE_HOST_SUFFIXES = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
+    BILIBILI_AUTO_SUBTITLE_PREFIX = "ai-";
     YOUTUBE_SAFE_PLAYER_CLIENTS = "default,-web";
-    DEFAULT_FILENAME_TEMPLATE = "%(title)s via VidBee.%(ext)s";
+    VIDBEE_OUTPUT_PATH_PREFIX = "__VIDBEE_OUTPUT_PATH__:";
     WINDOWS_FILENAME_TRIM_LENGTH = "120";
+    DIRECT_MEDIA_SEGMENT_EXTENSION = /\.(?:cmfa|cmfv|m4s)(?:$|[?#])/i;
     DEFAULT_RETRIES = "30";
     DEFAULT_FRAGMENT_RETRIES = "30";
+    DEFAULT_EXTRACTOR_RETRIES = "10";
     DEFAULT_RETRY_SLEEP = "2";
     DEFAULT_SOCKET_TIMEOUT = "30";
+    resolveDownloadSubtitleLanguages = (languages, isBilibili, writeAutoSubs) => {
+      const resolved = new Map(
+        expandSubtitleLanguageAliases(languages).map((language) => [language.toLowerCase(), language])
+      );
+      if (isBilibili && writeAutoSubs) {
+        for (const language of languages) {
+          if (language.toLowerCase().startsWith(BILIBILI_AUTO_SUBTITLE_PREFIX)) {
+            continue;
+          }
+          const primaryLanguage = language.split("-")[0]?.toLowerCase();
+          if (primaryLanguage) {
+            const automaticLanguage = `${BILIBILI_AUTO_SUBTITLE_PREFIX}${primaryLanguage}`;
+            resolved.set(automaticLanguage, automaticLanguage);
+          }
+        }
+      }
+      return [...resolved.values()];
+    };
     appendNetworkResilienceArgs = (args) => {
       args.push("--retries", DEFAULT_RETRIES);
       args.push("--fragment-retries", DEFAULT_FRAGMENT_RETRIES);
+      args.push("--extractor-retries", DEFAULT_EXTRACTOR_RETRIES);
       args.push("--retry-sleep", DEFAULT_RETRY_SLEEP);
+      args.push("--retry-sleep", `extractor:${DEFAULT_RETRY_SLEEP}`);
       args.push("--socket-timeout", DEFAULT_SOCKET_TIMEOUT);
     };
+    appendMetadataNetworkResilienceArgs = (args) => {
+      args.push("--retries", DEFAULT_RETRIES);
+      args.push("--extractor-retries", DEFAULT_EXTRACTOR_RETRIES);
+      args.push("--retry-sleep", DEFAULT_RETRY_SLEEP);
+      args.push("--retry-sleep", `extractor:${DEFAULT_RETRY_SLEEP}`);
+      args.push("--socket-timeout", DEFAULT_SOCKET_TIMEOUT);
+    };
+    METADATA_NETWORK_ATTEMPTS = 3;
+    METADATA_NETWORK_RETRY_DELAY_MS = 1e3;
+    isTransientYtDlpNetworkError = (error51) => {
+      const normalized = error51.toLowerCase();
+      return normalized.includes("incompleteread") || normalized.includes("error reading response") || normalized.includes("read timed out") || normalized.includes("connection reset") || normalized.includes("connection aborted") || normalized.includes("econnreset") || normalized.includes("econnaborted");
+    };
+    networkErrorMessage = (error51) => error51 instanceof Error ? error51.message : String(error51);
+    delayMetadataRetry = (ms) => new Promise((resolve2) => {
+      setTimeout(resolve2, ms);
+    });
+    retryTransientYtDlpNetworkError = async (run2, sleep = delayMetadataRetry) => {
+      let lastError;
+      for (let attempt = 1; attempt <= METADATA_NETWORK_ATTEMPTS; attempt += 1) {
+        try {
+          return await run2();
+        } catch (error51) {
+          lastError = error51;
+          const canRetry = attempt < METADATA_NETWORK_ATTEMPTS && isTransientYtDlpNetworkError(networkErrorMessage(error51));
+          if (!canRetry) {
+            throw error51;
+          }
+          await sleep(METADATA_NETWORK_RETRY_DELAY_MS);
+        }
+      }
+      throw lastError;
+    };
     hasYouTubeHost = (host) => YOUTUBE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
-    trim = (value2) => value2?.trim() ?? "";
-    normalizeBrowserCookiesSettingForYtDlp = (value2) => {
-      const rawValue = trim(value2);
+    trim = (value) => value?.trim() ?? "";
+    trimWindowsFilenameSegmentEnd = (value) => {
+      let end = value.length;
+      while (end > 0) {
+        const characterCode = value.charCodeAt(end - 1);
+        if (characterCode !== 32 && characterCode !== 46) {
+          break;
+        }
+        end -= 1;
+      }
+      return value.slice(0, end);
+    };
+    parseDownloadTimecode = (value) => {
+      const normalized = value.trim();
+      if (!normalized) {
+        return null;
+      }
+      const parts = normalized.split(":");
+      if (parts.length > 3 || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part))) {
+        return null;
+      }
+      const numericParts = parts.map(Number);
+      if (numericParts.some((part) => !Number.isFinite(part))) {
+        return null;
+      }
+      if (parts.length > 1 && numericParts.slice(1).some((part) => part >= 60)) {
+        return null;
+      }
+      return numericParts.reduce((total, part) => total * 60 + part, 0);
+    };
+    validateDownloadTimeRange = (startTime, endTime) => {
+      const start = trim(startTime);
+      const end = trim(endTime);
+      const startSeconds = start ? parseDownloadTimecode(start) : 0;
+      const endSeconds = end ? parseDownloadTimecode(end) : null;
+      if (start && startSeconds === null) {
+        throw new Error("Invalid start time. Use seconds, MM:SS, or HH:MM:SS.");
+      }
+      if (end && endSeconds === null) {
+        throw new Error("Invalid end time. Use seconds, MM:SS, or HH:MM:SS.");
+      }
+      if (endSeconds !== null && startSeconds !== null && endSeconds <= startSeconds) {
+        throw new Error("End time must be later than start time.");
+      }
+    };
+    isDirectMediaSegmentUrl = (value) => DIRECT_MEDIA_SEGMENT_EXTENSION.test(value.trim());
+    assertDownloadSourceUrl = (value) => {
+      if (isDirectMediaSegmentUrl(value)) {
+        throw new Error(
+          "This URL points to a single media segment. Paste the original video page URL instead."
+        );
+      }
+    };
+    normalizeBrowserCookiesSettingForYtDlp = (value) => {
+      const rawValue = trim(value);
       if (!rawValue || rawValue === "none") {
         return "none";
       }
@@ -18120,16 +21759,52 @@ var init_yt_dlp_args = __esm({
       if (!looksLikePath) {
         return `${browser}:${profile}`;
       }
-      const profileName = profile.includes("\\") ? path.win32.basename(profile) : path.posix.basename(profile);
+      const isWindowsPath = profile.includes("\\");
+      const isAbsolutePath = isWindowsPath ? path2.win32.isAbsolute(profile) : path2.posix.isAbsolute(profile);
+      if (browser === "firefox" && isAbsolutePath && existsSync4(path2.join(profile, "cookies.sqlite"))) {
+        return `${browser}:${profile}`;
+      }
+      const profileName = isWindowsPath ? path2.win32.basename(profile) : path2.posix.basename(profile);
       return profileName ? `${browser}:${profileName}` : browser;
     };
+    hostMatchesDomain = (host, domain2) => host === domain2 || host.endsWith(`.${domain2}`);
     isBilibiliUrl = (url2) => {
       try {
         const host = new URL(url2).hostname.toLowerCase();
-        return host.includes("bilibili.com") || host.includes("b23.tv") || host.includes("bili.tv");
+        return ["bilibili.com", "b23.tv", "bili.tv"].some((domain2) => hostMatchesDomain(host, domain2));
       } catch {
         return false;
       }
+    };
+    isTwitchUrl = (url2) => {
+      try {
+        const host = new URL(url2).hostname.toLowerCase();
+        return hostMatchesDomain(host, "twitch.tv");
+      } catch {
+        return false;
+      }
+    };
+    isTikTokUrl = (url2) => {
+      try {
+        const host = new URL(url2).hostname.toLowerCase();
+        return hostMatchesDomain(host, "tiktok.com");
+      } catch {
+        return false;
+      }
+    };
+    resolveSubtitleDownloadSkipReason = (options, settings) => {
+      if (options.type !== "video" || !(settings.downloadSubtitles ?? true)) {
+        return null;
+      }
+      if (isTikTokUrl(options.url) && !(settings.writeAutoSubs ?? true)) {
+        return "automatic-captions-disabled";
+      }
+      const browserForCookies = normalizeBrowserCookiesSettingForYtDlp(settings.browserForCookies);
+      const hasSubtitleAuth = browserForCookies && browserForCookies !== "none" || Boolean(trim(settings.cookiesPath));
+      if ((isBilibiliUrl(options.url) || isTwitchUrl(options.url)) && !hasSubtitleAuth) {
+        return "auth-required";
+      }
+      return null;
     };
     resolvePathWithHome = (rawPath) => {
       const trimmed = trim(rawPath);
@@ -18140,18 +21815,18 @@ var init_yt_dlp_args = __esm({
         return os.homedir();
       }
       if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-        return path.join(os.homedir(), trimmed.slice(2));
+        return path2.join(os.homedir(), trimmed.slice(2));
       }
       return trimmed;
     };
-    sanitizeFilenameTemplate = (template) => {
+    sanitizeFilenameTemplate = (template, fallbackTemplate = DEFAULT_FILENAME_TEMPLATE) => {
       const trimmed = template.trim();
       if (!trimmed) {
-        return DEFAULT_FILENAME_TEMPLATE;
+        return fallbackTemplate;
       }
       const normalized = trimmed.replace(/\\/g, "/");
-      const safeParts = normalized.split("/").map((part) => part.trim()).filter((part) => part !== "" && part !== "." && part !== "..").map((part) => part.replace(/[<>:"|?*]/g, "-").replace(/[. ]+$/g, "")).filter((part) => part !== "");
-      return safeParts.length === 0 ? DEFAULT_FILENAME_TEMPLATE : safeParts.join("/");
+      const safeParts = normalized.split("/").map((part) => part.trim()).filter((part) => part !== "" && part !== "." && part !== "..").map((part) => trimWindowsFilenameSegmentEnd(part.replace(/[<>:"|?*]/g, "-"))).filter((part) => part !== "");
+      return safeParts.length === 0 ? fallbackTemplate : safeParts.join("/");
     };
     appendPlatformFilenameSafetyArgs = (args, platform2 = process.platform) => {
       if (platform2 === "win32") {
@@ -18188,7 +21863,9 @@ var init_yt_dlp_args = __esm({
       });
       return `yt-dlp ${quoted.join(" ")}`;
     };
-    resolveFfmpegLocationFromPath = (ffmpegPath) => path.dirname(ffmpegPath);
+    resolveFfmpegLocationFromPath = (ffmpegPath) => path2.dirname(ffmpegPath);
+    BEST_FORMAT_FALLBACK = "bestvideo+bestaudio/best";
+    withBestFallback = (selector) => selector.includes("/") ? selector : `${selector}/${BEST_FORMAT_FALLBACK}`;
     resolveVideoFormatSelector = (options) => {
       const format = options.format;
       const audioFormat = options.audioFormat;
@@ -18210,7 +21887,7 @@ var init_yt_dlp_args = __esm({
         if (!audioFormat || audioFormat === "best") {
           return "bestvideo+bestaudio/best";
         }
-        return `bestvideo+${audioFormat}`;
+        return withBestFallback(`bestvideo+${audioFormat}`);
       }
       if (audioFormat === "none") {
         return `${format}+none`;
@@ -18218,7 +21895,25 @@ var init_yt_dlp_args = __esm({
       if (!audioFormat || audioFormat === "best") {
         return `${format}+bestaudio/best`;
       }
-      return `${format}+${audioFormat}`;
+      return withBestFallback(`${format}+${audioFormat}`);
+    };
+    UNSUPPORTED_THUMBNAIL_EMBED_ERROR = /supported filetypes for thumbnail embedding are/i;
+    THUMBNAIL_EMBED_UNSUPPORTED_LOG = "[VidBee] Thumbnail embedding is unsupported for this container. The video was saved. Choose MP4 or MKV to embed cover art.";
+    resolveThumbnailDownloadArgs = (type, container, embedThumbnail) => {
+      if (!embedThumbnail) {
+        return ["--no-embed-thumbnail"];
+      }
+      if (type === "video" && container === "webm") {
+        return ["--no-embed-thumbnail", "--write-thumbnail"];
+      }
+      return ["--embed-thumbnail", "--write-thumbnail"];
+    };
+    isUnsupportedThumbnailEmbedOnlyFailure = (output) => {
+      if (!UNSUPPORTED_THUMBNAIL_EMBED_ERROR.test(output)) {
+        return false;
+      }
+      const errorLines = output.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^ERROR:/i.test(line));
+      return errorLines.length > 0 && errorLines.every((line) => UNSUPPORTED_THUMBNAIL_EMBED_ERROR.test(line));
     };
     resolveAudioFormatSelector = (options) => {
       const format = options.format;
@@ -18231,8 +21926,11 @@ var init_yt_dlp_args = __esm({
       return format;
     };
     buildDownloadArgs = (options, fallbackDownloadPath, settings, jsRuntimeArgs = []) => {
+      assertDownloadSourceUrl(options.url);
+      validateDownloadTimeRange(options.startTime, options.endTime);
       const args = ["--no-playlist", "--no-mtime", "--encoding", "utf-8"];
-      if (options.type === "video") {
+      const container = options.type === "video" ? options.containerFormat ?? "auto" : void 0;
+      if (options.type === "video" && container) {
         const formatSelector = resolveVideoFormatSelector(options);
         if (formatSelector) {
           args.push("-f", formatSelector);
@@ -18240,7 +21938,6 @@ var init_yt_dlp_args = __esm({
         if ((options.audioFormatIds?.length ?? 0) > 0 || formatSelector.includes("mergeall")) {
           args.push("--audio-multistreams");
         }
-        const container = options.containerFormat ?? "auto";
         if (container === "auto") {
           args.push("--merge-output-format", "mp4/mkv");
         } else if (container !== "original") {
@@ -18249,41 +21946,81 @@ var init_yt_dlp_args = __esm({
         }
       } else if (options.type === "audio") {
         args.push("-f", resolveAudioFormatSelector(options));
+        if (options.audioBitrate !== void 0) {
+          if (![64, 96, 128, 160, 192, 256, 320].includes(options.audioBitrate)) {
+            throw new Error("Choose an audio bitrate between 64 and 320 kbps");
+          }
+          args.push("--extract-audio", "--audio-format", "mp3", "--audio-quality", String(options.audioBitrate) + "K");
+        }
       }
-      if (options.startTime || options.endTime) {
-        const start = options.startTime || "0";
-        const end = options.endTime || "";
-        args.push("--download-sections", `*${start}-${end}`);
+      const startTime = trim(options.startTime);
+      const endTime = trim(options.endTime);
+      if (startTime || endTime) {
+        const start = startTime || "0";
+        const end = endTime || "inf";
+        args.push("--download-sections", `*${start}-${end}`, "--force-keyframes-at-cuts");
       }
+      const downloadSubtitles = settings.downloadSubtitles ?? true;
+      const selectedSubtitleLanguages = resolveSubtitleLanguages(
+        settings.subtitleLanguages,
+        settings.interfaceLanguage
+      );
       const embedSubs = settings.embedSubs ?? true;
+      const writeAutoSubs = settings.writeAutoSubs ?? true;
       const embedThumbnail = settings.embedThumbnail ?? false;
       const embedMetadata = settings.embedMetadata ?? true;
       const embedChapters = settings.embedChapters ?? true;
       const browserForCookies = normalizeBrowserCookiesSettingForYtDlp(settings.browserForCookies);
       const cookiesPath = trim(settings.cookiesPath);
-      const hasSubtitleAuth = browserForCookies && browserForCookies !== "none" || Boolean(cookiesPath);
-      const shouldAttemptSubtitles = !isBilibiliUrl(options.url) || hasSubtitleAuth;
+      const isBilibili = isBilibiliUrl(options.url);
+      const subtitleLanguages = resolveDownloadSubtitleLanguages(
+        selectedSubtitleLanguages,
+        isBilibili,
+        writeAutoSubs
+      );
+      const subtitleSkipReason = resolveSubtitleDownloadSkipReason(options, settings);
+      const shouldAttemptSubtitles = options.type === "video" && downloadSubtitles && subtitleSkipReason === null;
+      const shouldEmbedSubs = embedSubs && shouldAttemptSubtitles && !isBilibili;
       if (shouldAttemptSubtitles) {
-        if (embedSubs) {
-          args.push("--sub-langs", "all");
+        args.push("--sub-langs", subtitleLanguages.join(","));
+        args.push("--sleep-subtitles", "1");
+        if (writeAutoSubs) {
+          args.push("--write-auto-subs");
         } else {
-          args.push("--write-subs");
+          args.push("--no-write-auto-subs");
         }
-        args.push(embedSubs ? "--embed-subs" : "--no-embed-subs");
+        args.push("--write-subs");
+        args.push(shouldEmbedSubs ? "--embed-subs" : "--no-embed-subs");
       } else {
-        args.push("--no-embed-subs");
+        args.push("--no-write-subs", "--no-write-auto-subs", "--no-embed-subs");
       }
-      args.push(embedThumbnail ? "--embed-thumbnail" : "--no-embed-thumbnail");
+      args.push(...resolveThumbnailDownloadArgs(options.type, container, embedThumbnail));
       args.push(embedMetadata ? "--embed-metadata" : "--no-embed-metadata");
       args.push(embedChapters ? "--embed-chapters" : "--no-embed-chapters");
       const baseDownloadPath = trim(options.customDownloadPath) || trim(settings.downloadPath) || fallbackDownloadPath;
+      const defaultFilenameTemplate = resolveFilenameTemplate(
+        settings.filenameStyle,
+        options.type,
+        settings.shareWatermark,
+        settings.filenameViaVidBee
+      );
       const filenameTemplate = sanitizeFilenameTemplate(
-        options.customFilenameTemplate ?? DEFAULT_FILENAME_TEMPLATE
+        options.customFilenameTemplate ?? defaultFilenameTemplate,
+        defaultFilenameTemplate
       );
       const safeTemplate = filenameTemplate.replace(/^[\\/]+/, "");
-      args.push("-o", path.join(baseDownloadPath, safeTemplate));
+      args.push("-o", path2.join(baseDownloadPath, safeTemplate));
       args.push("--continue");
       args.push("--no-playlist-reverse");
+      args.push(
+        "--print",
+        `after_move:${VIDBEE_OUTPUT_PATH_PREFIX}%(filepath)s`,
+        "--print",
+        "before_dl:VIDBEE_VISIBILITY:%(availability)s",
+        "--print",
+        "before_dl:VIDBEE_DURATION:%(duration)s",
+        "--no-quiet"
+      );
       appendPlatformFilenameSafetyArgs(args);
       appendNetworkResilienceArgs(args);
       if (browserForCookies && browserForCookies !== "none") {
@@ -18300,6 +22037,7 @@ var init_yt_dlp_args = __esm({
       if (configPath) {
         args.push("--config-location", configPath);
       } else {
+        args.push("--ignore-config");
         appendYouTubeSafeExtractorArgs(args, options.url);
       }
       if (jsRuntimeArgs.length > 0) {
@@ -18309,12 +22047,13 @@ var init_yt_dlp_args = __esm({
       return args;
     };
     buildVideoInfoArgs = (url2, settings, jsRuntimeArgs = []) => {
+      assertDownloadSourceUrl(url2);
       const args = ["-j", "--no-playlist", "--no-warnings", "--encoding", "utf-8"];
       const proxy = trim(settings.proxy);
       if (proxy) {
         args.push("--proxy", proxy);
       }
-      args.push("--socket-timeout", DEFAULT_SOCKET_TIMEOUT);
+      appendMetadataNetworkResilienceArgs(args);
       const browserForCookies = normalizeBrowserCookiesSettingForYtDlp(settings.browserForCookies);
       if (browserForCookies && browserForCookies !== "none") {
         args.push("--cookies-from-browser", browserForCookies);
@@ -18327,6 +22066,53 @@ var init_yt_dlp_args = __esm({
       if (configPath) {
         args.push("--config-location", configPath);
       } else {
+        args.push("--ignore-config");
+        appendYouTubeSafeExtractorArgs(args, url2);
+      }
+      if (jsRuntimeArgs.length > 0) {
+        args.push(...jsRuntimeArgs);
+      }
+      args.push(url2);
+      return args;
+    };
+    buildCaptionExtractArgs = (url2, outputTemplate, settings, jsRuntimeArgs = [], subtitleLanguages = "all") => {
+      assertDownloadSourceUrl(url2);
+      const args = [
+        "--skip-download",
+        "--write-subs",
+        "--write-auto-subs",
+        "--write-info-json",
+        "--sub-langs",
+        subtitleLanguages || "all",
+        "--sub-format",
+        "vtt/srt/ttml/best",
+        "--sleep-subtitles",
+        "1",
+        "--no-playlist",
+        "--no-warnings",
+        "--encoding",
+        "utf-8",
+        "-o",
+        outputTemplate
+      ];
+      const proxy = trim(settings.proxy);
+      if (proxy) {
+        args.push("--proxy", proxy);
+      }
+      appendMetadataNetworkResilienceArgs(args);
+      const browserForCookies = normalizeBrowserCookiesSettingForYtDlp(settings.browserForCookies);
+      if (browserForCookies && browserForCookies !== "none") {
+        args.push("--cookies-from-browser", browserForCookies);
+      }
+      const cookiesPath = trim(settings.cookiesPath);
+      if (cookiesPath) {
+        args.push("--cookies", cookiesPath);
+      }
+      const configPath = resolvePathWithHome(settings.configPath);
+      if (configPath) {
+        args.push("--config-location", configPath);
+      } else {
+        args.push("--ignore-config");
         appendYouTubeSafeExtractorArgs(args, url2);
       }
       if (jsRuntimeArgs.length > 0) {
@@ -18336,12 +22122,13 @@ var init_yt_dlp_args = __esm({
       return args;
     };
     buildPlaylistInfoArgs = (url2, settings, jsRuntimeArgs = []) => {
-      const args = ["-J", "--flat-playlist", "--no-warnings", "--encoding", "utf-8"];
+      assertDownloadSourceUrl(url2);
+      const args = ["-J", "--flat-playlist", "--ignore-errors", "--no-warnings", "--encoding", "utf-8"];
       const proxy = trim(settings.proxy);
       if (proxy) {
         args.push("--proxy", proxy);
       }
-      args.push("--socket-timeout", DEFAULT_SOCKET_TIMEOUT);
+      appendMetadataNetworkResilienceArgs(args);
       const browserForCookies = normalizeBrowserCookiesSettingForYtDlp(settings.browserForCookies);
       if (browserForCookies && browserForCookies !== "none") {
         args.push("--cookies-from-browser", browserForCookies);
@@ -18354,6 +22141,7 @@ var init_yt_dlp_args = __esm({
       if (configPath) {
         args.push("--config-location", configPath);
       } else {
+        args.push("--ignore-config");
         appendYouTubeSafeExtractorArgs(args, url2);
       }
       if (jsRuntimeArgs.length > 0) {
@@ -18365,44 +22153,64 @@ var init_yt_dlp_args = __esm({
   }
 });
 
-// ../../packages/downloader-core/src/downloader-core.ts
+// ../../node_modules/@vidbee/downloader-core/src/yt-dlp-wrap.ts
+function resolveYtDlpWrapCtor(exported) {
+  let current = exported;
+  for (let depth = 0; depth < MAX_YTDLP_WRAP_DEFAULT_DEPTH; depth += 1) {
+    if (typeof current === "function") {
+      return current;
+    }
+    if (current && typeof current === "object" && "default" in current) {
+      current = current.default;
+      continue;
+    }
+    break;
+  }
+  throw new TypeError("yt-dlp-wrap-plus did not export a constructor");
+}
+var MAX_YTDLP_WRAP_DEFAULT_DEPTH;
+var init_yt_dlp_wrap = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/yt-dlp-wrap.ts"() {
+    MAX_YTDLP_WRAP_DEFAULT_DEPTH = 3;
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/downloader-core.ts
 import { execSync } from "node:child_process";
 import { randomUUID as randomUUID2 } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import os2 from "node:os";
-import path2 from "node:path";
-import { fileURLToPath } from "node:url";
-var require2, YTDlpWrapModule, YTDlpWrapCtor, DEFAULT_DOWNLOAD_DIR, DEFAULT_MAX_CONCURRENT, MAX_TASK_LOG_LENGTH, FFMPEG_NOT_FOUND_ERROR, MODULE_DIR, REPO_ROOT_FROM_MODULE, getDesktopResourcesDirs, ensureExecutable, resolveBundledYtDlpPath, resolveBundledFfmpegLocation, tryCommandPath, resolveYtDlpPath, resolveFfmpegLocation, resolveJsRuntimePath, resolveJsRuntimeArgs, clampPercent, toOptionalNumber, toOptionalString, toOptionalStringArray, toTerminal, isHttpUrl, resolvePlaylistEntryUrl, trimTaskLog, extractSavedFilePath, cloneVideoFormat, cloneTask, DownloaderCore;
+import path3 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+import YTDlpWrap from "yt-dlp-wrap-plus";
+var YTDlpWrapCtor, DEFAULT_DOWNLOAD_DIR, DEFAULT_MAX_CONCURRENT, MAX_TASK_LOG_LENGTH, FFMPEG_NOT_FOUND_ERROR, MODULE_DIR, REPO_ROOT_FROM_MODULE, getDesktopResourcesDirs, ensureExecutable, resolveBundledYtDlpPath, resolveBundledFfmpegLocation, tryCommandPath, resolveYtDlpPath, resolveFfmpegLocation, resolveJsRuntimePath, resolveJsRuntimeArgs, clampPercent, toOptionalNumber, toOptionalString, toOptionalStringArray, toTerminal, isHttpUrl, resolvePlaylistEntryUrl, trimTaskLog, extractSavedFilePath, cloneVideoFormat, cloneTask, DownloaderCore;
 var init_downloader_core = __esm({
-  "../../packages/downloader-core/src/downloader-core.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/downloader-core/src/downloader-core.ts"() {
     init_yt_dlp_args();
-    require2 = createRequire(import.meta.url);
-    YTDlpWrapModule = require2("yt-dlp-wrap-plus");
-    YTDlpWrapCtor = YTDlpWrapModule.default ?? YTDlpWrapModule;
-    DEFAULT_DOWNLOAD_DIR = path2.join(os2.homedir(), "Downloads", "VidBee");
+    init_yt_dlp_wrap();
+    YTDlpWrapCtor = resolveYtDlpWrapCtor(YTDlpWrap);
+    DEFAULT_DOWNLOAD_DIR = path3.join(os2.homedir(), "Downloads", "VidBee");
     DEFAULT_MAX_CONCURRENT = 3;
     MAX_TASK_LOG_LENGTH = 8e4;
     FFMPEG_NOT_FOUND_ERROR = "ffmpeg/ffprobe not found. Use Desktop resources/ffmpeg, install in PATH, or set FFMPEG_PATH.";
-    MODULE_DIR = path2.dirname(fileURLToPath(import.meta.url));
-    REPO_ROOT_FROM_MODULE = path2.resolve(MODULE_DIR, "../../..");
+    MODULE_DIR = path3.dirname(fileURLToPath2(import.meta.url));
+    REPO_ROOT_FROM_MODULE = path3.resolve(MODULE_DIR, "../../..");
     getDesktopResourcesDirs = () => {
       const dirs = [];
       const cwd = process.cwd();
-      dirs.push(path2.join(cwd, "resources"));
-      dirs.push(path2.join(cwd, "apps", "desktop", "resources"));
-      dirs.push(path2.resolve(cwd, "..", "desktop", "resources"));
-      dirs.push(path2.join(REPO_ROOT_FROM_MODULE, "resources"));
-      dirs.push(path2.join(REPO_ROOT_FROM_MODULE, "apps", "desktop", "resources"));
+      dirs.push(path3.join(cwd, "resources"));
+      dirs.push(path3.join(cwd, "apps", "desktop", "resources"));
+      dirs.push(path3.resolve(cwd, "..", "desktop", "resources"));
+      dirs.push(path3.join(REPO_ROOT_FROM_MODULE, "resources"));
+      dirs.push(path3.join(REPO_ROOT_FROM_MODULE, "apps", "desktop", "resources"));
       if (process.env.NODE_ENV === "development") {
-        dirs.push(path2.join(REPO_ROOT_FROM_MODULE, "apps", "desktop", "resources"));
+        dirs.push(path3.join(REPO_ROOT_FROM_MODULE, "apps", "desktop", "resources"));
       }
       const resourcesPath = process.resourcesPath;
       if (resourcesPath) {
-        dirs.push(path2.join(resourcesPath, "app.asar.unpacked", "resources"));
-        dirs.push(path2.join(resourcesPath, "resources"));
+        dirs.push(path3.join(resourcesPath, "app.asar.unpacked", "resources"));
+        dirs.push(path3.join(resourcesPath, "resources"));
       }
       return Array.from(new Set(dirs));
     };
@@ -18418,7 +22226,7 @@ var init_downloader_core = __esm({
     resolveBundledYtDlpPath = () => {
       const binaryName = process.platform === "win32" ? "yt-dlp.exe" : process.platform === "darwin" ? "yt-dlp_macos" : "yt-dlp_linux";
       for (const resourcesDir of getDesktopResourcesDirs()) {
-        const candidate = path2.join(resourcesDir, binaryName);
+        const candidate = path3.join(resourcesDir, binaryName);
         if (!fs.existsSync(candidate)) {
           continue;
         }
@@ -18431,10 +22239,10 @@ var init_downloader_core = __esm({
       const ffmpegBinaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
       const ffprobeBinaryName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
       for (const resourcesDir of getDesktopResourcesDirs()) {
-        const candidateDir = path2.join(resourcesDir, "ffmpeg");
-        const ffmpegPath = path2.join(candidateDir, ffmpegBinaryName);
-        const ffprobePath = path2.join(candidateDir, ffprobeBinaryName);
-        if (!fs.existsSync(ffmpegPath) || !fs.existsSync(ffprobePath)) {
+        const candidateDir = path3.join(resourcesDir, "ffmpeg");
+        const ffmpegPath = path3.join(candidateDir, ffmpegBinaryName);
+        const ffprobePath = path3.join(candidateDir, ffprobeBinaryName);
+        if (!(fs.existsSync(ffmpegPath) && fs.existsSync(ffprobePath))) {
           continue;
         }
         ensureExecutable(ffmpegPath);
@@ -18446,7 +22254,7 @@ var init_downloader_core = __esm({
     tryCommandPath = (command) => {
       const commandName = process.platform === "win32" ? `where ${command}` : `which ${command}`;
       try {
-        const output = execSync(commandName, { stdio: ["ignore", "pipe", "ignore"] }).toString().split(/\r?\n/).map((value2) => value2.trim()).find((value2) => value2.length > 0);
+        const output = execSync(commandName, { stdio: ["ignore", "pipe", "ignore"] }).toString().split(/\r?\n/).map((value) => value.trim()).find((value) => value.length > 0);
         return output ?? null;
       } catch {
         return null;
@@ -18471,9 +22279,9 @@ var init_downloader_core = __esm({
       const ffmpegBinaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
       const ffprobeBinaryName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
       const resolveFromDirectory = (directory) => {
-        const ffmpegPath = path2.join(directory, ffmpegBinaryName);
-        const ffprobePath = path2.join(directory, ffprobeBinaryName);
-        if (!fs.existsSync(ffmpegPath) || !fs.existsSync(ffprobePath)) {
+        const ffmpegPath = path3.join(directory, ffmpegBinaryName);
+        const ffprobePath = path3.join(directory, ffprobeBinaryName);
+        if (!(fs.existsSync(ffmpegPath) && fs.existsSync(ffprobePath))) {
           return void 0;
         }
         ensureExecutable(ffmpegPath);
@@ -18486,16 +22294,16 @@ var init_downloader_core = __esm({
         if (stats.isDirectory()) {
           return resolveFromDirectory(envPath);
         }
-        const candidateDir = path2.dirname(envPath);
+        const candidateDir = path3.dirname(envPath);
         return resolveFromDirectory(candidateDir);
       }
       if (ytDlpPath) {
-        const ytDlpDir = path2.dirname(ytDlpPath);
+        const ytDlpDir = path3.dirname(ytDlpPath);
         const sameDirResolved = resolveFromDirectory(ytDlpDir);
         if (sameDirResolved) {
           return sameDirResolved;
         }
-        const siblingDirResolved = resolveFromDirectory(path2.join(ytDlpDir, "ffmpeg"));
+        const siblingDirResolved = resolveFromDirectory(path3.join(ytDlpDir, "ffmpeg"));
         if (siblingDirResolved) {
           return siblingDirResolved;
         }
@@ -18506,7 +22314,7 @@ var init_downloader_core = __esm({
       }
       const commandPath = tryCommandPath("ffmpeg");
       if (commandPath) {
-        const resolved = resolveFromDirectory(path2.dirname(commandPath));
+        const resolved = resolveFromDirectory(path3.dirname(commandPath));
         if (resolved) {
           return resolved;
         }
@@ -18528,10 +22336,11 @@ var init_downloader_core = __esm({
         return envPath;
       }
       const runtimeCandidates = [];
-      if (runtime === "deno") {
+      if (runtime === "node") {
+        const nodeName = process.platform === "win32" ? "node.exe" : "node";
+        runtimeCandidates.push(path3.join("node", nodeName), nodeName);
+      } else if (runtime === "deno") {
         runtimeCandidates.push(process.platform === "win32" ? "deno.exe" : "deno");
-      } else if (runtime === "node") {
-        runtimeCandidates.push(process.platform === "win32" ? "node.exe" : "node");
       } else if (runtime === "bun") {
         runtimeCandidates.push(process.platform === "win32" ? "bun.exe" : "bun");
       } else if (runtime === "quickjs") {
@@ -18544,7 +22353,7 @@ var init_downloader_core = __esm({
       }
       for (const resourcesDir of getDesktopResourcesDirs()) {
         for (const candidateName of runtimeCandidates) {
-          const candidatePath = path2.join(resourcesDir, candidateName);
+          const candidatePath = path3.join(resourcesDir, candidateName);
           if (!fs.existsSync(candidatePath)) {
             continue;
           }
@@ -18556,7 +22365,7 @@ var init_downloader_core = __esm({
       return commandPath ?? void 0;
     };
     resolveJsRuntimeArgs = () => {
-      const runtime = (process.env.YTDLP_JS_RUNTIME || "deno").trim();
+      const runtime = (process.env.YTDLP_JS_RUNTIME || "node").trim();
       if (!runtime || runtime === "none") {
         return [];
       }
@@ -18566,48 +22375,48 @@ var init_downloader_core = __esm({
       }
       return process.env.YTDLP_JS_RUNTIME ? ["--js-runtimes", runtime] : [];
     };
-    clampPercent = (value2) => {
-      if (typeof value2 !== "number" || Number.isNaN(value2)) {
+    clampPercent = (value) => {
+      if (typeof value !== "number" || Number.isNaN(value)) {
         return 0;
       }
-      if (value2 < 0) {
+      if (value < 0) {
         return 0;
       }
-      if (value2 > 100) {
+      if (value > 100) {
         return 100;
       }
-      return value2;
+      return value;
     };
-    toOptionalNumber = (value2) => {
-      if (typeof value2 !== "number" || Number.isNaN(value2)) {
+    toOptionalNumber = (value) => {
+      if (typeof value !== "number" || Number.isNaN(value)) {
         return void 0;
       }
-      return value2;
+      return value;
     };
-    toOptionalString = (value2) => {
-      if (typeof value2 !== "string") {
+    toOptionalString = (value) => {
+      if (typeof value !== "string") {
         return void 0;
       }
-      const trimmed = value2.trim();
+      const trimmed = value.trim();
       if (!trimmed) {
         return void 0;
       }
       return trimmed;
     };
-    toOptionalStringArray = (value2) => {
-      if (!Array.isArray(value2)) {
+    toOptionalStringArray = (value) => {
+      if (!Array.isArray(value)) {
         return void 0;
       }
-      const list = value2.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+      const list = value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
       return list.length > 0 ? list : void 0;
     };
     toTerminal = (task) => task.status === "completed" || task.status === "error" || task.status === "cancelled";
-    isHttpUrl = (value2) => {
-      if (!value2) {
+    isHttpUrl = (value) => {
+      if (!value) {
         return false;
       }
       try {
-        const parsed = new URL(value2);
+        const parsed = new URL(value);
         return parsed.protocol === "http:" || parsed.protocol === "https:";
       } catch {
         return false;
@@ -18635,11 +22444,11 @@ var init_downloader_core = __esm({
       }
       return void 0;
     };
-    trimTaskLog = (value2) => {
-      if (value2.length <= MAX_TASK_LOG_LENGTH) {
-        return value2;
+    trimTaskLog = (value) => {
+      if (value.length <= MAX_TASK_LOG_LENGTH) {
+        return value;
       }
-      return value2.slice(value2.length - MAX_TASK_LOG_LENGTH);
+      return value.slice(value.length - MAX_TASK_LOG_LENGTH);
     };
     extractSavedFilePath = (rawLog) => {
       const log = rawLog.trim();
@@ -18778,8 +22587,10 @@ var init_downloader_core = __esm({
         if (!target) {
           throw new Error("URL is required.");
         }
-        const raw = await this.runJsonCommand(
-          buildVideoInfoArgs(target, this.resolveRuntimeSettings(runtimeSettings), this.jsRuntimeArgs)
+        const raw = await retryTransientYtDlpNetworkError(
+          () => this.runJsonCommand(
+            buildVideoInfoArgs(target, this.resolveRuntimeSettings(runtimeSettings), this.jsRuntimeArgs)
+          )
         );
         const formats = (raw.formats ?? []).map((format) => ({
           formatId: format.format_id ?? "unknown",
@@ -18819,13 +22630,19 @@ var init_downloader_core = __esm({
         if (!target) {
           throw new Error("URL is required.");
         }
-        const raw = await this.runJsonCommand(
-          buildPlaylistInfoArgs(target, this.resolveRuntimeSettings(runtimeSettings), this.jsRuntimeArgs)
+        const raw = await retryTransientYtDlpNetworkError(
+          () => this.runJsonCommand(
+            buildPlaylistInfoArgs(
+              target,
+              this.resolveRuntimeSettings(runtimeSettings),
+              this.jsRuntimeArgs
+            )
+          )
         );
         const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
         const entries = rawEntries.map((entry, index2) => {
           const resolvedUrl = resolvePlaylistEntryUrl(entry);
-          if (!resolvedUrl || !isHttpUrl(resolvedUrl)) {
+          if (!(resolvedUrl && isHttpUrl(resolvedUrl))) {
             return null;
           }
           return {
@@ -18882,6 +22699,7 @@ var init_downloader_core = __esm({
             playlistSize: selectedEntries.length,
             format: input.format,
             audioFormat: input.audioFormat,
+            audioBitrate: input.audioBitrate,
             audioFormatIds: input.audioFormatIds,
             customDownloadPath: input.customDownloadPath,
             customFilenameTemplate: input.customFilenameTemplate,
@@ -19057,8 +22875,8 @@ var init_downloader_core = __esm({
           };
           const filePath = extractSavedFilePath(taskLog);
           if (filePath) {
-            finalPatch.savedFileName = path2.basename(filePath);
-            finalPatch.downloadPath = path2.dirname(filePath);
+            finalPatch.savedFileName = path3.basename(filePath);
+            finalPatch.downloadPath = path3.dirname(filePath);
           } else {
             finalPatch.downloadPath = resolvedDownloadPath;
           }
@@ -19088,7 +22906,7 @@ var init_downloader_core = __esm({
             error: `yt-dlp exited with code ${code ?? -1}`
           });
         });
-        process3.on("error", (error48) => {
+        process3.on("error", (error51) => {
           if (settled) {
             return;
           }
@@ -19101,7 +22919,7 @@ var init_downloader_core = __esm({
           }
           finalizeTask({
             status: "error",
-            error: error48.message
+            error: error51.message
           });
         });
         this.processQueue();
@@ -19113,7 +22931,7 @@ var init_downloader_core = __esm({
           active.controller.abort();
           return true;
         }
-        const pendingIndex = this.pending.findIndex((value2) => value2 === id);
+        const pendingIndex = this.pending.indexOf(id);
         if (pendingIndex >= 0) {
           this.pending.splice(pendingIndex, 1);
           this.updateTask(id, {
@@ -19171,464 +22989,10 @@ var init_downloader_core = __esm({
   }
 });
 
-// ../../packages/downloader-core/src/yt-dlp-executor.ts
-import { existsSync as existsSync4, statSync as statSync3 } from "node:fs";
-import { createRequire as createRequire2 } from "node:module";
-function makeNoopRun() {
-  return {
-    cancel: async () => {
-    },
-    pause: async () => {
-    }
-  };
-}
-function insertFfmpegLocation(args, ffmpegLocation) {
-  const urlArg = args.pop();
-  args.push("--ffmpeg-location", ffmpegLocation);
-  if (urlArg !== void 0) args.push(urlArg);
-}
-function mapProgress(payload) {
-  const percent = typeof payload.percent === "number" && !Number.isNaN(payload.percent) ? Math.max(0, Math.min(1, payload.percent / 100)) : null;
-  return {
-    percent,
-    bytesDownloaded: parseSize(payload.downloaded),
-    bytesTotal: parseSize(payload.total),
-    speedBps: parseSpeed(payload.currentSpeed),
-    etaMs: parseEtaMs(payload.eta),
-    ticks: 0
-  };
-}
-function parseSize(value2) {
-  if (!value2) return null;
-  const m = /([0-9]+(?:\.[0-9]+)?)\s*(B|KB|KiB|MB|MiB|GB|GiB|TB|TiB)/i.exec(value2);
-  if (!m) return null;
-  const n = Number.parseFloat(m[1] ?? "");
-  if (!Number.isFinite(n)) return null;
-  const unit = (m[2] ?? "B").toLowerCase();
-  const factor = unit === "kb" || unit === "kib" ? 1024 : unit === "mb" || unit === "mib" ? 1024 ** 2 : unit === "gb" || unit === "gib" ? 1024 ** 3 : unit === "tb" || unit === "tib" ? 1024 ** 4 : 1;
-  return Math.round(n * factor);
-}
-function parseSpeed(value2) {
-  if (!value2) return null;
-  const cleaned = value2.replace(/\/s$/i, "").trim();
-  return parseSize(cleaned);
-}
-function parseEtaMs(value2) {
-  if (!value2) return null;
-  const trimmed = value2.trim();
-  if (!trimmed || trimmed === "Unknown") return null;
-  const parts = trimmed.split(":").map((p) => Number.parseInt(p, 10));
-  if (parts.some((n) => !Number.isFinite(n))) return null;
-  let seconds = 0;
-  for (const p of parts) seconds = seconds * 60 + p;
-  return seconds * 1e3;
-}
-function hasPostprocessSignal(text2) {
-  return PROCESSING_DETECT_PATTERNS.some((re) => re.test(text2));
-}
-function extractFormatId(rawLog) {
-  const log = rawLog.trim();
-  if (!log) return void 0;
-  const re = /Downloading\s+\d+\s+format\(s\):\s+([^\r\n]+)/gi;
-  const matches = Array.from(log.matchAll(re));
-  const last = matches.at(-1);
-  const value2 = last?.[1]?.trim();
-  if (!value2) return void 0;
-  return value2;
-}
-function extractSavedFilePath2(rawLog) {
-  const log = rawLog.trim();
-  if (!log) return void 0;
-  const patterns = [
-    /Merging formats into "([^"]+)"/g,
-    /Destination:\s+"([^"]+)"/g,
-    /Destination:\s+'([^']+)'/g,
-    /\[download\]\s+([^\r\n]+?)\s+has already been downloaded/g
-  ];
-  for (const re of patterns) {
-    const matches = Array.from(log.matchAll(re));
-    const last = matches.at(-1);
-    const candidate = last?.[1]?.trim();
-    if (candidate) return candidate;
-  }
-  const lines = log.split(/\r?\n/).reverse();
-  for (const line of lines) {
-    const idx = line.indexOf("Destination:");
-    if (idx >= 0) {
-      const candidate = line.slice(idx + "Destination:".length).trim();
-      if (candidate) return candidate;
-    }
-  }
-  return void 0;
-}
-function classifyYtDlpExit(exitCode, stderr) {
-  const txt = stderr.toLowerCase();
-  if (/(http error 429|too many requests|rate.?limit)/.test(txt))
-    return virtualError("http-429", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(login required|requires (?:cookies|authentication)|sign in to confirm)/.test(txt))
-    return virtualError("auth-required", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(not available in your country|geo.?restricted|geographic)/.test(txt))
-    return virtualError("geo-blocked", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(video unavailable|not found|404)/.test(txt))
-    return virtualError("not-found", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(no space left|disk full|enospc)/.test(txt))
-    return virtualError("disk-full", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(permission denied|eacces)/.test(txt))
-    return virtualError("permission-denied", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(ffmpeg|ffprobe)/.test(txt))
-    return virtualError("ffmpeg", stderr || `yt-dlp exited ${exitCode}`);
-  if (/(network|timeout|econnreset|enotfound|ehostunreach)/.test(txt))
-    return virtualError("network-transient", stderr || `yt-dlp exited ${exitCode}`);
-  return virtualError("unknown", stderr || `yt-dlp exited with code ${exitCode ?? -1}`);
-}
-function createTailBuffer(maxBytes) {
-  let buf = "";
-  return {
-    append(text2) {
-      buf += text2;
-      if (buf.length > maxBytes * 4) {
-        buf = buf.slice(buf.length - maxBytes);
-      }
-    },
-    read() {
-      return buf.length > maxBytes ? buf.slice(buf.length - maxBytes) : buf;
-    }
-  };
-}
-var require3, YTDlpWrapModule2, YTDlpWrapCtor2, DEFAULT_KILL_GRACE_MS, STDOUT_TAIL_BYTES, STDERR_TAIL_BYTES2, PROCESSING_DETECT_PATTERNS, FFMPEG_NOT_FOUND_ERROR2, YtDlpExecutor;
-var init_yt_dlp_executor = __esm({
-  "../../packages/downloader-core/src/yt-dlp-executor.ts"() {
-    "use strict";
-    init_src();
-    init_yt_dlp_args();
-    require3 = createRequire2(import.meta.url);
-    YTDlpWrapModule2 = require3("yt-dlp-wrap-plus");
-    YTDlpWrapCtor2 = YTDlpWrapModule2.default ?? YTDlpWrapModule2;
-    DEFAULT_KILL_GRACE_MS = 1e4;
-    STDOUT_TAIL_BYTES = 8 * 1024;
-    STDERR_TAIL_BYTES2 = 8 * 1024;
-    PROCESSING_DETECT_PATTERNS = [
-      /\bMerging formats?\b/i,
-      /^\[Postprocess\]/m,
-      /\b(?:Embedding|Adding|Fixing|Converting)\b/i,
-      /\b(?:ExtractAudio|VideoConvertor|FFmpeg)\b/i
-    ];
-    FFMPEG_NOT_FOUND_ERROR2 = "ffmpeg/ffprobe not found. Use Desktop resources/ffmpeg, install in PATH, or set FFMPEG_PATH.";
-    YtDlpExecutor = class {
-      opts;
-      cachedYtDlp = null;
-      cachedYtDlpPath = null;
-      constructor(options) {
-        this.opts = {
-          resolveYtDlpPath: options.resolveYtDlpPath,
-          resolveFfmpegLocation: options.resolveFfmpegLocation,
-          defaultDownloadDir: options.defaultDownloadDir,
-          defaultRuntimeSettings: options.defaultRuntimeSettings ?? {},
-          extraArgs: options.extraArgs,
-          buildArgs: options.buildArgs,
-          killGraceMs: options.killGraceMs ?? DEFAULT_KILL_GRACE_MS,
-          clock: options.clock ?? Date.now,
-          spawnFn: options.spawnFn
-        };
-      }
-      run(ctx, events) {
-        const stdoutTail = createTailBuffer(STDOUT_TAIL_BYTES);
-        const stderrTail = createTailBuffer(STDERR_TAIL_BYTES2);
-        let postprocessSeen = false;
-        let settled = false;
-        let cancelRequested = false;
-        let killTimer = null;
-        let proc = null;
-        let formatIdSeen;
-        const finishOnce = (e) => {
-          if (settled) return;
-          settled = true;
-          if (killTimer) {
-            clearTimeout(killTimer);
-            killTimer = null;
-          }
-          events.onFinish(e);
-        };
-        let args;
-        try {
-          args = this.buildArgsFor(ctx.input);
-        } catch (err) {
-          const error48 = virtualError("unknown", String(err instanceof Error ? err.message : err));
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: { type: "error", error: error48, exitCode: null },
-            closedAt: this.opts.clock(),
-            stdoutTail: "",
-            stderrTail: String(err instanceof Error ? err.message : err)
-          });
-          return makeNoopRun();
-        }
-        const ffmpegLocation = this.opts.resolveFfmpegLocation();
-        if (!ffmpegLocation) {
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: {
-              type: "error",
-              error: virtualError("binary-missing", FFMPEG_NOT_FOUND_ERROR2),
-              exitCode: null
-            },
-            closedAt: this.opts.clock(),
-            stdoutTail: "",
-            stderrTail: FFMPEG_NOT_FOUND_ERROR2
-          });
-          return makeNoopRun();
-        }
-        insertFfmpegLocation(args, ffmpegLocation);
-        const controller = new AbortController();
-        let ytDlpPath;
-        try {
-          ytDlpPath = this.opts.resolveYtDlpPath();
-        } catch (err) {
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: {
-              type: "error",
-              error: virtualError("binary-missing", String(err instanceof Error ? err.message : err)),
-              exitCode: null
-            },
-            closedAt: this.opts.clock(),
-            stdoutTail: "",
-            stderrTail: String(err instanceof Error ? err.message : err)
-          });
-          return makeNoopRun();
-        }
-        try {
-          proc = this.opts.spawnFn ? this.opts.spawnFn(ytDlpPath, args, controller.signal) : this.getYtDlp(ytDlpPath).exec(args, { signal: controller.signal });
-        } catch (err) {
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: {
-              type: "error",
-              error: virtualError("unknown", String(err instanceof Error ? err.message : err)),
-              exitCode: null
-            },
-            closedAt: this.opts.clock(),
-            stdoutTail: stdoutTail.read(),
-            stderrTail: stderrTail.read()
-          });
-          return makeNoopRun();
-        }
-        const pid = proc.ytDlpProcess?.pid ?? -1;
-        events.onSpawn({
-          taskId: ctx.taskId,
-          attemptId: ctx.attemptId,
-          pid,
-          pidStartedAt: null,
-          kind: "yt-dlp",
-          spawnedAt: this.opts.clock()
-        });
-        const pumpStdoutPostprocess = (chunk) => {
-          const text2 = chunk.toString();
-          stdoutTail.append(text2);
-          if (!postprocessSeen && hasPostprocessSignal(text2)) {
-            postprocessSeen = true;
-          }
-          const fid = extractFormatId(text2);
-          if (fid) {
-            formatIdSeen = fid;
-          }
-        };
-        const pumpStderrPostprocess = (chunk) => {
-          const text2 = chunk.toString();
-          stderrTail.append(text2);
-          if (!postprocessSeen && hasPostprocessSignal(text2)) {
-            postprocessSeen = true;
-          }
-          events.onStd({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            stream: "stderr",
-            line: text2.replace(/\r?\n$/, "")
-          });
-        };
-        proc.ytDlpProcess?.stdout?.on("data", (chunk) => {
-          pumpStdoutPostprocess(chunk);
-          events.onStd({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            stream: "stdout",
-            line: chunk.toString().replace(/\r?\n$/, "")
-          });
-        });
-        proc.ytDlpProcess?.stderr?.on("data", pumpStderrPostprocess);
-        proc.on("progress", (payload) => {
-          const progress = mapProgress(payload);
-          events.onProgress({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            progress,
-            enteredProcessing: postprocessSeen
-          });
-        });
-        proc.on("close", (code) => {
-          const closedAt = this.opts.clock();
-          const stdout = stdoutTail.read();
-          const stderr = stderrTail.read();
-          if (cancelRequested) {
-            finishOnce({
-              taskId: ctx.taskId,
-              attemptId: ctx.attemptId,
-              result: { type: "cancelled" },
-              closedAt,
-              stdoutTail: stdout,
-              stderrTail: stderr
-            });
-            return;
-          }
-          if (code === 0) {
-            const filePath = extractSavedFilePath2(stdout) || "";
-            let realSize = 0;
-            if (filePath) {
-              try {
-                if (existsSync4(filePath)) realSize = statSync3(filePath).size;
-              } catch {
-              }
-            }
-            const output = {
-              filePath,
-              size: realSize,
-              durationMs: null,
-              sha256: null,
-              // Prefer the streaming sniff (captures even if pushed out of the
-              // tail buffer); fall back to a tail re-scan when running with
-              // tiny test fixtures whose entire run fits in 8KB.
-              formatId: formatIdSeen ?? extractFormatId(stdout) ?? null
-            };
-            finishOnce({
-              taskId: ctx.taskId,
-              attemptId: ctx.attemptId,
-              result: { type: "success", output },
-              closedAt,
-              stdoutTail: stdout,
-              stderrTail: stderr
-            });
-            return;
-          }
-          const error48 = classifyYtDlpExit(code, stderr);
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: { type: "error", error: error48, exitCode: code ?? null },
-            closedAt,
-            stdoutTail: stdout,
-            stderrTail: stderr
-          });
-        });
-        proc.on("error", (err) => {
-          const closedAt = this.opts.clock();
-          if (cancelRequested) {
-            finishOnce({
-              taskId: ctx.taskId,
-              attemptId: ctx.attemptId,
-              result: { type: "cancelled" },
-              closedAt,
-              stdoutTail: stdoutTail.read(),
-              stderrTail: stderrTail.read()
-            });
-            return;
-          }
-          const error48 = virtualError("unknown", err.message);
-          finishOnce({
-            taskId: ctx.taskId,
-            attemptId: ctx.attemptId,
-            result: { type: "error", error: error48, exitCode: null },
-            closedAt,
-            stdoutTail: stdoutTail.read(),
-            stderrTail: stderrTail.read()
-          });
-        });
-        const cancel = async (timeout) => {
-          if (settled) return;
-          cancelRequested = true;
-          const grace = timeout ?? this.opts.killGraceMs;
-          try {
-            controller.abort();
-          } catch {
-          }
-          try {
-            proc?.ytDlpProcess?.kill("SIGTERM");
-          } catch {
-          }
-          if (killTimer) clearTimeout(killTimer);
-          if (grace > 0) {
-            killTimer = setTimeout(() => {
-              try {
-                proc?.ytDlpProcess?.kill("SIGKILL");
-              } catch {
-              }
-            }, grace);
-          } else {
-            try {
-              proc?.ytDlpProcess?.kill("SIGKILL");
-            } catch {
-            }
-          }
-        };
-        return {
-          cancel,
-          pause: () => cancel(this.opts.killGraceMs)
-        };
-      }
-      buildArgsFor(input) {
-        if (this.opts.buildArgs) return this.opts.buildArgs(input, this.opts.defaultDownloadDir);
-        if (input.rawArgs && input.rawArgs.length > 0) {
-          return [...input.rawArgs];
-        }
-        const opts = input.options ?? {};
-        const type = opts.type ?? (input.kind === "audio" ? "audio" : "video");
-        const settings = {
-          ...this.opts.defaultRuntimeSettings,
-          ...opts.settings ?? {}
-        };
-        const downloadPath = opts.customDownloadPath?.trim() || settings.downloadPath?.trim() || this.opts.defaultDownloadDir;
-        const merged = { ...settings, downloadPath };
-        const extra = this.opts.extraArgs ? [...this.opts.extraArgs()] : [];
-        return buildDownloadArgs(
-          {
-            url: input.url,
-            type,
-            format: opts.format,
-            audioFormat: opts.audioFormat,
-            audioFormatIds: opts.audioFormatIds ? [...opts.audioFormatIds] : void 0,
-            startTime: opts.startTime,
-            endTime: opts.endTime,
-            customDownloadPath: opts.customDownloadPath,
-            customFilenameTemplate: opts.customFilenameTemplate,
-            containerFormat: opts.containerFormat
-          },
-          this.opts.defaultDownloadDir,
-          merged,
-          extra
-        );
-      }
-      /** Diagnostic: return the resolved argv yt-dlp would be invoked with. */
-      describeCommandFor(input) {
-        return formatYtDlpCommand(this.buildArgsFor(input));
-      }
-      getYtDlp(binaryPath) {
-        if (this.cachedYtDlp && this.cachedYtDlpPath === binaryPath) return this.cachedYtDlp;
-        this.cachedYtDlp = new YTDlpWrapCtor2(binaryPath);
-        this.cachedYtDlpPath = binaryPath;
-        return this.cachedYtDlp;
-      }
-    };
-  }
-});
-
-// ../../packages/downloader-core/src/format-preferences.ts
+// ../../node_modules/@vidbee/downloader-core/src/format-preferences.ts
 var ONE_CLICK_CONTAINER_OPTIONS, qualityPresetToVideoHeight, qualityPresetToAudioAbr, dedupe, getQualityPreset, buildAudioSelectors, buildVideoFormatPreference, buildAudioFormatPreference;
 var init_format_preferences = __esm({
-  "../../packages/downloader-core/src/format-preferences.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/downloader-core/src/format-preferences.ts"() {
     ONE_CLICK_CONTAINER_OPTIONS = [
       "auto",
       "mp4",
@@ -19637,7 +23001,7 @@ var init_format_preferences = __esm({
       "original"
     ];
     qualityPresetToVideoHeight = {
-      best: null,
+      best: 2160,
       good: 1080,
       normal: 720,
       bad: 480,
@@ -19701,48 +23065,1124 @@ var init_format_preferences = __esm({
   }
 });
 
-// ../../packages/downloader-core/src/index.ts
-var src_exports2 = {};
-__export(src_exports2, {
-  DownloaderCore: () => DownloaderCore,
-  ONE_CLICK_CONTAINER_OPTIONS: () => ONE_CLICK_CONTAINER_OPTIONS,
-  WebAppSettingsSchema: () => WebAppSettingsSchema,
-  YtDlpExecutor: () => YtDlpExecutor,
-  appendYouTubeSafeExtractorArgs: () => appendYouTubeSafeExtractorArgs,
-  buildAudioFormatPreference: () => buildAudioFormatPreference,
-  buildBrowserCookiesSetting: () => buildBrowserCookiesSetting,
-  buildDownloadArgs: () => buildDownloadArgs,
-  buildPlaylistInfoArgs: () => buildPlaylistInfoArgs,
-  buildVideoFormatPreference: () => buildVideoFormatPreference,
-  buildVideoInfoArgs: () => buildVideoInfoArgs,
-  downloaderContract: () => downloaderContract,
-  formatYtDlpCommand: () => formatYtDlpCommand,
-  parseBrowserCookiesSetting: () => parseBrowserCookiesSetting,
-  resolveAudioFormatSelector: () => resolveAudioFormatSelector,
-  resolveFfmpegLocationFromPath: () => resolveFfmpegLocationFromPath,
-  resolvePathWithHome: () => resolvePathWithHome,
-  resolveVideoFormatSelector: () => resolveVideoFormatSelector,
-  sanitizeFilenameTemplate: () => sanitizeFilenameTemplate
-});
-var init_src2 = __esm({
-  "../../packages/downloader-core/src/index.ts"() {
-    "use strict";
-    init_browser_cookies_setting();
-    init_contract2();
-    init_downloader_core();
-    init_yt_dlp_executor();
-    init_schemas4();
-    init_format_preferences();
-    init_yt_dlp_args();
+// ../../node_modules/@vidbee/downloader-core/src/format-selector.ts
+var SINGLE_FORMAT_FALLBACK, isMuxedVideoFormat, resolvePreferredAudioExt, buildSingleVideoFormatSelector;
+var init_format_selector = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/format-selector.ts"() {
+    SINGLE_FORMAT_FALLBACK = "bestvideo+bestaudio/best";
+    isMuxedVideoFormat = (format) => Boolean(format?.vcodec && format.vcodec !== "none" && format.acodec && format.acodec !== "none");
+    resolvePreferredAudioExt = (videoExt) => {
+      if (!videoExt) {
+        return void 0;
+      }
+      const normalizedExt = videoExt.toLowerCase();
+      if (normalizedExt === "mp4") {
+        return "m4a";
+      }
+      if (normalizedExt === "webm") {
+        return "webm";
+      }
+      return void 0;
+    };
+    buildSingleVideoFormatSelector = (formatId, format) => {
+      if (!format || isMuxedVideoFormat(format)) {
+        return `${formatId}/${SINGLE_FORMAT_FALLBACK}`;
+      }
+      const preferredAudioExt = resolvePreferredAudioExt(format.ext);
+      if (!preferredAudioExt) {
+        return `${formatId}+bestaudio/${SINGLE_FORMAT_FALLBACK}`;
+      }
+      return `${formatId}+bestaudio[ext=${preferredAudioExt}]/${formatId}+bestaudio/${SINGLE_FORMAT_FALLBACK}`;
+    };
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/entity.js
-function is(value2, type) {
-  if (!value2 || typeof value2 !== "object") {
+// ../../node_modules/@vidbee/downloader-core/src/editor-video.ts
+import { spawn as spawn3 } from "node:child_process";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { stat, unlink } from "node:fs/promises";
+import path4 from "node:path";
+async function createEditorVideo(source, ffmpegDirectory, signal) {
+  const parsed = path4.parse(source);
+  const output = path4.join(parsed.dir, `${parsed.name}.editor-${randomUUID3().slice(0, 8)}.mp4`);
+  const binary = path4.join(ffmpegDirectory, process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+  try {
+    await new Promise((resolve2, reject) => {
+      const child = spawn3(
+        binary,
+        [
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-nostdin",
+          "-n",
+          "-protocol_whitelist",
+          "file,pipe",
+          "-i",
+          source,
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0?",
+          "-map_metadata",
+          "0",
+          "-vf",
+          "pad=ceil(iw/2)*2:ceil(ih/2)*2,fps=30",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "fast",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "192k",
+          "-ar",
+          "48000",
+          "-ac",
+          "2",
+          "-movflags",
+          "+faststart",
+          output
+        ],
+        { windowsHide: true, signal, stdio: ["ignore", "ignore", "pipe"] }
+      );
+      let error51 = "";
+      child.stderr.on("data", (chunk) => {
+        error51 = (error51 + chunk.toString()).slice(-2e3);
+      });
+      child.once("error", reject);
+      child.once(
+        "close",
+        (code) => code === 0 ? resolve2() : reject(new Error(`MP4 conversion failed. Source file was kept. ${error51}`))
+      );
+    });
+    signal.throwIfAborted();
+    if ((await stat(output)).size === 0) {
+      throw new Error("MP4 conversion produced an empty file.");
+    }
+    return output;
+  } catch (error51) {
+    await unlink(output).catch(() => {
+    });
+    throw error51;
+  }
+}
+var init_editor_video = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/editor-video.ts"() {
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/yt-dlp-progress.ts
+function parseYtDlpProgressPayload(payload) {
+  const rawPercent = payload.percent;
+  const percent = typeof rawPercent === "number" && Number.isFinite(rawPercent) && rawPercent >= 0 ? Math.max(0, Math.min(1, rawPercent / 100)) : null;
+  const bytesTotal = parseSize(payload.totalSize ?? payload.total);
+  const explicitDownloaded = parseSize(payload.downloaded);
+  const bytesDownloaded = explicitDownloaded ?? (percent != null && bytesTotal != null ? Math.round(bytesTotal * percent) : null);
+  return {
+    percent,
+    bytesDownloaded,
+    bytesTotal,
+    speedBps: parseSpeed(payload.currentSpeed),
+    etaMs: parseEtaMs(payload.eta)
+  };
+}
+function parseSize(value) {
+  if (!value) {
+    return null;
+  }
+  const m = /([0-9]+(?:\.[0-9]+)?)\s*(B|KB|KiB|MB|MiB|GB|GiB|TB|TiB)/i.exec(value);
+  if (!m) {
+    return null;
+  }
+  const n = Number.parseFloat(m[1] ?? "");
+  if (!Number.isFinite(n)) {
+    return null;
+  }
+  const unit = (m[2] ?? "B").toLowerCase();
+  const factor = unit === "kb" || unit === "kib" ? 1024 : unit === "mb" || unit === "mib" ? 1024 ** 2 : unit === "gb" || unit === "gib" ? 1024 ** 3 : unit === "tb" || unit === "tib" ? 1024 ** 4 : 1;
+  return Math.round(n * factor);
+}
+function parseSpeed(value) {
+  if (!value) {
+    return null;
+  }
+  const cleaned = value.replace(/\/s$/i, "").trim();
+  return parseSize(cleaned);
+}
+function parseEtaMs(value) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "Unknown") {
+    return null;
+  }
+  const parts = trimmed.split(":").map((p) => Number.parseInt(p, 10));
+  if (parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  let seconds = 0;
+  for (const p of parts) {
+    seconds = seconds * 60 + p;
+  }
+  return seconds * 1e3;
+}
+var SIDECAR_MAX_BYTES, MEDIA_MIN_BYTES, LARGE_FILE_MIN_BYTES, NEW_STREAM_DROP, NEW_STREAM_MAX_PERCENT, NEW_STREAM_MIN_TOTAL_RATIO, NEW_STREAM_MAX_TOTAL_RATIO, LARGE_FILE_TAKEOVER_RATIO, DownloadProgressAggregator;
+var init_yt_dlp_progress = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/yt-dlp-progress.ts"() {
+    SIDECAR_MAX_BYTES = 512 * 1024;
+    MEDIA_MIN_BYTES = 2 * 1024 * 1024;
+    LARGE_FILE_MIN_BYTES = 8 * 1024 * 1024;
+    NEW_STREAM_DROP = 0.2;
+    NEW_STREAM_MAX_PERCENT = 0.25;
+    NEW_STREAM_MIN_TOTAL_RATIO = 0.03;
+    NEW_STREAM_MAX_TOTAL_RATIO = 0.8;
+    LARGE_FILE_TAKEOVER_RATIO = 4;
+    DownloadProgressAggregator = class {
+      highWater = 0;
+      maxTotal = 0;
+      completedBytes = 0;
+      currentDownloaded = 0;
+      currentTotal = null;
+      ticks = 0;
+      /**
+       * Apply one wrap progress event. Returns null when the event is junk
+       * and the previous overall progress should be kept.
+       */
+      apply(payload) {
+        const parsed = parseYtDlpProgressPayload(payload);
+        if (parsed.percent == null) {
+          return null;
+        }
+        const total = parsed.bytesTotal;
+        const downloaded = parsed.bytesDownloaded;
+        if (total != null && total <= SIDECAR_MAX_BYTES) {
+          if (total > this.maxTotal && this.maxTotal < LARGE_FILE_MIN_BYTES) {
+            this.maxTotal = total;
+          }
+          return this.snapshot(parsed, this.highWater);
+        }
+        if (this.isLargeFileTakeover(total)) {
+          this.completedBytes = 0;
+          this.currentDownloaded = downloaded ?? 0;
+          this.currentTotal = total;
+          this.maxTotal = total ?? this.maxTotal;
+          this.highWater = parsed.percent;
+          return this.snapshot(parsed, this.highWater);
+        }
+        const startedNewStream = this.isNewMediaStream(parsed.percent, total);
+        if (startedNewStream) {
+          const finished = Math.max(this.currentDownloaded, this.currentTotal ?? this.currentDownloaded);
+          this.completedBytes += finished;
+          this.currentDownloaded = downloaded ?? 0;
+          this.currentTotal = total;
+          if (total != null && total > this.maxTotal) {
+            this.maxTotal = total;
+          }
+        } else {
+          this.rememberCurrentFile(total, downloaded);
+        }
+        if (parsed.percent >= 0.99 && (total == null || total < LARGE_FILE_MIN_BYTES) && this.maxTotal < LARGE_FILE_MIN_BYTES) {
+          return this.snapshot(parsed, this.highWater);
+        }
+        const candidate = this.overallPercent(parsed.percent);
+        this.highWater = startedNewStream ? candidate : Math.max(this.highWater, candidate);
+        return this.snapshot(parsed, this.highWater);
+      }
+      /** Overall 0..1 from accumulated bytes, or the current file percent. */
+      overallPercent(fallback) {
+        const overallTotal = this.completedBytes + (this.currentTotal ?? 0);
+        if (overallTotal <= 0) {
+          return fallback;
+        }
+        return (this.completedBytes + this.currentDownloaded) / overallTotal;
+      }
+      /** Remember the largest total and current-file byte counters. */
+      rememberCurrentFile(total, downloaded) {
+        if (total != null && total > this.maxTotal) {
+          this.maxTotal = total;
+        }
+        if (total != null && (this.currentTotal == null || total >= this.currentTotal)) {
+          this.currentTotal = total;
+        }
+        if (downloaded != null) {
+          this.currentDownloaded = Math.max(this.currentDownloaded, downloaded);
+        }
+      }
+      /**
+       * True when a much larger file appears after a thumbnail/json sidecar so
+       * we should follow the media file instead of keeping a fake 100%.
+       */
+      isLargeFileTakeover(total) {
+        return total != null && total >= LARGE_FILE_MIN_BYTES && (this.maxTotal === 0 || total > this.maxTotal * LARGE_FILE_TAKEOVER_RATIO);
+      }
+      /**
+       * True when video finished and a substantial next file (usually audio)
+       * starts at ~0%. Fragments of a known large file do not match.
+       */
+      isNewMediaStream(percent, total) {
+        if (this.highWater - percent < NEW_STREAM_DROP || percent > NEW_STREAM_MAX_PERCENT) {
+          return false;
+        }
+        if (total == null || this.currentTotal == null) {
+          return false;
+        }
+        return total >= MEDIA_MIN_BYTES && total >= this.maxTotal * NEW_STREAM_MIN_TOTAL_RATIO && total < this.currentTotal * NEW_STREAM_MAX_TOTAL_RATIO;
+      }
+      /** Build a TaskProgress snapshot, bumping the tick counter. */
+      snapshot(parsed, percent) {
+        this.ticks += 1;
+        const bytesDownloaded = this.completedBytes + this.currentDownloaded;
+        const currentTotal = this.currentTotal;
+        const bytesTotal = currentTotal == null ? null : this.completedBytes + currentTotal;
+        return {
+          percent: Math.max(0, Math.min(1, percent)),
+          bytesDownloaded: bytesDownloaded > 0 ? bytesDownloaded : parsed.bytesDownloaded,
+          bytesTotal: bytesTotal != null && bytesTotal > 0 ? bytesTotal : parsed.bytesTotal,
+          speedBps: parsed.speedBps,
+          etaMs: parsed.etaMs,
+          ticks: this.ticks
+        };
+      }
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/yt-dlp-executor.ts
+import { existsSync as existsSync5, statSync as statSync3 } from "node:fs";
+import YTDlpWrap2 from "yt-dlp-wrap-plus";
+function makeNoopRun() {
+  return {
+    cancel: async () => {
+    },
+    pause: async () => {
+    }
+  };
+}
+function insertFfmpegLocation(args, ffmpegLocation) {
+  const urlArg = args.pop();
+  args.push("--ffmpeg-location", ffmpegLocation);
+  if (urlArg !== void 0) {
+    args.push(urlArg);
+  }
+}
+function hasNonEmptyFile(filePath) {
+  if (!filePath) {
     return false;
   }
-  if (value2 instanceof type) {
+  try {
+    return existsSync5(filePath) && statSync3(filePath).size > 0;
+  } catch {
+    return false;
+  }
+}
+function extractFormatId(rawLog) {
+  const log = rawLog.trim();
+  if (!log) {
+    return void 0;
+  }
+  const re = /Downloading\s+\d+\s+format\(s\):\s+([^\r\n]+)/gi;
+  const matches = Array.from(log.matchAll(re));
+  const last = matches.at(-1);
+  const value = last?.[1]?.trim();
+  if (!value) {
+    return void 0;
+  }
+  return value;
+}
+function extractSavedFilePath2(rawLog) {
+  const log = rawLog.trim();
+  if (!log) {
+    return void 0;
+  }
+  const patterns = [
+    new RegExp(`^${VIDBEE_OUTPUT_PATH_PREFIX}(.+)$`, "gm"),
+    /Merging formats into "([^"]+)"/g,
+    /Destination:\s+"([^"]+)"/g,
+    /Destination:\s+'([^']+)'/g,
+    /\[download\]\s+([^\r\n]+?)\s+has already been downloaded/g,
+    /\[MoveFiles\]\s+Moving file "[^"]+" to "([^"]+)"/g,
+    /\[(?:EmbedSubtitle|EmbedThumbnail|FixupM3u8|Metadata)\].*?"([^"]+)"/g,
+    /\[(?:ExtractAudio|VideoConvertor|VideoRemuxer)\].*?\bto "([^"]+)"/g
+  ];
+  let latestMatchIndex = -1;
+  let latestCandidate;
+  for (const re of patterns) {
+    for (const match of log.matchAll(re)) {
+      const candidate = match[1]?.trim();
+      const matchIndex = match.index ?? -1;
+      if (candidate && matchIndex >= latestMatchIndex) {
+        latestMatchIndex = matchIndex;
+        latestCandidate = candidate;
+      }
+    }
+  }
+  if (latestCandidate) {
+    return latestCandidate;
+  }
+  const lines = log.split(/\r?\n/).reverse();
+  for (const line of lines) {
+    const idx = line.indexOf("Destination:");
+    if (idx >= 0) {
+      const candidate = line.slice(idx + "Destination:".length).trim();
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+  return void 0;
+}
+function classifyYtDlpExit(exitCode, stderr) {
+  return classify({ exitCode, stderr: stderr || `yt-dlp exited with code ${exitCode ?? -1}` });
+}
+function createTailBuffer2(maxBytes) {
+  let buf = "";
+  return {
+    append(text2) {
+      buf += text2;
+      if (buf.length > maxBytes * 4) {
+        buf = buf.slice(buf.length - maxBytes);
+      }
+    },
+    read() {
+      return buf.length > maxBytes ? buf.slice(buf.length - maxBytes) : buf;
+    }
+  };
+}
+var YTDlpWrapCtor2, DEFAULT_KILL_GRACE_MS, STDOUT_TAIL_BYTES, STDERR_TAIL_BYTES2, OUTPUT_PATH_SCAN_BYTES, PROCESSING_LINE, OUTPUT_LINE_END, SUBTITLE_DOWNLOAD_ERROR, SUBTITLE_DOWNLOAD_INFO, SUBTITLE_UNAVAILABLE_INFO, SUBTITLE_OPTIONS_WITH_VALUE, SUBTITLE_TOGGLE_OPTIONS, SUBTITLE_FALLBACK_LOG, FFMPEG_NOT_FOUND_ERROR2, extractDownloadedSubtitleLanguages, resolveSubtitleOutcome, YtDlpExecutor, hasSubtitleDownloadArgs, withoutSubtitleDownloadArgs;
+var init_yt_dlp_executor = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/yt-dlp-executor.ts"() {
+    init_src();
+    init_process();
+    init_editor_video();
+    init_yt_dlp_args();
+    init_yt_dlp_progress();
+    init_yt_dlp_wrap();
+    YTDlpWrapCtor2 = resolveYtDlpWrapCtor(YTDlpWrap2);
+    DEFAULT_KILL_GRACE_MS = 1e4;
+    STDOUT_TAIL_BYTES = 8 * 1024;
+    STDERR_TAIL_BYTES2 = 8 * 1024;
+    OUTPUT_PATH_SCAN_BYTES = 4 * 1024;
+    PROCESSING_LINE = /^\[(?:Merger|Postprocess|ExtractAudio|VideoConvertor|VideoRemuxer|EmbedThumbnail|EmbedSubtitle|Metadata|Fixup\w*|FFmpeg)\]/i;
+    OUTPUT_LINE_END = /\r\n|\n|\r/;
+    SUBTITLE_DOWNLOAD_ERROR = /Unable to download video subtitles for/i;
+    SUBTITLE_DOWNLOAD_INFO = /\[info\][^\r\n]*Downloading subtitles:\s*([^\r\n]+)/i;
+    SUBTITLE_UNAVAILABLE_INFO = /There are no subtitles for the requested languages|video doesn't have subtitles/i;
+    SUBTITLE_OPTIONS_WITH_VALUE = /* @__PURE__ */ new Set(["--sleep-subtitles", "--sub-langs"]);
+    SUBTITLE_TOGGLE_OPTIONS = /* @__PURE__ */ new Set([
+      "--embed-subs",
+      "--no-embed-subs",
+      "--no-write-auto-subs",
+      "--no-write-subs",
+      "--write-auto-subs",
+      "--write-subs"
+    ]);
+    SUBTITLE_FALLBACK_LOG = "[VidBee] Subtitle download failed; retrying the video without subtitles.";
+    FFMPEG_NOT_FOUND_ERROR2 = "ffmpeg/ffprobe not found. Use Desktop resources/ffmpeg, install in PATH, or set FFMPEG_PATH.";
+    extractDownloadedSubtitleLanguages = (output) => {
+      const rawLanguages = output.match(SUBTITLE_DOWNLOAD_INFO)?.[1];
+      if (!rawLanguages) {
+        return [];
+      }
+      return rawLanguages.split(",").map((language) => language.trim()).filter(Boolean);
+    };
+    resolveSubtitleOutcome = (input) => {
+      if (input.initialStatus) {
+        return { status: input.initialStatus };
+      }
+      if (input.fallbackAttempted) {
+        return { status: "failed" };
+      }
+      if (input.downloadedLanguages.length > 0) {
+        return { languages: [...input.downloadedLanguages], status: "downloaded" };
+      }
+      if (input.subtitlesRequested && input.unavailableSeen) {
+        return { status: "unavailable" };
+      }
+      return void 0;
+    };
+    YtDlpExecutor = class {
+      opts;
+      cachedYtDlp = null;
+      cachedYtDlpPath = null;
+      constructor(options) {
+        this.opts = {
+          resolveYtDlpPath: options.resolveYtDlpPath,
+          resolveFfmpegLocation: options.resolveFfmpegLocation,
+          defaultDownloadDir: options.defaultDownloadDir,
+          defaultRuntimeSettings: options.defaultRuntimeSettings ?? {},
+          extraArgs: options.extraArgs,
+          buildArgs: options.buildArgs,
+          prepareSettings: options.prepareSettings,
+          killGraceMs: options.killGraceMs ?? DEFAULT_KILL_GRACE_MS,
+          clock: options.clock ?? Date.now,
+          spawnFn: options.spawnFn
+        };
+      }
+      run(ctx, events) {
+        const stdoutTail = createTailBuffer2(STDOUT_TAIL_BYTES);
+        const stderrTail = createTailBuffer2(STDERR_TAIL_BYTES2);
+        let postprocessSeen = false;
+        const processingLines = { stdout: "", stderr: "" };
+        let settled = false;
+        let cancelRequested = false;
+        let killTimer = null;
+        let proc = null;
+        let formatIdSeen;
+        let filePathSeen;
+        let outputPathProbe = "";
+        let subtitleSignalProbe = "";
+        let subtitleUnavailableSeen = false;
+        let mediaDurationMs = null;
+        let subtitleVisibility;
+        const subtitleLanguagesSeen = /* @__PURE__ */ new Set();
+        let progressAggregator = new DownloadProgressAggregator();
+        let subtitleFallbackAttempted = false;
+        const canRetryWithoutSubtitles = !(ctx.input.rawArgs?.length || this.opts.buildArgs);
+        const captureProcessing = (text2, stream) => {
+          if (postprocessSeen || settled || cancelRequested) {
+            return;
+          }
+          const lines = `${processingLines[stream]}${text2}`.split(OUTPUT_LINE_END);
+          processingLines[stream] = (lines.pop() ?? "").slice(-OUTPUT_PATH_SCAN_BYTES);
+          if (lines.some((line) => PROCESSING_LINE.test(line.trimStart()))) {
+            postprocessSeen = true;
+            events.onProcessing?.({ taskId: ctx.taskId, attemptId: ctx.attemptId });
+          }
+        };
+        const captureOutputPath = (text2) => {
+          outputPathProbe = `${outputPathProbe}${text2}`.slice(-OUTPUT_PATH_SCAN_BYTES);
+          const filePath = extractSavedFilePath2(outputPathProbe);
+          if (filePath) {
+            filePathSeen = filePath;
+          }
+        };
+        const captureSubtitleSignals = (text2) => {
+          subtitleSignalProbe = `${subtitleSignalProbe}${text2}`.slice(-OUTPUT_PATH_SCAN_BYTES);
+          const duration3 = subtitleSignalProbe.match(/VIDBEE_DURATION:(\d+(?:\.\d+)?)/);
+          if (duration3) {
+            mediaDurationMs = Number(duration3[1]) * 1e3;
+          }
+          const visibility = subtitleSignalProbe.match(/VIDBEE_VISIBILITY:(public|private|unlisted)\b/);
+          if (visibility) {
+            subtitleVisibility = visibility[1];
+          }
+          for (const language of extractDownloadedSubtitleLanguages(subtitleSignalProbe)) {
+            subtitleLanguagesSeen.add(language);
+          }
+          if (SUBTITLE_UNAVAILABLE_INFO.test(subtitleSignalProbe)) {
+            subtitleUnavailableSeen = true;
+          }
+        };
+        const finishOnce = (e) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          if (killTimer) {
+            clearTimeout(killTimer);
+            killTimer = null;
+          }
+          events.onFinish(e);
+        };
+        const launch = (settingsOverride) => {
+          if (cancelRequested || settled) {
+            return makeNoopRun();
+          }
+          let args;
+          try {
+            args = this.buildArgsFor(ctx.input, settingsOverride);
+          } catch (err) {
+            const error51 = virtualError("unknown", String(err instanceof Error ? err.message : err));
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: { type: "error", error: error51, exitCode: null },
+              closedAt: this.opts.clock(),
+              stdoutTail: "",
+              stderrTail: String(err instanceof Error ? err.message : err)
+            });
+            return makeNoopRun();
+          }
+          const subtitlesRequested = hasSubtitleDownloadArgs(args);
+          const initialSubtitleStatus = this.resolveInitialSubtitleStatus(ctx.input);
+          const ffmpegLocation = this.opts.resolveFfmpegLocation();
+          if (!ffmpegLocation) {
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: {
+                type: "error",
+                error: virtualError("binary-missing", FFMPEG_NOT_FOUND_ERROR2),
+                exitCode: null
+              },
+              closedAt: this.opts.clock(),
+              stdoutTail: "",
+              stderrTail: FFMPEG_NOT_FOUND_ERROR2
+            });
+            return makeNoopRun();
+          }
+          insertFfmpegLocation(args, ffmpegLocation);
+          const controller = new AbortController();
+          let ytDlpPath;
+          try {
+            ytDlpPath = this.opts.resolveYtDlpPath();
+          } catch (err) {
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: {
+                type: "error",
+                error: virtualError("binary-missing", String(err instanceof Error ? err.message : err)),
+                exitCode: null
+              },
+              closedAt: this.opts.clock(),
+              stdoutTail: "",
+              stderrTail: String(err instanceof Error ? err.message : err)
+            });
+            return makeNoopRun();
+          }
+          const pumpStdoutPostprocess = (chunk) => {
+            const text2 = chunk.toString();
+            stdoutTail.append(text2);
+            captureOutputPath(text2);
+            captureSubtitleSignals(text2);
+            captureProcessing(text2, "stdout");
+            const fid = extractFormatId(text2);
+            if (fid) {
+              formatIdSeen = fid;
+            }
+          };
+          const pumpStderrPostprocess = (chunk) => {
+            const text2 = chunk.toString();
+            stderrTail.append(text2);
+            captureOutputPath(text2);
+            captureSubtitleSignals(text2);
+            captureProcessing(text2, "stderr");
+            events.onStd({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              stream: "stderr",
+              line: text2.replace(/\r?\n$/, "")
+            });
+          };
+          const spawnProcess = (processArgs) => this.opts.spawnFn ? this.opts.spawnFn(ytDlpPath, processArgs, controller.signal) : this.getYtDlp(ytDlpPath).exec(processArgs, { signal: controller.signal });
+          const finishSuccessfulProcess = async (closedAt) => {
+            const stdout = stdoutTail.read();
+            const stderr = stderrTail.read();
+            let filePath = filePathSeen ?? extractSavedFilePath2(`${stdout}
+${stderr}`) ?? "";
+            if (ctx.input.options?.editorCompatible === true && filePath) {
+              events.onProcessing?.({ taskId: ctx.taskId, attemptId: ctx.attemptId });
+              events.onStd({
+                taskId: ctx.taskId,
+                attemptId: ctx.attemptId,
+                stream: "stdout",
+                line: "Converting to editing MP4: H.264, AAC, 30 fps. Original file is retained."
+              });
+              try {
+                filePath = await createEditorVideo(filePath, ffmpegLocation, controller.signal);
+              } catch (error51) {
+                finishOnce({
+                  taskId: ctx.taskId,
+                  attemptId: ctx.attemptId,
+                  result: cancelRequested ? { type: "cancelled" } : {
+                    type: "error",
+                    error: virtualError(
+                      "unknown",
+                      error51 instanceof Error ? error51.message : "MP4 conversion failed"
+                    ),
+                    exitCode: null
+                  },
+                  closedAt: this.opts.clock(),
+                  stdoutTail: stdout,
+                  stderrTail: stderr
+                });
+                return;
+              }
+            }
+            let realSize = 0;
+            if (filePath) {
+              try {
+                if (existsSync5(filePath)) {
+                  realSize = statSync3(filePath).size;
+                }
+              } catch {
+              }
+            }
+            const output = {
+              filePath,
+              size: realSize,
+              durationMs: mediaDurationMs,
+              sha256: null,
+              // Prefer the streaming sniff (captures even if pushed out of the
+              // tail buffer); fall back to a tail re-scan when running with
+              // tiny test fixtures whose entire run fits in 8KB.
+              formatId: formatIdSeen ?? extractFormatId(stdout) ?? null
+            };
+            const subtitleOutcome = resolveSubtitleOutcome({
+              downloadedLanguages: [...subtitleLanguagesSeen],
+              fallbackAttempted: subtitleFallbackAttempted,
+              initialStatus: initialSubtitleStatus,
+              subtitlesRequested,
+              unavailableSeen: subtitleUnavailableSeen
+            });
+            if (subtitleOutcome) {
+              output.subtitleStatus = subtitleOutcome.status;
+              output.subtitleAcquisition = {
+                id: ctx.attemptId,
+                acquiredAt: closedAt,
+                visibility: subtitleVisibility,
+                credentialsUsed: args.includes("--ignore-config") ? args.some(
+                  (argument) => /^(?:--cookies|--cookies-from-browser|--username|--password|--netrc|--netrc-location|--netrc-cmd|--add-header)(?:=|$)/.test(
+                    argument
+                  )
+                ) : void 0
+              };
+              if (subtitleOutcome.languages) {
+                output.subtitleLanguages = subtitleOutcome.languages;
+              }
+            }
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: { type: "success", output },
+              closedAt,
+              stdoutTail: stdout,
+              stderrTail: stderr
+            });
+          };
+          const finishProcessError = (err) => {
+            const closedAt = this.opts.clock();
+            if (cancelRequested) {
+              finishOnce({
+                taskId: ctx.taskId,
+                attemptId: ctx.attemptId,
+                result: { type: "cancelled" },
+                closedAt,
+                stdoutTail: stdoutTail.read(),
+                stderrTail: stderrTail.read()
+              });
+              return;
+            }
+            const error51 = classifyYtDlpExit(null, `${stderrTail.read()}
+${err.message}`);
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: { type: "error", error: error51, exitCode: null },
+              closedAt,
+              stdoutTail: stdoutTail.read(),
+              stderrTail: stderrTail.read()
+            });
+          };
+          const bindProcess = (target, processArgs) => {
+            let processStderr = "";
+            target.ytDlpProcess?.stdout?.on("data", (chunk) => {
+              if (target !== proc) {
+                return;
+              }
+              pumpStdoutPostprocess(chunk);
+              events.onStd({
+                taskId: ctx.taskId,
+                attemptId: ctx.attemptId,
+                stream: "stdout",
+                line: chunk.toString().replace(/\r?\n$/, "")
+              });
+            });
+            target.ytDlpProcess?.stderr?.on("data", (chunk) => {
+              if (target === proc) {
+                processStderr = `${processStderr}${chunk.toString()}`.slice(-STDERR_TAIL_BYTES2);
+                pumpStderrPostprocess(chunk);
+              }
+            });
+            target.on("progress", (payload) => {
+              if (target !== proc) {
+                return;
+              }
+              const progress = progressAggregator.apply(payload);
+              if (!progress) {
+                return;
+              }
+              events.onProgress({
+                taskId: ctx.taskId,
+                attemptId: ctx.attemptId,
+                progress,
+                enteredProcessing: postprocessSeen
+              });
+            });
+            target.on("close", (code) => {
+              if (target !== proc || settled) {
+                return;
+              }
+              const closedAt = this.opts.clock();
+              const stdout = stdoutTail.read();
+              const stderr = stderrTail.read();
+              if (cancelRequested) {
+                finishOnce({
+                  taskId: ctx.taskId,
+                  attemptId: ctx.attemptId,
+                  result: { type: "cancelled" },
+                  closedAt,
+                  stdoutTail: stdout,
+                  stderrTail: stderr
+                });
+                return;
+              }
+              if (code === 0) {
+                finishSuccessfulProcess(closedAt);
+                return;
+              }
+              const savedPath = filePathSeen ?? extractSavedFilePath2(`${stdout}
+${stderr}`);
+              if (hasNonEmptyFile(savedPath) && isUnsupportedThumbnailEmbedOnlyFailure(processStderr || stderr)) {
+                stderrTail.append(`
+${THUMBNAIL_EMBED_UNSUPPORTED_LOG}
+`);
+                finishSuccessfulProcess(closedAt);
+                return;
+              }
+              if (!subtitleFallbackAttempted && canRetryWithoutSubtitles && hasSubtitleDownloadArgs(processArgs) && SUBTITLE_DOWNLOAD_ERROR.test(processStderr)) {
+                subtitleFallbackAttempted = true;
+                stderrTail.append(`${SUBTITLE_FALLBACK_LOG}
+`);
+                events.onStd({
+                  taskId: ctx.taskId,
+                  attemptId: ctx.attemptId,
+                  stream: "stderr",
+                  line: SUBTITLE_FALLBACK_LOG
+                });
+                progressAggregator = new DownloadProgressAggregator();
+                postprocessSeen = false;
+                processingLines.stdout = "";
+                processingLines.stderr = "";
+                try {
+                  const fallbackArgs = withoutSubtitleDownloadArgs(processArgs);
+                  proc = spawnProcess(fallbackArgs);
+                  bindProcess(proc, fallbackArgs);
+                } catch (err) {
+                  finishProcessError(err instanceof Error ? err : new Error(String(err)));
+                }
+                return;
+              }
+              const error51 = classifyYtDlpExit(code, processStderr || stderr);
+              finishOnce({
+                taskId: ctx.taskId,
+                attemptId: ctx.attemptId,
+                result: { type: "error", error: error51, exitCode: code ?? null },
+                closedAt,
+                stdoutTail: stdout,
+                stderrTail: stderr
+              });
+            });
+            target.on("error", (err) => {
+              if (target === proc) {
+                finishProcessError(err);
+              }
+            });
+          };
+          try {
+            proc = spawnProcess(args);
+          } catch (err) {
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: {
+                type: "error",
+                error: virtualError("unknown", String(err instanceof Error ? err.message : err)),
+                exitCode: null
+              },
+              closedAt: this.opts.clock(),
+              stdoutTail: stdoutTail.read(),
+              stderrTail: stderrTail.read()
+            });
+            return makeNoopRun();
+          }
+          const pid = proc.ytDlpProcess?.pid ?? -1;
+          events.onSpawn({
+            taskId: ctx.taskId,
+            attemptId: ctx.attemptId,
+            pid,
+            pidStartedAt: null,
+            kind: "yt-dlp",
+            spawnedAt: this.opts.clock()
+          });
+          bindProcess(proc, args);
+          const cancel = async (timeout) => {
+            if (settled) {
+              return;
+            }
+            cancelRequested = true;
+            const grace = timeout ?? this.opts.killGraceMs;
+            try {
+              controller.abort();
+            } catch {
+            }
+            try {
+              killProcessTree(proc?.ytDlpProcess?.pid, "SIGTERM");
+            } catch {
+            }
+            if (killTimer) {
+              clearTimeout(killTimer);
+            }
+            if (grace > 0) {
+              killTimer = setTimeout(() => {
+                try {
+                  killProcessTree(proc?.ytDlpProcess?.pid, "SIGKILL");
+                } catch {
+                }
+              }, grace);
+            } else {
+              try {
+                killProcessTree(proc?.ytDlpProcess?.pid, "SIGKILL");
+              } catch {
+              }
+            }
+          };
+          return {
+            cancel,
+            pause: () => cancel(this.opts.killGraceMs)
+          };
+        };
+        if (!this.opts.prepareSettings) {
+          return launch();
+        }
+        let launched;
+        const pendingCancel = async (timeout) => {
+          cancelRequested = true;
+          if (launched) {
+            await launched.cancel(timeout);
+          }
+        };
+        void this.opts.prepareSettings(ctx.input).then(
+          (prepared) => {
+            if (cancelRequested || settled) {
+              return;
+            }
+            launched = launch(prepared ?? void 0);
+          },
+          (err) => {
+            const message = String(err instanceof Error ? err.message : err);
+            finishOnce({
+              taskId: ctx.taskId,
+              attemptId: ctx.attemptId,
+              result: { type: "error", error: virtualError("unknown", message), exitCode: null },
+              closedAt: this.opts.clock(),
+              stdoutTail: "",
+              stderrTail: message
+            });
+          }
+        );
+        return {
+          cancel: pendingCancel,
+          pause: () => pendingCancel(this.opts.killGraceMs)
+        };
+      }
+      /** Merge host defaults with per-task runtime setting overrides. */
+      resolveRuntimeSettings(input, override) {
+        const opts = input.options ?? {};
+        return {
+          ...this.opts.defaultRuntimeSettings,
+          ...opts.settings ?? {},
+          ...override ?? {}
+        };
+      }
+      /** Detect user-visible subtitle skips that happen before yt-dlp starts. */
+      resolveInitialSubtitleStatus(input) {
+        if (input.rawArgs?.length || this.opts.buildArgs) {
+          return void 0;
+        }
+        const opts = input.options ?? {};
+        const type = opts.type ?? (input.kind === "audio" ? "audio" : "video");
+        const skipReason = resolveSubtitleDownloadSkipReason(
+          { type, url: input.url },
+          this.resolveRuntimeSettings(input)
+        );
+        return skipReason === "auth-required" ? "skipped-auth" : void 0;
+      }
+      /** Build the final yt-dlp arguments for one task input. */
+      buildArgsFor(input, settingsOverride) {
+        if (this.opts.buildArgs) {
+          return this.opts.buildArgs(input, this.opts.defaultDownloadDir);
+        }
+        if (input.rawArgs && input.rawArgs.length > 0) {
+          return [...input.rawArgs];
+        }
+        const opts = input.options ?? {};
+        const type = opts.type ?? (input.kind === "audio" ? "audio" : "video");
+        const settings = this.resolveRuntimeSettings(input, settingsOverride);
+        const downloadPath = opts.customDownloadPath?.trim() || settings.downloadPath?.trim() || this.opts.defaultDownloadDir;
+        const merged = { ...settings, downloadPath };
+        const extra = this.opts.extraArgs ? [...this.opts.extraArgs()] : [];
+        return buildDownloadArgs(
+          {
+            url: input.url,
+            type,
+            format: opts.format,
+            audioFormat: opts.audioFormat,
+            audioBitrate: opts.audioBitrate,
+            audioFormatIds: opts.audioFormatIds ? [...opts.audioFormatIds] : void 0,
+            startTime: opts.startTime,
+            endTime: opts.endTime,
+            customDownloadPath: opts.customDownloadPath,
+            customFilenameTemplate: opts.customFilenameTemplate,
+            containerFormat: opts.containerFormat
+          },
+          this.opts.defaultDownloadDir,
+          merged,
+          extra
+        );
+      }
+      /** Diagnostic: return the resolved argv yt-dlp would be invoked with. */
+      describeCommandFor(input) {
+        return formatYtDlpCommand(this.buildArgsFor(input));
+      }
+      getYtDlp(binaryPath) {
+        if (this.cachedYtDlp && this.cachedYtDlpPath === binaryPath) {
+          return this.cachedYtDlp;
+        }
+        this.cachedYtDlp = new YTDlpWrapCtor2(binaryPath);
+        this.cachedYtDlpPath = binaryPath;
+        return this.cachedYtDlp;
+      }
+    };
+    hasSubtitleDownloadArgs = (args) => args.some(
+      (arg) => arg === "--embed-subs" || arg === "--write-auto-subs" || arg === "--write-subs"
+    );
+    withoutSubtitleDownloadArgs = (args) => {
+      const filtered = [];
+      let skipNextValue = false;
+      for (const arg of args) {
+        if (skipNextValue) {
+          skipNextValue = false;
+          continue;
+        }
+        if (SUBTITLE_OPTIONS_WITH_VALUE.has(arg)) {
+          skipNextValue = true;
+          continue;
+        }
+        if (SUBTITLE_TOGGLE_OPTIONS.has(arg)) {
+          continue;
+        }
+        filtered.push(arg);
+      }
+      const sourceUrl = filtered.pop();
+      filtered.push("--no-write-subs", "--no-write-auto-subs", "--no-embed-subs");
+      if (sourceUrl) {
+        filtered.push(sourceUrl);
+      }
+      return filtered;
+    };
+  }
+});
+
+// ../../node_modules/@vidbee/downloader-core/src/index.ts
+var src_exports2 = {};
+__export(src_exports2, {
+  COOKIES_CHROME_EXTENSION_URL: () => COOKIES_CHROME_EXTENSION_URL,
+  COOKIES_FIREFOX_EXTENSION_URL: () => COOKIES_FIREFOX_EXTENSION_URL,
+  COOKIES_GUIDE_URL: () => COOKIES_GUIDE_URL,
+  COOKIE_BROWSER_IDS: () => COOKIE_BROWSER_IDS,
+  COOKIE_SITE_SPECS: () => COOKIE_SITE_SPECS,
+  DEFAULT_FILENAME_STYLE: () => DEFAULT_FILENAME_STYLE,
+  DEFAULT_FILENAME_TEMPLATE: () => DEFAULT_FILENAME_TEMPLATE,
+  DEFAULT_FILENAME_VIA_VIDBEE: () => DEFAULT_FILENAME_VIA_VIDBEE,
+  DEFAULT_SUBTITLE_LANGUAGES: () => DEFAULT_SUBTITLE_LANGUAGES,
+  DownloaderCore: () => DownloaderCore,
+  FILENAME_STYLES: () => FILENAME_STYLES,
+  FILENAME_STYLE_PREVIEWS: () => FILENAME_STYLE_PREVIEWS,
+  FOLLOW_INTERFACE_SUBTITLE_LANGUAGE: () => FOLLOW_INTERFACE_SUBTITLE_LANGUAGE,
+  MACOS_BROWSER_COOKIE_PERMISSION_MESSAGE: () => MACOS_BROWSER_COOKIE_PERMISSION_MESSAGE,
+  MAX_SUBTITLE_LANGUAGES: () => MAX_SUBTITLE_LANGUAGES,
+  METADATA_NETWORK_ATTEMPTS: () => METADATA_NETWORK_ATTEMPTS,
+  ONE_CLICK_CONTAINER_OPTIONS: () => ONE_CLICK_CONTAINER_OPTIONS,
+  SHARED_FILENAME_TEMPLATE: () => SHARED_FILENAME_TEMPLATE,
+  SINGLE_FORMAT_FALLBACK: () => SINGLE_FORMAT_FALLBACK,
+  VIA_VIDBEE_LABEL: () => VIA_VIDBEE_LABEL,
+  VIDBEE_EXTENSION_CHROME_URL: () => VIDBEE_EXTENSION_CHROME_URL,
+  VIDBEE_OUTPUT_PATH_PREFIX: () => VIDBEE_OUTPUT_PATH_PREFIX,
+  WebAppSettingsSchema: () => WebAppSettingsSchema,
+  YtDlpExecutor: () => YtDlpExecutor,
+  appendYouTubeSafeExtractorArgs: () => appendYouTubeSafeExtractorArgs,
+  applyViaVidBeeFilename: () => applyViaVidBeeFilename,
+  assertDownloadSourceUrl: () => assertDownloadSourceUrl,
+  buildAudioFormatPreference: () => buildAudioFormatPreference,
+  buildBrowserCookiesSetting: () => buildBrowserCookiesSetting,
+  buildCaptionExtractArgs: () => buildCaptionExtractArgs,
+  buildDownloadArgs: () => buildDownloadArgs,
+  buildPlaylistInfoArgs: () => buildPlaylistInfoArgs,
+  buildSingleVideoFormatSelector: () => buildSingleVideoFormatSelector,
+  buildVideoFormatPreference: () => buildVideoFormatPreference,
+  buildVideoInfoArgs: () => buildVideoInfoArgs,
+  cookieDomainsForUrl: () => cookieDomainsForUrl,
+  downloaderContract: () => downloaderContract,
+  expandSubtitleLanguageAliases: () => expandSubtitleLanguageAliases,
+  formatYtDlpCommand: () => formatYtDlpCommand,
+  getBrowserCookieDatabaseName: () => getBrowserCookieDatabaseName,
+  getBrowserCookieDatabaseRelativeSegments: () => getBrowserCookieDatabaseRelativeSegments,
+  getBrowserProfileBaseDirs: () => getBrowserProfileBaseDirs,
+  getBrowserProfileCandidates: () => getBrowserProfileCandidates,
+  getCookieSetupFailureKind: () => getCookieSetupFailureKind,
+  getMaxCookiesFileBytes: () => getMaxCookiesFileBytes,
+  hasConfiguredCookieSettings: () => hasConfiguredCookieSettings,
+  inspectNetscapeCookies: () => inspectNetscapeCookies,
+  interfaceSubtitleLanguage: () => interfaceSubtitleLanguage,
+  isBrowserCookieReadSupported: () => isBrowserCookieReadSupported,
+  isCookieBrowserId: () => isCookieBrowserId,
+  isDirectMediaSegmentUrl: () => isDirectMediaSegmentUrl,
+  isFilenameStyle: () => isFilenameStyle,
+  isMuxedVideoFormat: () => isMuxedVideoFormat,
+  isTransientYtDlpNetworkError: () => isTransientYtDlpNetworkError,
+  isWindowsBlockedCookieBrowser: () => isWindowsBlockedCookieBrowser,
+  listSelectableCookieBrowsers: () => listSelectableCookieBrowsers,
+  looksLikeNetscapeCookies: () => looksLikeNetscapeCookies,
+  matchCookieSites: () => matchCookieSites,
+  normalizeSubtitleLanguages: () => normalizeSubtitleLanguages,
+  parseBrowserCookiesSetting: () => parseBrowserCookiesSetting,
+  parseDownloadTimecode: () => parseDownloadTimecode,
+  recommendCookieSetup: () => recommendCookieSetup,
+  resolveAudioFormatSelector: () => resolveAudioFormatSelector,
+  resolveFfmpegLocationFromPath: () => resolveFfmpegLocationFromPath,
+  resolveFilenameTemplate: () => resolveFilenameTemplate,
+  resolvePathWithHome: () => resolvePathWithHome,
+  resolvePreferredAudioExt: () => resolvePreferredAudioExt,
+  resolveSubtitleDownloadSkipReason: () => resolveSubtitleDownloadSkipReason,
+  resolveSubtitleLanguages: () => resolveSubtitleLanguages,
+  resolveVideoFormatSelector: () => resolveVideoFormatSelector,
+  retryTransientYtDlpNetworkError: () => retryTransientYtDlpNetworkError,
+  sanitizeFilenameTemplate: () => sanitizeFilenameTemplate,
+  serializeNetscapeCookies: () => serializeNetscapeCookies,
+  unconfiguredCookieHealth: () => unconfiguredCookieHealth,
+  validateDownloadTimeRange: () => validateDownloadTimeRange
+});
+var init_src2 = __esm({
+  "../../node_modules/@vidbee/downloader-core/src/index.ts"() {
+    init_browser_cookies_setting();
+    init_contract2();
+    init_cookie_browser_paths();
+    init_cookie_setup();
+    init_downloader_core();
+    init_filename_style();
+    init_format_preferences();
+    init_format_selector();
+    init_schemas4();
+    init_subtitle_languages();
+    init_yt_dlp_args();
+    init_yt_dlp_executor();
+  }
+});
+
+// ../../node_modules/drizzle-orm/entity.js
+function is(value, type) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (value instanceof type) {
     return true;
   }
   if (!Object.prototype.hasOwnProperty.call(type, entityKind)) {
@@ -19750,7 +24190,7 @@ function is(value2, type) {
       `Class "${type.name ?? "<unknown>"}" doesn't look like a Drizzle entity. If this is incorrect and the class is provided by Drizzle, please report this as a bug.`
     );
   }
-  let cls = Object.getPrototypeOf(value2).constructor;
+  let cls = Object.getPrototypeOf(value).constructor;
   if (cls) {
     while (cls) {
       if (entityKind in cls && cls[entityKind] === type[entityKind]) {
@@ -19761,18 +24201,17 @@ function is(value2, type) {
   }
   return false;
 }
-var entityKind, hasOwnEntityKind;
+var entityKind;
 var init_entity = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/entity.js"() {
-    entityKind = Symbol.for("drizzle:entityKind");
-    hasOwnEntityKind = Symbol.for("drizzle:hasOwnEntityKind");
+  "../../node_modules/drizzle-orm/entity.js"() {
+    entityKind = /* @__PURE__ */ Symbol.for("drizzle:entityKind");
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/column.js
+// ../../node_modules/drizzle-orm/column.js
 var Column;
 var init_column = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/column.js"() {
+  "../../node_modules/drizzle-orm/column.js"() {
     init_entity();
     Column = class {
       constructor(table, config2) {
@@ -19812,11 +24251,11 @@ var init_column = __esm({
       generated = void 0;
       generatedIdentity = void 0;
       config;
-      mapFromDriverValue(value2) {
-        return value2;
+      mapFromDriverValue(value) {
+        return value;
       }
-      mapToDriverValue(value2) {
-        return value2;
+      mapToDriverValue(value) {
+        return value;
       }
       // ** @internal */
       shouldDisableInsert() {
@@ -19826,10 +24265,10 @@ var init_column = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/column-builder.js
+// ../../node_modules/drizzle-orm/column-builder.js
 var ColumnBuilder;
 var init_column_builder = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/column-builder.js"() {
+  "../../node_modules/drizzle-orm/column-builder.js"() {
     init_entity();
     ColumnBuilder = class {
       static [entityKind] = "ColumnBuilder";
@@ -19880,8 +24319,8 @@ var init_column_builder = __esm({
        *
        * If you need to set a dynamic default value, use {@link $defaultFn} instead.
        */
-      default(value2) {
-        this.config.default = value2;
+      default(value) {
+        this.config.default = value;
         this.config.hasDefault = true;
         return this;
       }
@@ -19935,18 +24374,18 @@ var init_column_builder = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/table.utils.js
+// ../../node_modules/drizzle-orm/table.utils.js
 var TableName;
 var init_table_utils = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/table.utils.js"() {
-    TableName = Symbol.for("drizzle:Name");
+  "../../node_modules/drizzle-orm/table.utils.js"() {
+    TableName = /* @__PURE__ */ Symbol.for("drizzle:Name");
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/foreign-keys.js
+// ../../node_modules/drizzle-orm/pg-core/foreign-keys.js
 var ForeignKeyBuilder, ForeignKey;
 var init_foreign_keys = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/foreign-keys.js"() {
+  "../../node_modules/drizzle-orm/pg-core/foreign-keys.js"() {
     init_entity();
     init_table_utils();
     ForeignKeyBuilder = class {
@@ -20007,22 +24446,22 @@ var init_foreign_keys = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/tracing-utils.js
+// ../../node_modules/drizzle-orm/tracing-utils.js
 function iife(fn, ...args) {
   return fn(...args);
 }
 var init_tracing_utils = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/tracing-utils.js"() {
+  "../../node_modules/drizzle-orm/tracing-utils.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/unique-constraint.js
+// ../../node_modules/drizzle-orm/pg-core/unique-constraint.js
 function uniqueKeyName(table, columns) {
   return `${table[TableName]}_${columns.join("_")}_unique`;
 }
 var UniqueConstraintBuilder, UniqueOnConstraintBuilder, UniqueConstraint;
 var init_unique_constraint = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/unique-constraint.js"() {
+  "../../node_modules/drizzle-orm/pg-core/unique-constraint.js"() {
     init_entity();
     init_table_utils();
     UniqueConstraintBuilder = class {
@@ -20073,7 +24512,7 @@ var init_unique_constraint = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/utils/array.js
+// ../../node_modules/drizzle-orm/pg-core/utils/array.js
 function parsePgArrayValue(arrayString, startFrom, inQuotes) {
   for (let i = startFrom; i < arrayString.length; i++) {
     const char = arrayString[i];
@@ -20113,8 +24552,8 @@ function parsePgNestedArray(arrayString, startFrom = 0) {
       continue;
     }
     if (char === '"') {
-      const [value22, startFrom2] = parsePgArrayValue(arrayString, i + 1, true);
-      result.push(value22);
+      const [value2, startFrom2] = parsePgArrayValue(arrayString, i + 1, true);
+      result.push(value2);
       i = startFrom2;
       continue;
     }
@@ -20122,13 +24561,13 @@ function parsePgNestedArray(arrayString, startFrom = 0) {
       return [result, i + 1];
     }
     if (char === "{") {
-      const [value22, startFrom2] = parsePgNestedArray(arrayString, i + 1);
-      result.push(value22);
+      const [value2, startFrom2] = parsePgNestedArray(arrayString, i + 1);
+      result.push(value2);
       i = startFrom2;
       continue;
     }
-    const [value2, newStartFrom] = parsePgArrayValue(arrayString, i, false);
-    result.push(value2);
+    const [value, newStartFrom] = parsePgArrayValue(arrayString, i, false);
+    result.push(value);
     i = newStartFrom;
   }
   return [result, i];
@@ -20149,14 +24588,14 @@ function makePgArray(array2) {
   }).join(",")}}`;
 }
 var init_array = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/utils/array.js"() {
+  "../../node_modules/drizzle-orm/pg-core/utils/array.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/columns/common.js
+// ../../node_modules/drizzle-orm/pg-core/columns/common.js
 var PgColumnBuilder, PgColumn, ExtraConfigColumn, IndexedColumn, PgArrayBuilder, PgArray;
 var init_common = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/columns/common.js"() {
+  "../../node_modules/drizzle-orm/pg-core/columns/common.js"() {
     init_column_builder();
     init_column();
     init_entity();
@@ -20332,14 +24771,14 @@ var init_common = __esm({
       getSQLType() {
         return `${this.baseColumn.getSQLType()}[${typeof this.size === "number" ? this.size : ""}]`;
       }
-      mapFromDriverValue(value2) {
-        if (typeof value2 === "string") {
-          value2 = parsePgArray(value2);
+      mapFromDriverValue(value) {
+        if (typeof value === "string") {
+          value = parsePgArray(value);
         }
-        return value2.map((v) => this.baseColumn.mapFromDriverValue(v));
+        return value.map((v) => this.baseColumn.mapFromDriverValue(v));
       }
-      mapToDriverValue(value2, isNestedArray = false) {
-        const a = value2.map(
+      mapToDriverValue(value, isNestedArray = false) {
+        const a = value.map(
           (v) => v === null ? null : is(this.baseColumn, _PgArray) ? this.baseColumn.mapToDriverValue(v, true) : this.baseColumn.mapToDriverValue(v)
         );
         if (isNestedArray) return a;
@@ -20349,13 +24788,13 @@ var init_common = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/columns/enum.js
+// ../../node_modules/drizzle-orm/pg-core/columns/enum.js
 function isPgEnum(obj) {
   return !!obj && typeof obj === "function" && isPgEnumSym in obj && obj[isPgEnumSym] === true;
 }
 var PgEnumObjectColumnBuilder, PgEnumObjectColumn, isPgEnumSym, PgEnumColumnBuilder, PgEnumColumn;
 var init_enum = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/pg-core/columns/enum.js"() {
+  "../../node_modules/drizzle-orm/pg-core/columns/enum.js"() {
     init_entity();
     init_common();
     PgEnumObjectColumnBuilder = class extends PgColumnBuilder {
@@ -20384,7 +24823,7 @@ var init_enum = __esm({
         return this.enum.enumName;
       }
     };
-    isPgEnumSym = Symbol.for("drizzle:isPgEnum");
+    isPgEnumSym = /* @__PURE__ */ Symbol.for("drizzle:isPgEnum");
     PgEnumColumnBuilder = class extends PgColumnBuilder {
       static [entityKind] = "PgEnumColumnBuilder";
       constructor(name, enumInstance) {
@@ -20414,10 +24853,10 @@ var init_enum = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/subquery.js
+// ../../node_modules/drizzle-orm/subquery.js
 var Subquery, WithSubquery;
 var init_subquery = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/subquery.js"() {
+  "../../node_modules/drizzle-orm/subquery.js"() {
     init_entity();
     Subquery = class {
       static [entityKind] = "Subquery";
@@ -20441,18 +24880,18 @@ var init_subquery = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/version.js
+// ../../node_modules/drizzle-orm/version.js
 var version2;
 var init_version = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/version.js"() {
-    version2 = "0.44.7";
+  "../../node_modules/drizzle-orm/version.js"() {
+    version2 = "0.45.2";
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/tracing.js
+// ../../node_modules/drizzle-orm/tracing.js
 var otel, rawTracer, tracer;
 var init_tracing = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/tracing.js"() {
+  "../../node_modules/drizzle-orm/tracing.js"() {
     init_tracing_utils();
     init_version();
     tracer = {
@@ -20489,15 +24928,15 @@ var init_tracing = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/view-common.js
+// ../../node_modules/drizzle-orm/view-common.js
 var ViewBaseConfig;
 var init_view_common = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/view-common.js"() {
-    ViewBaseConfig = Symbol.for("drizzle:ViewBaseConfig");
+  "../../node_modules/drizzle-orm/view-common.js"() {
+    ViewBaseConfig = /* @__PURE__ */ Symbol.for("drizzle:ViewBaseConfig");
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/table.js
+// ../../node_modules/drizzle-orm/table.js
 function getTableName(table) {
   return table[TableName];
 }
@@ -20506,17 +24945,17 @@ function getTableUniqueName(table) {
 }
 var Schema, Columns, ExtraConfigColumns, OriginalName, BaseName, IsAlias, ExtraConfigBuilder, IsDrizzleTable, Table;
 var init_table = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/table.js"() {
+  "../../node_modules/drizzle-orm/table.js"() {
     init_entity();
     init_table_utils();
-    Schema = Symbol.for("drizzle:Schema");
-    Columns = Symbol.for("drizzle:Columns");
-    ExtraConfigColumns = Symbol.for("drizzle:ExtraConfigColumns");
-    OriginalName = Symbol.for("drizzle:OriginalName");
-    BaseName = Symbol.for("drizzle:BaseName");
-    IsAlias = Symbol.for("drizzle:IsAlias");
-    ExtraConfigBuilder = Symbol.for("drizzle:ExtraConfigBuilder");
-    IsDrizzleTable = Symbol.for("drizzle:IsDrizzleTable");
+    Schema = /* @__PURE__ */ Symbol.for("drizzle:Schema");
+    Columns = /* @__PURE__ */ Symbol.for("drizzle:Columns");
+    ExtraConfigColumns = /* @__PURE__ */ Symbol.for("drizzle:ExtraConfigColumns");
+    OriginalName = /* @__PURE__ */ Symbol.for("drizzle:OriginalName");
+    BaseName = /* @__PURE__ */ Symbol.for("drizzle:BaseName");
+    IsAlias = /* @__PURE__ */ Symbol.for("drizzle:IsAlias");
+    ExtraConfigBuilder = /* @__PURE__ */ Symbol.for("drizzle:ExtraConfigBuilder");
+    IsDrizzleTable = /* @__PURE__ */ Symbol.for("drizzle:IsDrizzleTable");
     Table = class {
       static [entityKind] = "Table";
       /** @internal */
@@ -20566,9 +25005,9 @@ var init_table = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/sql.js
-function isSQLWrapper(value2) {
-  return value2 !== null && value2 !== void 0 && typeof value2.getSQL === "function";
+// ../../node_modules/drizzle-orm/sql/sql.js
+function isSQLWrapper(value) {
+  return value !== null && value !== void 0 && typeof value.getSQL === "function";
 }
 function mergeQueries(queries) {
   const result = { sql: "", params: [] };
@@ -20584,8 +25023,8 @@ function mergeQueries(queries) {
   }
   return result;
 }
-function isDriverValueEncoder(value2) {
-  return typeof value2 === "object" && value2 !== null && "mapToDriverValue" in value2 && typeof value2.mapToDriverValue === "function";
+function isDriverValueEncoder(value) {
+  return typeof value === "object" && value !== null && "mapToDriverValue" in value && typeof value.mapToDriverValue === "function";
 }
 function sql(strings, ...params) {
   const queryChunks = [];
@@ -20599,7 +25038,7 @@ function sql(strings, ...params) {
 }
 var FakePrimitiveParam, StringChunk, SQL, Name, noopDecoder, noopEncoder, noopMapper, Param, Placeholder, IsDrizzleView, View;
 var init_sql = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/sql.js"() {
+  "../../node_modules/drizzle-orm/sql/sql.js"() {
     init_entity();
     init_enum();
     init_subquery();
@@ -20613,8 +25052,8 @@ var init_sql = __esm({
     StringChunk = class {
       static [entityKind] = "StringChunk";
       value;
-      constructor(value2) {
-        this.value = Array.isArray(value2) ? value2 : [value2];
+      constructor(value) {
+        this.value = Array.isArray(value) ? value : [value];
       }
       getSQL() {
         return new SQL([this]);
@@ -20822,8 +25261,8 @@ var init_sql = __esm({
       }
     };
     Name = class {
-      constructor(value2) {
-        this.value = value2;
+      constructor(value) {
+        this.value = value;
       }
       static [entityKind] = "Name";
       brand;
@@ -20832,10 +25271,10 @@ var init_sql = __esm({
       }
     };
     noopDecoder = {
-      mapFromDriverValue: (value2) => value2
+      mapFromDriverValue: (value) => value
     };
     noopEncoder = {
-      mapToDriverValue: (value2) => value2
+      mapToDriverValue: (value) => value
     };
     noopMapper = {
       ...noopDecoder,
@@ -20846,8 +25285,8 @@ var init_sql = __esm({
        * @param value - Parameter value
        * @param encoder - Encoder to convert the value to a driver parameter
        */
-      constructor(value2, encoder = noopEncoder) {
-        this.value = value2;
+      constructor(value, encoder = noopEncoder) {
+        this.value = value;
         this.encoder = encoder;
       }
       static [entityKind] = "Param";
@@ -20880,16 +25319,16 @@ var init_sql = __esm({
         return new SQL(result);
       }
       sql2.join = join4;
-      function identifier(value2) {
-        return new Name(value2);
+      function identifier(value) {
+        return new Name(value);
       }
       sql2.identifier = identifier;
       function placeholder2(name2) {
         return new Placeholder(name2);
       }
       sql2.placeholder = placeholder2;
-      function param2(value2, encoder) {
-        return new Param(value2, encoder);
+      function param2(value, encoder) {
+        return new Param(value, encoder);
       }
       sql2.param = param2;
     })(sql || (sql = {}));
@@ -20921,7 +25360,7 @@ var init_sql = __esm({
         return new SQL([this]);
       }
     };
-    IsDrizzleView = Symbol.for("drizzle:IsDrizzleView");
+    IsDrizzleView = /* @__PURE__ */ Symbol.for("drizzle:IsDrizzleView");
     View = class {
       static [entityKind] = "View";
       /** @internal */
@@ -20955,7 +25394,7 @@ var init_sql = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/alias.js
+// ../../node_modules/drizzle-orm/alias.js
 function aliasedTable(table, tableAlias) {
   return new Proxy(table, new TableAliasProxyHandler(tableAlias, false));
 }
@@ -20984,7 +25423,7 @@ function mapColumnsInSQLToAlias(query, alias) {
 }
 var ColumnAliasProxyHandler, TableAliasProxyHandler, RelationTableAliasProxyHandler;
 var init_alias = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/alias.js"() {
+  "../../node_modules/drizzle-orm/alias.js"() {
     init_column();
     init_entity();
     init_sql();
@@ -21039,11 +25478,11 @@ var init_alias = __esm({
           });
           return proxiedColumns;
         }
-        const value2 = target[prop];
-        if (is(value2, Column)) {
-          return new Proxy(value2, new ColumnAliasProxyHandler(new Proxy(target, this)));
+        const value = target[prop];
+        if (is(value, Column)) {
+          return new Proxy(value, new ColumnAliasProxyHandler(new Proxy(target, this)));
         }
-        return value2;
+        return value;
       }
     };
     RelationTableAliasProxyHandler = class {
@@ -21061,21 +25500,21 @@ var init_alias = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/alias.js
+// ../../node_modules/drizzle-orm/sqlite-core/alias.js
 var init_alias2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/alias.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/alias.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/checks.js
+// ../../node_modules/drizzle-orm/sqlite-core/checks.js
 var CheckBuilder, Check;
 var init_checks3 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/checks.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/checks.js"() {
     init_entity();
     CheckBuilder = class {
-      constructor(name, value2) {
+      constructor(name, value) {
         this.name = name;
-        this.value = value2;
+        this.value = value;
       }
       static [entityKind] = "SQLiteCheckBuilder";
       brand;
@@ -21096,14 +25535,14 @@ var init_checks3 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/utils.js
+// ../../node_modules/drizzle-orm/utils.js
 function orderSelectedFields(fields, pathPrefix) {
   return Object.entries(fields).reduce((result, [name, field]) => {
     if (typeof name !== "string") {
       return result;
     }
     const newPath = pathPrefix ? [...pathPrefix, name] : [name];
-    if (is(field, Column) || is(field, SQL) || is(field, SQL.Aliased)) {
+    if (is(field, Column) || is(field, SQL) || is(field, SQL.Aliased) || is(field, Subquery)) {
       result.push({ path: newPath, field });
     } else if (is(field, Table)) {
       result.push(...orderSelectedFields(field[Table.Symbol.Columns], newPath));
@@ -21127,11 +25566,11 @@ function haveSameKeys(left, right) {
   return true;
 }
 function mapUpdateSet(table, values) {
-  const entries = Object.entries(values).filter(([, value2]) => value2 !== void 0).map(([key, value2]) => {
-    if (is(value2, SQL) || is(value2, Column)) {
-      return [key, value2];
+  const entries = Object.entries(values).filter(([, value]) => value !== void 0).map(([key, value]) => {
+    if (is(value, SQL) || is(value, Column)) {
+      return [key, value];
     } else {
-      return [key, new Param(value2, table[Table.Symbol.Columns][key])];
+      return [key, new Param(value, table[Table.Symbol.Columns][key])];
     }
   });
   if (entries.length === 0) {
@@ -21164,8 +25603,8 @@ function getColumnNameAndConfig(a, b) {
   };
 }
 var textDecoder;
-var init_utils = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/utils.js"() {
+var init_utils2 = __esm({
+  "../../node_modules/drizzle-orm/utils.js"() {
     init_column();
     init_entity();
     init_sql();
@@ -21176,10 +25615,10 @@ var init_utils = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/foreign-keys.js
+// ../../node_modules/drizzle-orm/sqlite-core/foreign-keys.js
 var ForeignKeyBuilder2, ForeignKey2;
 var init_foreign_keys2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/foreign-keys.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/foreign-keys.js"() {
     init_entity();
     init_table_utils();
     ForeignKeyBuilder2 = class {
@@ -21240,13 +25679,13 @@ var init_foreign_keys2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/unique-constraint.js
+// ../../node_modules/drizzle-orm/sqlite-core/unique-constraint.js
 function uniqueKeyName2(table, columns) {
   return `${table[TableName]}_${columns.join("_")}_unique`;
 }
 var UniqueConstraintBuilder2, UniqueOnConstraintBuilder2, UniqueConstraint2;
 var init_unique_constraint2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/unique-constraint.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/unique-constraint.js"() {
     init_entity();
     init_table_utils();
     UniqueConstraintBuilder2 = class {
@@ -21289,10 +25728,10 @@ var init_unique_constraint2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/common.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/common.js
 var SQLiteColumnBuilder, SQLiteColumn;
 var init_common2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/common.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/common.js"() {
     init_column_builder();
     init_column();
     init_entity();
@@ -21350,7 +25789,7 @@ var init_common2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/blob.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/blob.js
 function blob(a, b) {
   const { name, config: config2 } = getColumnNameAndConfig(a, b);
   if (config2?.mode === "json") {
@@ -21363,9 +25802,9 @@ function blob(a, b) {
 }
 var SQLiteBigIntBuilder, SQLiteBigInt, SQLiteBlobJsonBuilder, SQLiteBlobJson, SQLiteBlobBufferBuilder, SQLiteBlobBuffer;
 var init_blob = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/blob.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/blob.js"() {
     init_entity();
-    init_utils();
+    init_utils2();
     init_common2();
     SQLiteBigIntBuilder = class extends SQLiteColumnBuilder {
       static [entityKind] = "SQLiteBigIntBuilder";
@@ -21382,15 +25821,15 @@ var init_blob = __esm({
       getSQLType() {
         return "blob";
       }
-      mapFromDriverValue(value2) {
+      mapFromDriverValue(value) {
         if (typeof Buffer !== "undefined" && Buffer.from) {
-          const buf = Buffer.isBuffer(value2) ? value2 : value2 instanceof ArrayBuffer ? Buffer.from(value2) : value2.buffer ? Buffer.from(value2.buffer, value2.byteOffset, value2.byteLength) : Buffer.from(value2);
+          const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
           return BigInt(buf.toString("utf8"));
         }
-        return BigInt(textDecoder.decode(value2));
+        return BigInt(textDecoder.decode(value));
       }
-      mapToDriverValue(value2) {
-        return Buffer.from(value2.toString());
+      mapToDriverValue(value) {
+        return Buffer.from(value.toString());
       }
     };
     SQLiteBlobJsonBuilder = class extends SQLiteColumnBuilder {
@@ -21411,15 +25850,15 @@ var init_blob = __esm({
       getSQLType() {
         return "blob";
       }
-      mapFromDriverValue(value2) {
+      mapFromDriverValue(value) {
         if (typeof Buffer !== "undefined" && Buffer.from) {
-          const buf = Buffer.isBuffer(value2) ? value2 : value2 instanceof ArrayBuffer ? Buffer.from(value2) : value2.buffer ? Buffer.from(value2.buffer, value2.byteOffset, value2.byteLength) : Buffer.from(value2);
+          const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
           return JSON.parse(buf.toString("utf8"));
         }
-        return JSON.parse(textDecoder.decode(value2));
+        return JSON.parse(textDecoder.decode(value));
       }
-      mapToDriverValue(value2) {
-        return Buffer.from(JSON.stringify(value2));
+      mapToDriverValue(value) {
+        return Buffer.from(JSON.stringify(value));
       }
     };
     SQLiteBlobBufferBuilder = class extends SQLiteColumnBuilder {
@@ -21434,11 +25873,11 @@ var init_blob = __esm({
     };
     SQLiteBlobBuffer = class extends SQLiteColumn {
       static [entityKind] = "SQLiteBlobBuffer";
-      mapFromDriverValue(value2) {
-        if (Buffer.isBuffer(value2)) {
-          return value2;
+      mapFromDriverValue(value) {
+        if (Buffer.isBuffer(value)) {
+          return value;
         }
-        return Buffer.from(value2);
+        return Buffer.from(value);
       }
       getSQLType() {
         return "blob";
@@ -21447,7 +25886,7 @@ var init_blob = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/custom.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/custom.js
 function customType(customTypeParams) {
   return (a, b) => {
     const { name, config: config2 } = getColumnNameAndConfig(a, b);
@@ -21460,9 +25899,9 @@ function customType(customTypeParams) {
 }
 var SQLiteCustomColumnBuilder, SQLiteCustomColumn;
 var init_custom = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/custom.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/custom.js"() {
     init_entity();
-    init_utils();
+    init_utils2();
     init_common2();
     SQLiteCustomColumnBuilder = class extends SQLiteColumnBuilder {
       static [entityKind] = "SQLiteCustomColumnBuilder";
@@ -21493,17 +25932,17 @@ var init_custom = __esm({
       getSQLType() {
         return this.sqlName;
       }
-      mapFromDriverValue(value2) {
-        return typeof this.mapFrom === "function" ? this.mapFrom(value2) : value2;
+      mapFromDriverValue(value) {
+        return typeof this.mapFrom === "function" ? this.mapFrom(value) : value;
       }
-      mapToDriverValue(value2) {
-        return typeof this.mapTo === "function" ? this.mapTo(value2) : value2;
+      mapToDriverValue(value) {
+        return typeof this.mapTo === "function" ? this.mapTo(value) : value;
       }
     };
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/integer.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/integer.js
 function integer2(a, b) {
   const { name, config: config2 } = getColumnNameAndConfig(a, b);
   if (config2?.mode === "timestamp" || config2?.mode === "timestamp_ms") {
@@ -21516,10 +25955,10 @@ function integer2(a, b) {
 }
 var SQLiteBaseIntegerBuilder, SQLiteBaseInteger, SQLiteIntegerBuilder, SQLiteInteger, SQLiteTimestampBuilder, SQLiteTimestamp, SQLiteBooleanBuilder, SQLiteBoolean;
 var init_integer = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/integer.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/integer.js"() {
     init_entity();
     init_sql();
-    init_utils();
+    init_utils2();
     init_common2();
     SQLiteBaseIntegerBuilder = class extends SQLiteColumnBuilder {
       static [entityKind] = "SQLiteBaseIntegerBuilder";
@@ -21581,14 +26020,14 @@ var init_integer = __esm({
     SQLiteTimestamp = class extends SQLiteBaseInteger {
       static [entityKind] = "SQLiteTimestamp";
       mode = this.config.mode;
-      mapFromDriverValue(value2) {
+      mapFromDriverValue(value) {
         if (this.config.mode === "timestamp") {
-          return new Date(value2 * 1e3);
+          return new Date(value * 1e3);
         }
-        return new Date(value2);
+        return new Date(value);
       }
-      mapToDriverValue(value2) {
-        const unix = value2.getTime();
+      mapToDriverValue(value) {
+        const unix = value.getTime();
         if (this.config.mode === "timestamp") {
           return Math.floor(unix / 1e3);
         }
@@ -21611,17 +26050,17 @@ var init_integer = __esm({
     SQLiteBoolean = class extends SQLiteBaseInteger {
       static [entityKind] = "SQLiteBoolean";
       mode = this.config.mode;
-      mapFromDriverValue(value2) {
-        return Number(value2) === 1;
+      mapFromDriverValue(value) {
+        return Number(value) === 1;
       }
-      mapToDriverValue(value2) {
-        return value2 ? 1 : 0;
+      mapToDriverValue(value) {
+        return value ? 1 : 0;
       }
     };
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/numeric.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/numeric.js
 function numeric(a, b) {
   const { name, config: config2 } = getColumnNameAndConfig(a, b);
   const mode = config2?.mode;
@@ -21629,9 +26068,9 @@ function numeric(a, b) {
 }
 var SQLiteNumericBuilder, SQLiteNumeric, SQLiteNumericNumberBuilder, SQLiteNumericNumber, SQLiteNumericBigIntBuilder, SQLiteNumericBigInt;
 var init_numeric = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/numeric.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/numeric.js"() {
     init_entity();
-    init_utils();
+    init_utils2();
     init_common2();
     SQLiteNumericBuilder = class extends SQLiteColumnBuilder {
       static [entityKind] = "SQLiteNumericBuilder";
@@ -21648,9 +26087,9 @@ var init_numeric = __esm({
     };
     SQLiteNumeric = class extends SQLiteColumn {
       static [entityKind] = "SQLiteNumeric";
-      mapFromDriverValue(value2) {
-        if (typeof value2 === "string") return value2;
-        return String(value2);
+      mapFromDriverValue(value) {
+        if (typeof value === "string") return value;
+        return String(value);
       }
       getSQLType() {
         return "numeric";
@@ -21671,9 +26110,9 @@ var init_numeric = __esm({
     };
     SQLiteNumericNumber = class extends SQLiteColumn {
       static [entityKind] = "SQLiteNumericNumber";
-      mapFromDriverValue(value2) {
-        if (typeof value2 === "number") return value2;
-        return Number(value2);
+      mapFromDriverValue(value) {
+        if (typeof value === "number") return value;
+        return Number(value);
       }
       mapToDriverValue = String;
       getSQLType() {
@@ -21704,13 +26143,13 @@ var init_numeric = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/real.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/real.js
 function real(name) {
   return new SQLiteRealBuilder(name ?? "");
 }
 var SQLiteRealBuilder, SQLiteReal;
 var init_real = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/real.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/real.js"() {
     init_entity();
     init_common2();
     SQLiteRealBuilder = class extends SQLiteColumnBuilder {
@@ -21732,7 +26171,7 @@ var init_real = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/text.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/text.js
 function text(a, b = {}) {
   const { name, config: config2 } = getColumnNameAndConfig(a, b);
   if (config2.mode === "json") {
@@ -21742,9 +26181,9 @@ function text(a, b = {}) {
 }
 var SQLiteTextBuilder, SQLiteText, SQLiteTextJsonBuilder, SQLiteTextJson;
 var init_text = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/text.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/text.js"() {
     init_entity();
-    init_utils();
+    init_utils2();
     init_common2();
     SQLiteTextBuilder = class extends SQLiteColumnBuilder {
       static [entityKind] = "SQLiteTextBuilder";
@@ -21790,19 +26229,19 @@ var init_text = __esm({
       getSQLType() {
         return "text";
       }
-      mapFromDriverValue(value2) {
-        return JSON.parse(value2);
+      mapFromDriverValue(value) {
+        return JSON.parse(value);
       }
-      mapToDriverValue(value2) {
-        return JSON.stringify(value2);
+      mapToDriverValue(value) {
+        return JSON.stringify(value);
       }
     };
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/index.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/index.js
 var init_columns = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/index.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/index.js"() {
     init_blob();
     init_common2();
     init_custom();
@@ -21813,10 +26252,10 @@ var init_columns = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/selection-proxy.js
+// ../../node_modules/drizzle-orm/selection-proxy.js
 var SelectionProxyHandler;
 var init_selection_proxy = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/selection-proxy.js"() {
+  "../../node_modules/drizzle-orm/selection-proxy.js"() {
     init_alias();
     init_column();
     init_entity();
@@ -21852,50 +26291,50 @@ var init_selection_proxy = __esm({
           return subquery[prop];
         }
         const columns = is(subquery, Subquery) ? subquery._.selectedFields : is(subquery, View) ? subquery[ViewBaseConfig].selectedFields : subquery;
-        const value2 = columns[prop];
-        if (is(value2, SQL.Aliased)) {
-          if (this.config.sqlAliasedBehavior === "sql" && !value2.isSelectionField) {
-            return value2.sql;
+        const value = columns[prop];
+        if (is(value, SQL.Aliased)) {
+          if (this.config.sqlAliasedBehavior === "sql" && !value.isSelectionField) {
+            return value.sql;
           }
-          const newValue = value2.clone();
+          const newValue = value.clone();
           newValue.isSelectionField = true;
           return newValue;
         }
-        if (is(value2, SQL)) {
+        if (is(value, SQL)) {
           if (this.config.sqlBehavior === "sql") {
-            return value2;
+            return value;
           }
           throw new Error(
             `You tried to reference "${prop}" field from a subquery, which is a raw SQL field, but it doesn't have an alias declared. Please add an alias to the field using ".as('alias')" method.`
           );
         }
-        if (is(value2, Column)) {
+        if (is(value, Column)) {
           if (this.config.alias) {
             return new Proxy(
-              value2,
+              value,
               new ColumnAliasProxyHandler(
                 new Proxy(
-                  value2.table,
+                  value.table,
                   new TableAliasProxyHandler(this.config.alias, this.config.replaceOriginalName ?? false)
                 )
               )
             );
           }
-          return value2;
+          return value;
         }
-        if (typeof value2 !== "object" || value2 === null) {
-          return value2;
+        if (typeof value !== "object" || value === null) {
+          return value;
         }
-        return new Proxy(value2, new _SelectionProxyHandler(this.config));
+        return new Proxy(value, new _SelectionProxyHandler(this.config));
       }
     };
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/query-promise.js
+// ../../node_modules/drizzle-orm/query-promise.js
 var QueryPromise;
 var init_query_promise = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/query-promise.js"() {
+  "../../node_modules/drizzle-orm/query-promise.js"() {
     init_entity();
     QueryPromise = class {
       static [entityKind] = "QueryPromise";
@@ -21905,9 +26344,9 @@ var init_query_promise = __esm({
       }
       finally(onFinally) {
         return this.then(
-          (value2) => {
+          (value) => {
             onFinally?.();
-            return value2;
+            return value;
           },
           (reason) => {
             onFinally?.();
@@ -21922,7 +26361,7 @@ var init_query_promise = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/all.js
+// ../../node_modules/drizzle-orm/sqlite-core/columns/all.js
 function getSQLiteColumnBuilders() {
   return {
     blob,
@@ -21934,7 +26373,7 @@ function getSQLiteColumnBuilders() {
   };
 }
 var init_all = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/columns/all.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/columns/all.js"() {
     init_blob();
     init_custom();
     init_integer();
@@ -21944,7 +26383,7 @@ var init_all = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/table.js
+// ../../node_modules/drizzle-orm/sqlite-core/table.js
 function sqliteTableBase(name, columns, extraConfig, schema, baseName = name) {
   const rawTable = new SQLiteTable(name, schema, baseName);
   const parsedColumns = typeof columns === "function" ? columns(getSQLiteColumnBuilders()) : columns;
@@ -21967,11 +26406,11 @@ function sqliteTableBase(name, columns, extraConfig, schema, baseName = name) {
 }
 var InlineForeignKeys, SQLiteTable, sqliteTable;
 var init_table2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/table.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/table.js"() {
     init_entity();
     init_table();
     init_all();
-    InlineForeignKeys = Symbol.for("drizzle:SQLiteInlineForeignKeys");
+    InlineForeignKeys = /* @__PURE__ */ Symbol.for("drizzle:SQLiteInlineForeignKeys");
     SQLiteTable = class extends Table {
       static [entityKind] = "SQLiteTable";
       /** @internal */
@@ -21991,13 +26430,13 @@ var init_table2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/indexes.js
+// ../../node_modules/drizzle-orm/sqlite-core/indexes.js
 function index(name) {
   return new IndexBuilderOn(name, false);
 }
 var IndexBuilderOn, IndexBuilder, Index;
 var init_indexes = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/indexes.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/indexes.js"() {
     init_entity();
     IndexBuilderOn = class {
       constructor(name, unique) {
@@ -22043,10 +26482,10 @@ var init_indexes = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/primary-keys.js
+// ../../node_modules/drizzle-orm/sqlite-core/primary-keys.js
 var PrimaryKeyBuilder, PrimaryKey;
 var init_primary_keys = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/primary-keys.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/primary-keys.js"() {
     init_entity();
     init_table2();
     PrimaryKeyBuilder = class {
@@ -22080,7 +26519,7 @@ var init_primary_keys = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/utils.js
+// ../../node_modules/drizzle-orm/sqlite-core/utils.js
 function extractUsedTable(table) {
   if (is(table, SQLiteTable)) {
     return [`${table[Table.Symbol.BaseName]}`];
@@ -22093,8 +26532,8 @@ function extractUsedTable(table) {
   }
   return [];
 }
-var init_utils2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/utils.js"() {
+var init_utils3 = __esm({
+  "../../node_modules/drizzle-orm/sqlite-core/utils.js"() {
     init_entity();
     init_sql();
     init_subquery();
@@ -22103,17 +26542,17 @@ var init_utils2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/delete.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/delete.js
 var SQLiteDeleteBase;
 var init_delete = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/delete.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/delete.js"() {
     init_entity();
     init_query_promise();
     init_selection_proxy();
     init_table2();
     init_table();
-    init_utils();
     init_utils2();
+    init_utils3();
     SQLiteDeleteBase = class extends QueryPromise {
       constructor(table, session, dialect, withList) {
         super();
@@ -22229,7 +26668,7 @@ var init_delete = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/casing.js
+// ../../node_modules/drizzle-orm/casing.js
 function toSnakeCase(input) {
   const words = input.replace(/['\u2019]/g, "").match(/[\da-z]+|[A-Z]+(?![a-z])|[A-Z][\da-z]+/g) ?? [];
   return words.map((word) => word.toLowerCase()).join("_");
@@ -22246,7 +26685,7 @@ function noopCase(input) {
 }
 var CasingCache;
 var init_casing = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/casing.js"() {
+  "../../node_modules/drizzle-orm/casing.js"() {
     init_entity();
     init_table();
     CasingCache = class {
@@ -22288,10 +26727,10 @@ var init_casing = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/errors.js
+// ../../node_modules/drizzle-orm/errors.js
 var DrizzleError, DrizzleQueryError, TransactionRollbackError;
 var init_errors3 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/errors.js"() {
+  "../../node_modules/drizzle-orm/errors.js"() {
     init_entity();
     DrizzleError = class extends Error {
       static [entityKind] = "DrizzleError";
@@ -22321,12 +26760,12 @@ params: ${params}`);
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/conditions.js
-function bindIfParam(value2, column) {
-  if (isDriverValueEncoder(column) && !isSQLWrapper(value2) && !is(value2, Param) && !is(value2, Placeholder) && !is(value2, Column) && !is(value2, Table) && !is(value2, View)) {
-    return new Param(value2, column);
+// ../../node_modules/drizzle-orm/sql/expressions/conditions.js
+function bindIfParam(value, column) {
+  if (isDriverValueEncoder(column) && !isSQLWrapper(value) && !is(value, Param) && !is(value, Placeholder) && !is(value, Column) && !is(value, Table) && !is(value, View)) {
+    return new Param(value, column);
   }
-  return value2;
+  return value;
 }
 function and(...unfilteredConditions) {
   const conditions = unfilteredConditions.filter(
@@ -22381,11 +26820,11 @@ function notInArray(column, values) {
   }
   return sql`${column} not in ${bindIfParam(values, column)}`;
 }
-function isNull(value2) {
-  return sql`${value2} is null`;
+function isNull(value) {
+  return sql`${value} is null`;
 }
-function isNotNull(value2) {
-  return sql`${value2} is not null`;
+function isNotNull(value) {
+  return sql`${value} is not null`;
 }
 function exists(subquery) {
   return sql`exists ${subquery}`;
@@ -22405,21 +26844,21 @@ function notBetween(column, min, max) {
     column
   )} and ${bindIfParam(max, column)}`;
 }
-function like(column, value2) {
-  return sql`${column} like ${value2}`;
+function like(column, value) {
+  return sql`${column} like ${value}`;
 }
-function notLike(column, value2) {
-  return sql`${column} not like ${value2}`;
+function notLike(column, value) {
+  return sql`${column} not like ${value}`;
 }
-function ilike(column, value2) {
-  return sql`${column} ilike ${value2}`;
+function ilike(column, value) {
+  return sql`${column} ilike ${value}`;
 }
-function notIlike(column, value2) {
-  return sql`${column} not ilike ${value2}`;
+function notIlike(column, value) {
+  return sql`${column} not ilike ${value}`;
 }
 var eq, ne, gt, gte, lt, lte;
 var init_conditions = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/conditions.js"() {
+  "../../node_modules/drizzle-orm/sql/expressions/conditions.js"() {
     init_column();
     init_entity();
     init_table();
@@ -22445,7 +26884,7 @@ var init_conditions = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/select.js
+// ../../node_modules/drizzle-orm/sql/expressions/select.js
 function asc(column) {
   return sql`${column} asc`;
 }
@@ -22453,20 +26892,20 @@ function desc(column) {
   return sql`${column} desc`;
 }
 var init_select = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/select.js"() {
+  "../../node_modules/drizzle-orm/sql/expressions/select.js"() {
     init_sql();
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/index.js
+// ../../node_modules/drizzle-orm/sql/expressions/index.js
 var init_expressions = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/expressions/index.js"() {
+  "../../node_modules/drizzle-orm/sql/expressions/index.js"() {
     init_conditions();
     init_select();
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/relations.js
+// ../../node_modules/drizzle-orm/relations.js
 function getOperators() {
   return {
     and,
@@ -22549,7 +26988,7 @@ function normalizeRelation(schema, tableNamesMap, relation) {
     `There is not enough information to infer relation "${sourceTableTsName}.${relation.fieldName}"`
   );
 }
-function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelection, mapColumnValue = (value2) => value2) {
+function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelection, mapColumnValue = (value) => value) {
   const result = {};
   for (const [
     selectionItemIndex,
@@ -22575,7 +27014,7 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
         )
       );
     } else {
-      const value2 = mapColumnValue(row[selectionItemIndex]);
+      const value = mapColumnValue(row[selectionItemIndex]);
       const field = selectionItem.field;
       let decoder;
       if (is(field, Column)) {
@@ -22585,14 +27024,14 @@ function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelect
       } else {
         decoder = field.sql.decoder;
       }
-      result[selectionItem.tsKey] = value2 === null ? null : decoder.mapFromDriverValue(value2);
+      result[selectionItem.tsKey] = value === null ? null : decoder.mapFromDriverValue(value);
     }
   }
   return result;
 }
 var Relation, Relations, One, Many;
 var init_relations = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/relations.js"() {
+  "../../node_modules/drizzle-orm/relations.js"() {
     init_table();
     init_column();
     init_entity();
@@ -22653,39 +27092,39 @@ var init_relations = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/aggregate.js
+// ../../node_modules/drizzle-orm/sql/functions/aggregate.js
 var init_aggregate = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/aggregate.js"() {
+  "../../node_modules/drizzle-orm/sql/functions/aggregate.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/vector.js
+// ../../node_modules/drizzle-orm/sql/functions/vector.js
 var init_vector = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/vector.js"() {
+  "../../node_modules/drizzle-orm/sql/functions/vector.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/index.js
+// ../../node_modules/drizzle-orm/sql/functions/index.js
 var init_functions = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/functions/index.js"() {
+  "../../node_modules/drizzle-orm/sql/functions/index.js"() {
     init_aggregate();
     init_vector();
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/index.js
+// ../../node_modules/drizzle-orm/sql/index.js
 var init_sql2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sql/index.js"() {
+  "../../node_modules/drizzle-orm/sql/index.js"() {
     init_expressions();
     init_functions();
     init_sql();
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/view-base.js
+// ../../node_modules/drizzle-orm/sqlite-core/view-base.js
 var SQLiteViewBase;
 var init_view_base = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/view-base.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/view-base.js"() {
     init_entity();
     init_sql();
     SQLiteViewBase = class extends View {
@@ -22694,10 +27133,10 @@ var init_view_base = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/dialect.js
+// ../../node_modules/drizzle-orm/sqlite-core/dialect.js
 var SQLiteDialect, SQLiteSyncDialect, SQLiteAsyncDialect;
 var init_dialect = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/dialect.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/dialect.js"() {
     init_alias();
     init_casing();
     init_column();
@@ -22710,7 +27149,7 @@ var init_dialect = __esm({
     init_table2();
     init_subquery();
     init_table();
-    init_utils();
+    init_utils2();
     init_view_common();
     init_view_base();
     SQLiteDialect = class {
@@ -22721,7 +27160,7 @@ var init_dialect = __esm({
         this.casing = new CasingCache(config2?.casing);
       }
       escapeName(name) {
-        return `"${name}"`;
+        return `"${name.replace(/"/g, '""')}"`;
       }
       escapeParam(_num) {
         return "?";
@@ -22741,7 +27180,14 @@ var init_dialect = __esm({
         withSqlChunks.push(sql` `);
         return sql.join(withSqlChunks);
       }
-      buildDeleteQuery({ table, where, returning, withList, limit, orderBy }) {
+      buildDeleteQuery({
+        table,
+        where,
+        returning,
+        withList,
+        limit,
+        orderBy
+      }) {
         const withSql = this.buildWithCTE(withList);
         const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
         const whereSql = where ? sql` where ${where}` : void 0;
@@ -22755,17 +27201,30 @@ var init_dialect = __esm({
           (colName) => set2[colName] !== void 0 || tableColumns[colName]?.onUpdateFn !== void 0
         );
         const setSize = columnNames.length;
-        return sql.join(columnNames.flatMap((colName, i) => {
-          const col = tableColumns[colName];
-          const value2 = set2[colName] ?? sql.param(col.onUpdateFn(), col);
-          const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value2}`;
-          if (i < setSize - 1) {
-            return [res, sql.raw(", ")];
-          }
-          return [res];
-        }));
+        return sql.join(
+          columnNames.flatMap((colName, i) => {
+            const col = tableColumns[colName];
+            const onUpdateFnResult = col.onUpdateFn?.();
+            const value = set2[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
+            const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
+            if (i < setSize - 1) {
+              return [res, sql.raw(", ")];
+            }
+            return [res];
+          })
+        );
       }
-      buildUpdateQuery({ table, set: set2, where, returning, withList, joins, from, limit, orderBy }) {
+      buildUpdateQuery({
+        table,
+        set: set2,
+        where,
+        returning,
+        withList,
+        joins,
+        from,
+        limit,
+        orderBy
+      }) {
         const withSql = this.buildWithCTE(withList);
         const setSql = this.buildUpdateSet(table, set2);
         const fromSql = from && sql.join([sql.raw(" from "), this.buildFromTable(from)]);
@@ -22816,7 +27275,9 @@ var init_dialect = __esm({
             const tableName = field.table[Table.Symbol.Name];
             if (field.columnType === "SQLiteNumericBigInt") {
               if (isSingleTable) {
-                chunk.push(sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`);
+                chunk.push(
+                  sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`
+                );
               } else {
                 chunk.push(
                   sql`cast(${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))} as text)`
@@ -22826,9 +27287,19 @@ var init_dialect = __esm({
               if (isSingleTable) {
                 chunk.push(sql.identifier(this.casing.getColumnCasing(field)));
               } else {
-                chunk.push(sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`);
+                chunk.push(
+                  sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`
+                );
               }
             }
+          } else if (is(field, Subquery)) {
+            const entries = Object.entries(field._.selectedFields);
+            if (entries.length === 1) {
+              const entry = entries[0][1];
+              const fieldDecoder = is(entry, SQL) ? entry.decoder : is(entry, Column) ? { mapFromDriverValue: (v) => entry.mapFromDriverValue(v) } : entry.sql.decoder;
+              if (fieldDecoder) field._.sql.decoder = fieldDecoder;
+            }
+            chunk.push(field);
           }
           if (i < columnsLen - 1) {
             chunk.push(sql`, `);
@@ -22855,7 +27326,9 @@ var init_dialect = __esm({
               const origTableName = table[SQLiteTable.Symbol.OriginalName];
               const alias = tableName === origTableName ? void 0 : joinMeta.alias;
               joinsArray.push(
-                sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(origTableName)}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
+                sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(
+                  origTableName
+                )}${alias && sql` ${sql.identifier(alias)}`}${onSql}`
               );
             } else {
               joinsArray.push(
@@ -22886,7 +27359,9 @@ var init_dialect = __esm({
       }
       buildFromTable(table) {
         if (is(table, Table) && table[Table.Symbol.IsAlias]) {
-          return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(table[Table.Symbol.OriginalName])} ${sql.identifier(table[Table.Symbol.Name])}`;
+          return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(
+            table[Table.Symbol.OriginalName]
+          )} ${sql.identifier(table[Table.Symbol.Name])}`;
         }
         return table;
       }
@@ -22912,7 +27387,9 @@ var init_dialect = __esm({
           ))(f.field.table)) {
             const tableName = getTableName(f.field.table);
             throw new Error(
-              `Your "${f.path.join("->")}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
+              `Your "${f.path.join(
+                "->"
+              )}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`
             );
           }
         }
@@ -22972,7 +27449,9 @@ var init_dialect = __esm({
               for (let i = 0; i < singleOrderBy.queryChunks.length; i++) {
                 const chunk = singleOrderBy.queryChunks[i];
                 if (is(chunk, SQLiteColumn)) {
-                  singleOrderBy.queryChunks[i] = sql.identifier(this.casing.getColumnCasing(chunk));
+                  singleOrderBy.queryChunks[i] = sql.identifier(
+                    this.casing.getColumnCasing(chunk)
+                  );
                 }
               }
               orderByValues.push(sql`${singleOrderBy}`);
@@ -22987,7 +27466,14 @@ var init_dialect = __esm({
         const offsetSql = offset ? sql` offset ${offset}` : void 0;
         return sql`${leftChunk}${operatorChunk}${rightChunk}${orderBySql}${limitSql}${offsetSql}`;
       }
-      buildInsertQuery({ table, values: valuesOrSelect, onConflict, returning, withList, select }) {
+      buildInsertQuery({
+        table,
+        values: valuesOrSelect,
+        onConflict,
+        returning,
+        withList,
+        select
+      }) {
         const valuesSqlList = [];
         const columns = table[Table.Symbol.Columns];
         const colEntries = Object.entries(columns).filter(
@@ -23004,10 +27490,10 @@ var init_dialect = __esm({
         } else {
           const values = valuesOrSelect;
           valuesSqlList.push(sql.raw("values "));
-          for (const [valueIndex, value2] of values.entries()) {
+          for (const [valueIndex, value] of values.entries()) {
             const valueList = [];
             for (const [fieldName, col] of colEntries) {
-              const colValue = value2[fieldName];
+              const colValue = value[fieldName];
               if (colValue === void 0 || is(colValue, Param) && colValue.value === void 0) {
                 let defaultValue;
                 if (col.default !== null && col.default !== void 0) {
@@ -23063,17 +27549,20 @@ var init_dialect = __esm({
         const joins = [];
         if (config2 === true) {
           const selectionEntries = Object.entries(tableConfig.columns);
-          selection = selectionEntries.map(([key, value2]) => ({
-            dbKey: value2.name,
+          selection = selectionEntries.map(([key, value]) => ({
+            dbKey: value.name,
             tsKey: key,
-            field: aliasedTableColumn(value2, tableAlias),
+            field: aliasedTableColumn(value, tableAlias),
             relationTableTsKey: void 0,
             isJson: false,
             selection: []
           }));
         } else {
           const aliasedColumns = Object.fromEntries(
-            Object.entries(tableConfig.columns).map(([key, value2]) => [key, aliasedTableColumn(value2, tableAlias)])
+            Object.entries(tableConfig.columns).map(([key, value]) => [
+              key,
+              aliasedTableColumn(value, tableAlias)
+            ])
           );
           if (config2.where) {
             const whereSql = typeof config2.where === "function" ? config2.where(aliasedColumns, getOperators()) : config2.where;
@@ -23083,19 +27572,21 @@ var init_dialect = __esm({
           let selectedColumns = [];
           if (config2.columns) {
             let isIncludeMode = false;
-            for (const [field, value2] of Object.entries(config2.columns)) {
-              if (value2 === void 0) {
+            for (const [field, value] of Object.entries(config2.columns)) {
+              if (value === void 0) {
                 continue;
               }
               if (field in tableConfig.columns) {
-                if (!isIncludeMode && value2 === true) {
+                if (!isIncludeMode && value === true) {
                   isIncludeMode = true;
                 }
                 selectedColumns.push(field);
               }
             }
             if (selectedColumns.length > 0) {
-              selectedColumns = isIncludeMode ? selectedColumns.filter((c) => config2.columns?.[c] === true) : Object.keys(tableConfig.columns).filter((key) => !selectedColumns.includes(key));
+              selectedColumns = isIncludeMode ? selectedColumns.filter((c) => config2.columns?.[c] === true) : Object.keys(tableConfig.columns).filter(
+                (key) => !selectedColumns.includes(key)
+              );
             }
           } else {
             selectedColumns = Object.keys(tableConfig.columns);
@@ -23106,23 +27597,29 @@ var init_dialect = __esm({
           }
           let selectedRelations = [];
           if (config2.with) {
-            selectedRelations = Object.entries(config2.with).filter((entry) => !!entry[1]).map(([tsKey, queryConfig]) => ({ tsKey, queryConfig, relation: tableConfig.relations[tsKey] }));
+            selectedRelations = Object.entries(config2.with).filter(
+              (entry) => !!entry[1]
+            ).map(([tsKey, queryConfig]) => ({
+              tsKey,
+              queryConfig,
+              relation: tableConfig.relations[tsKey]
+            }));
           }
           let extras;
           if (config2.extras) {
             extras = typeof config2.extras === "function" ? config2.extras(aliasedColumns, { sql }) : config2.extras;
-            for (const [tsKey, value2] of Object.entries(extras)) {
+            for (const [tsKey, value] of Object.entries(extras)) {
               fieldsSelection.push({
                 tsKey,
-                value: mapColumnsInAliasedSQLToAlias(value2, tableAlias)
+                value: mapColumnsInAliasedSQLToAlias(value, tableAlias)
               });
             }
           }
-          for (const { tsKey, value: value2 } of fieldsSelection) {
+          for (const { tsKey, value } of fieldsSelection) {
             selection.push({
-              dbKey: is(value2, SQL.Aliased) ? value2.fieldAlias : tableConfig.columns[tsKey].name,
+              dbKey: is(value, SQL.Aliased) ? value.fieldAlias : tableConfig.columns[tsKey].name,
               tsKey,
-              field: is(value2, Column) ? aliasedTableColumn(value2, tableAlias) : value2,
+              field: is(value, Column) ? aliasedTableColumn(value, tableAlias) : value,
               relationTableTsKey: void 0,
               isJson: false,
               selection: []
@@ -23145,14 +27642,21 @@ var init_dialect = __esm({
             queryConfig: selectedRelationConfigValue,
             relation
           } of selectedRelations) {
-            const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
+            const normalizedRelation = normalizeRelation(
+              schema,
+              tableNamesMap,
+              relation
+            );
             const relationTableName = getTableUniqueName(relation.referencedTable);
             const relationTableTsName = tableNamesMap[relationTableName];
             const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
             const joinOn2 = and(
               ...normalizedRelation.fields.map(
                 (field2, i) => eq(
-                  aliasedTableColumn(normalizedRelation.references[i], relationTableAlias),
+                  aliasedTableColumn(
+                    normalizedRelation.references[i],
+                    relationTableAlias
+                  ),
                   aliasedTableColumn(field2, tableAlias)
                 )
               )
@@ -23196,14 +27700,16 @@ var init_dialect = __esm({
           if (is(nestedQueryRelation, Many)) {
             field = sql`coalesce(json_group_array(${field}), json_array())`;
           }
-          const nestedSelection = [{
-            dbKey: "data",
-            tsKey: "data",
-            field: field.as("data"),
-            isJson: true,
-            relationTableTsKey: tableConfig.tsName,
-            selection
-          }];
+          const nestedSelection = [
+            {
+              dbKey: "data",
+              tsKey: "data",
+              field: field.as("data"),
+              isJson: true,
+              relationTableTsKey: tableConfig.tsName,
+              selection
+            }
+          ];
           const needsSubquery = limit !== void 0 || offset !== void 0 || orderBy.length > 0;
           if (needsSubquery) {
             result = this.buildSelectQuery({
@@ -23289,7 +27795,9 @@ var init_dialect = __esm({
                 session.run(sql.raw(stmt));
               }
               session.run(
-                sql`INSERT INTO ${sql.identifier(migrationsTable)} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
+                sql`INSERT INTO ${sql.identifier(
+                  migrationsTable
+                )} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
               );
             }
           }
@@ -23323,7 +27831,9 @@ var init_dialect = __esm({
                 await tx.run(sql.raw(stmt));
               }
               await tx.run(
-                sql`INSERT INTO ${sql.identifier(migrationsTable)} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
+                sql`INSERT INTO ${sql.identifier(
+                  migrationsTable
+                )} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`
               );
             }
           }
@@ -23333,10 +27843,10 @@ var init_dialect = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/query-builders/query-builder.js
+// ../../node_modules/drizzle-orm/query-builders/query-builder.js
 var TypedQueryBuilder;
 var init_query_builder = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/query-builders/query-builder.js"() {
+  "../../node_modules/drizzle-orm/query-builders/query-builder.js"() {
     init_entity();
     TypedQueryBuilder = class {
       static [entityKind] = "TypedQueryBuilder";
@@ -23348,7 +27858,7 @@ var init_query_builder = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/select.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/select.js
 function createSetOperator(type, isAll) {
   return (leftSelect, rightSelect, ...restSelects) => {
     const setOperators = [rightSelect, ...restSelects].map((select) => ({
@@ -23368,7 +27878,7 @@ function createSetOperator(type, isAll) {
 }
 var SQLiteSelectBuilder, SQLiteSelectQueryBuilderBase, SQLiteSelectBase, getSQLiteSetOperators, union2, unionAll, intersect, except;
 var init_select2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/select.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/select.js"() {
     init_entity();
     init_query_builder();
     init_query_promise();
@@ -23376,9 +27886,9 @@ var init_select2 = __esm({
     init_sql();
     init_subquery();
     init_table();
-    init_utils();
-    init_view_common();
     init_utils2();
+    init_view_common();
+    init_utils3();
     init_view_base();
     SQLiteSelectBuilder = class {
       static [entityKind] = "SQLiteSelectBuilder";
@@ -24029,10 +28539,10 @@ var init_select2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js
 var QueryBuilder;
 var init_query_builder2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js"() {
     init_entity();
     init_selection_proxy();
     init_dialect();
@@ -24107,17 +28617,17 @@ var init_query_builder2 = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/insert.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/insert.js
 var SQLiteInsertBuilder, SQLiteInsertBase;
 var init_insert = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/insert.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/insert.js"() {
     init_entity();
     init_query_promise();
     init_sql();
     init_table2();
     init_table();
-    init_utils();
     init_utils2();
+    init_utils3();
     init_query_builder2();
     SQLiteInsertBuilder = class {
       constructor(table, session, dialect, withList) {
@@ -24293,25 +28803,25 @@ var init_insert = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/select.types.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/select.types.js
 var init_select_types = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/select.types.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/select.types.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/update.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/update.js
 var SQLiteUpdateBuilder, SQLiteUpdateBase;
 var init_update = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/update.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/update.js"() {
     init_entity();
     init_query_promise();
     init_selection_proxy();
     init_table2();
     init_subquery();
     init_table();
-    init_utils();
-    init_view_common();
     init_utils2();
+    init_view_common();
+    init_utils3();
     init_view_base();
     SQLiteUpdateBuilder = class {
       constructor(table, session, dialect, withList) {
@@ -24480,9 +28990,9 @@ var init_update = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/index.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/index.js
 var init_query_builders = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/index.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/index.js"() {
     init_delete();
     init_insert();
     init_query_builder2();
@@ -24492,10 +29002,10 @@ var init_query_builders = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/count.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/count.js
 var SQLiteCountBuilder;
 var init_count = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/count.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/count.js"() {
     init_entity();
     init_sql();
     SQLiteCountBuilder = class _SQLiteCountBuilder extends SQL {
@@ -24529,9 +29039,9 @@ var init_count = __esm({
       }
       finally(onFinally) {
         return this.then(
-          (value2) => {
+          (value) => {
             onFinally?.();
-            return value2;
+            return value;
           },
           (reason) => {
             onFinally?.();
@@ -24543,10 +29053,10 @@ var init_count = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/query.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/query.js
 var RelationalQueryBuilder, SQLiteRelationalQuery, SQLiteSyncRelationalQuery;
 var init_query = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/query.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/query.js"() {
     init_entity();
     init_query_promise();
     init_relations();
@@ -24695,10 +29205,10 @@ var init_query = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/raw.js
+// ../../node_modules/drizzle-orm/sqlite-core/query-builders/raw.js
 var SQLiteRaw;
 var init_raw = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/query-builders/raw.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/query-builders/raw.js"() {
     init_entity();
     init_query_promise();
     SQLiteRaw = class extends QueryPromise {
@@ -24730,10 +29240,10 @@ var init_raw = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/db.js
+// ../../node_modules/drizzle-orm/sqlite-core/db.js
 var BaseSQLiteDatabase;
 var init_db = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/db.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/db.js"() {
     init_entity();
     init_selection_proxy();
     init_sql();
@@ -25034,7 +29544,7 @@ var init_db = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/cache/core/cache.js
+// ../../node_modules/drizzle-orm/cache/core/cache.js
 async function hashQuery(sql2, params) {
   const dataToHash = `${sql2}-${JSON.stringify(params)}`;
   const encoder = new TextEncoder();
@@ -25046,7 +29556,7 @@ async function hashQuery(sql2, params) {
 }
 var Cache, NoopCache;
 var init_cache = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/cache/core/cache.js"() {
+  "../../node_modules/drizzle-orm/cache/core/cache.js"() {
     init_entity();
     Cache = class {
       static [entityKind] = "Cache";
@@ -25067,10 +29577,10 @@ var init_cache = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/session.js
+// ../../node_modules/drizzle-orm/sqlite-core/session.js
 var ExecuteResultSync, SQLitePreparedQuery, SQLiteSession, SQLiteTransaction;
 var init_session = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/session.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/session.js"() {
     init_cache();
     init_entity();
     init_errors3();
@@ -25273,19 +29783,19 @@ var init_session = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/subquery.js
+// ../../node_modules/drizzle-orm/sqlite-core/subquery.js
 var init_subquery2 = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/subquery.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/subquery.js"() {
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/view.js
+// ../../node_modules/drizzle-orm/sqlite-core/view.js
 var ViewBuilderCore, ViewBuilder, ManualViewBuilder, SQLiteView;
 var init_view = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/view.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/view.js"() {
     init_entity();
     init_selection_proxy();
-    init_utils();
+    init_utils2();
     init_query_builder2();
     init_table2();
     init_view_base();
@@ -25376,9 +29886,9 @@ var init_view = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/index.js
+// ../../node_modules/drizzle-orm/sqlite-core/index.js
 var init_sqlite_core = __esm({
-  "../../node_modules/.pnpm/drizzle-orm@0.44.7_@opentelemetry+api@1.9.1_@types+better-sqlite3@7.6.13_@types+pg@8.15.6_better-sqlite3@12.9.0/node_modules/drizzle-orm/sqlite-core/index.js"() {
+  "../../node_modules/drizzle-orm/sqlite-core/index.js"() {
     init_alias2();
     init_checks3();
     init_columns();
@@ -25392,12 +29902,12 @@ var init_sqlite_core = __esm({
     init_subquery2();
     init_table2();
     init_unique_constraint2();
-    init_utils2();
+    init_utils3();
     init_view();
   }
 });
 
-// ../../packages/db/src/task-queue.ts
+// ../../node_modules/@vidbee/db/src/task-queue.ts
 var task_queue_exports = {};
 __export(task_queue_exports, {
   TASK_QUEUE_DDL_V1: () => TASK_QUEUE_DDL_V1,
@@ -25408,8 +29918,7 @@ __export(task_queue_exports, {
 });
 var tasksTable, attemptsTable, processJournalTable, schemaMetaTable, TASK_QUEUE_DDL_V1;
 var init_task_queue = __esm({
-  "../../packages/db/src/task-queue.ts"() {
-    "use strict";
+  "../../node_modules/@vidbee/db/src/task-queue.ts"() {
     init_sqlite_core();
     tasksTable = sqliteTable(
       "tasks",
@@ -25545,6 +30054,609 @@ INSERT INTO schema_meta (key, value) VALUES ('task_queue_version', '1')
 `;
   }
 });
+
+// src/parser/redact.ts
+var REDACTED = "<redacted>";
+var VALUE_FLAGS_FULL = /* @__PURE__ */ new Set([
+  "--username",
+  "--password",
+  "--video-password",
+  "--ap-password",
+  "--twofactor",
+  "--ap-username"
+]);
+var HEADER_FLAGS = /* @__PURE__ */ new Set(["--add-headers", "--add-header"]);
+var SENSITIVE_HEADER_NAMES = /* @__PURE__ */ new Set([
+  "authorization",
+  "cookie",
+  "set-cookie",
+  "token",
+  "x-token",
+  "bearer",
+  "x-auth",
+  "x-auth-token",
+  "proxy-authorization"
+]);
+var SENSITIVE_QUERY_KEYS = /* @__PURE__ */ new Set([
+  "token",
+  "access_token",
+  "auth_token",
+  "id_token",
+  "signature",
+  "sig",
+  "policy",
+  "key",
+  "secret",
+  "apikey",
+  "api_key",
+  "password",
+  "pass",
+  "pwd"
+]);
+function redactArgs(args) {
+  const out = [];
+  let redacted = false;
+  for (let i = 0; i < args.length; i++) {
+    const tok = args[i];
+    if (tok === void 0) continue;
+    const eq2 = tok.indexOf("=");
+    const head = eq2 === -1 ? tok : tok.slice(0, eq2);
+    const inline = eq2 === -1 ? null : tok.slice(eq2 + 1);
+    if (VALUE_FLAGS_FULL.has(head)) {
+      if (inline !== null) {
+        out.push(`${head}=${REDACTED}`);
+        redacted = true;
+      } else {
+        out.push(head);
+        if (i + 1 < args.length) {
+          out.push(REDACTED);
+          redacted = true;
+          i += 1;
+        }
+      }
+      continue;
+    }
+    if (HEADER_FLAGS.has(head)) {
+      const consumed = handleHeader(head, inline, args, i, out);
+      if (consumed.redacted) redacted = true;
+      i += consumed.skip;
+      continue;
+    }
+    if (looksLikeUrl(tok)) {
+      const scrubbed = scrubUrl(tok);
+      if (scrubbed.changed) redacted = true;
+      out.push(scrubbed.value);
+      continue;
+    }
+    out.push(tok);
+  }
+  return { args: out, summary: { redacted } };
+}
+function redactText(text2) {
+  let out = text2;
+  out = out.replace(/(authorization|cookie|x-auth-token|bearer)\s*:\s*[^\n\r]+/gi, (m, name) => {
+    return `${name}: ${REDACTED}`;
+  });
+  out = out.replace(/\bhttps?:\/\/[^\s'"]+/g, (url2) => scrubUrl(url2).value);
+  return out;
+}
+function handleHeader(head, inline, args, i, out) {
+  let value;
+  let skip = 0;
+  if (inline !== null) {
+    value = inline;
+  } else if (i + 1 < args.length) {
+    value = args[i + 1] ?? null;
+    skip = 1;
+  } else {
+    out.push(head);
+    return { skip: 0, redacted: false };
+  }
+  if (value === null) {
+    out.push(head);
+    return { skip: 0, redacted: false };
+  }
+  const colon = value.indexOf(":");
+  if (colon === -1) {
+    if (inline !== null) out.push(`${head}=${value}`);
+    else {
+      out.push(head);
+      out.push(value);
+    }
+    return { skip, redacted: false };
+  }
+  const name = value.slice(0, colon).trim().toLowerCase();
+  const rendered = SENSITIVE_HEADER_NAMES.has(name) ? `${value.slice(0, colon)}: ${REDACTED}` : value;
+  const changed = rendered !== value;
+  if (inline !== null) out.push(`${head}=${rendered}`);
+  else {
+    out.push(head);
+    out.push(rendered);
+  }
+  return { skip, redacted: changed };
+}
+function looksLikeUrl(tok) {
+  return /^https?:\/\//i.test(tok);
+}
+function scrubUrl(raw) {
+  let url2;
+  try {
+    url2 = new URL(raw);
+  } catch {
+    return { value: raw, changed: false };
+  }
+  let changed = false;
+  for (const key of Array.from(url2.searchParams.keys())) {
+    if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
+      url2.searchParams.set(key, REDACTED);
+      changed = true;
+    }
+  }
+  return { value: changed ? url2.toString() : raw, changed };
+}
+
+// src/download/build-input.ts
+var URL_REGEX = /^https?:\/\//i;
+function buildForwardedInput(opts) {
+  const { args: sanitizedArgs, summary } = redactArgs(opts.argv);
+  const url2 = guessUrl(opts.argv) ?? "";
+  const outputHints = parseOutputHints(opts.argv);
+  const commandPreview = formatCommand(sanitizedArgs);
+  const kind = "yt-dlp-forward";
+  const input = {
+    url: url2,
+    kind,
+    rawArgs: [...opts.argv],
+    options: {
+      source: "cli",
+      sanitizedArgs,
+      commandPreview,
+      outputHints,
+      vidbee: {
+        wait: opts.flags.wait,
+        ...opts.flags.maxAttempts !== void 0 && {
+          maxAttempts: opts.flags.maxAttempts
+        },
+        ...opts.flags.priority && { priority: opts.flags.priority },
+        ...opts.flags.groupKey !== void 0 && { groupKey: opts.flags.groupKey }
+      }
+    }
+  };
+  return { input, commandPreview, redacted: summary.redacted };
+}
+function formatCommand(argv) {
+  return ["yt-dlp", ...argv].map((tok) => needsShellQuote(tok) ? quote(tok) : tok).join(" ");
+}
+function needsShellQuote(tok) {
+  return /[\s'"\\$`]/.test(tok);
+}
+function quote(tok) {
+  return `'${tok.replace(/'/g, "'\\''")}'`;
+}
+function guessUrl(argv) {
+  let last = null;
+  for (let i = 0; i < argv.length; i++) {
+    const tok = argv[i];
+    if (!tok || tok.startsWith("-")) continue;
+    const prev = argv[i - 1];
+    if (prev !== void 0 && prev.startsWith("-") && consumesValue(prev)) continue;
+    if (URL_REGEX.test(tok)) last = tok;
+  }
+  return last;
+}
+var VALUE_CONSUMING_FLAGS = /* @__PURE__ */ new Set([
+  "-f",
+  "--format",
+  "-o",
+  "--output",
+  "--cookies",
+  "--cookies-from-browser",
+  "--proxy",
+  "--user-agent",
+  "--referer",
+  "--sleep-interval",
+  "-r",
+  "--limit-rate",
+  "--retries",
+  "--fragment-retries",
+  "--extractor-retries",
+  "--retry-sleep",
+  "-N",
+  "--concurrent-fragments",
+  "--throttled-rate",
+  "--add-headers",
+  "--add-header",
+  "--config-location",
+  "--paths",
+  "-P",
+  "--ffmpeg-location",
+  "--postprocessor-args",
+  "--user-agent",
+  "--print",
+  "--username",
+  "--password",
+  "--video-password",
+  "--ap-password",
+  "--twofactor",
+  "--audio-format",
+  "--audio-quality",
+  "--merge-output-format",
+  "--remux-video",
+  "--recode-video",
+  "--container"
+]);
+function consumesValue(flag) {
+  if (flag.includes("=")) return false;
+  return VALUE_CONSUMING_FLAGS.has(flag);
+}
+function parseOutputHints(argv) {
+  let outputTemplate;
+  const paths = [];
+  let stdoutMode = false;
+  for (let i = 0; i < argv.length; i++) {
+    const tok = argv[i];
+    if (tok === void 0) continue;
+    if (tok === "-o" || tok === "--output") {
+      const v = argv[i + 1];
+      if (v === "-") stdoutMode = true;
+      else if (v) outputTemplate = v;
+      continue;
+    }
+    if (tok === "-o-" || tok === "-o=-" || tok === "--output=-") {
+      stdoutMode = true;
+      continue;
+    }
+    if (tok.startsWith("-o=")) {
+      outputTemplate = tok.slice(3);
+      continue;
+    }
+    if (tok.startsWith("--output=")) {
+      outputTemplate = tok.slice("--output=".length);
+      continue;
+    }
+    if (tok === "-P" || tok === "--paths") {
+      const v = argv[i + 1];
+      if (v) paths.push(v);
+    }
+  }
+  const out = {};
+  if (outputTemplate !== void 0) out.outputTemplate = outputTemplate;
+  if (paths.length > 0) out.paths = paths;
+  if (stdoutMode) out.stdoutMode = true;
+  return out;
+}
+
+// src/download/enqueue.ts
+init_src();
+var defaultDelay = (ms) => new Promise((r) => setTimeout(r, ms));
+async function enqueueDownload(opts) {
+  if (!opts.client.add) {
+    throw new Error("transport does not support add()");
+  }
+  const created = await opts.client.add(opts.request);
+  let task = created.task;
+  if (!opts.wait) return { kind: "detached", task };
+  const clock = opts.clock ?? Date.now;
+  const delay = opts.delay ?? defaultDelay;
+  const fast = opts.pollFastMs ?? 200;
+  const slow = opts.pollSlowMs ?? 1e3;
+  const start = clock();
+  const budget = opts.waitTimeoutMs ?? null;
+  while (true) {
+    if (TERMINAL_STATUSES.has(task.status)) {
+      return task.status === "completed" ? { kind: "wait-success", task } : { kind: "wait-non-success", task, reason: task.status };
+    }
+    if (task.status === "retry-scheduled" || task.status === "paused") {
+      return { kind: "wait-non-success", task, reason: task.status };
+    }
+    if (budget !== null && clock() - start >= budget) {
+      return { kind: "wait-non-success", task, reason: "timeout" };
+    }
+    const interval = task.status === "queued" ? slow : fast;
+    await delay(interval);
+    task = await opts.client.get(task.id);
+  }
+}
+
+// src/download/probe.ts
+import { spawn } from "node:child_process";
+
+// src/envelope/index.ts
+var ExitCode = {
+  /** probe success | detached download enqueue success | wait-mode success */
+  OK: 0,
+  /** wait-mode terminated non-success (failed | retry-scheduled) */
+  WAIT_NON_SUCCESS: 1,
+  /** argv parse error (incl. unknown --vidbee-*) */
+  ARG_ERROR: 2,
+  /** desktop / api unreachable: descriptor missing, conn refused, handshake failed */
+  HOST_UNREACHABLE: 3,
+  /** auth failure */
+  AUTH_FAILED: 4,
+  /** internal contract error (schema mismatch, version mismatch) */
+  CONTRACT_ERROR: 5
+};
+function renderEnvelope(env, opts = {}) {
+  return opts.pretty ? JSON.stringify(env, null, 2) : JSON.stringify(env);
+}
+function exitCodeForError(code) {
+  switch (code) {
+    case "DESKTOP_NOT_READY":
+    case "API_UNREACHABLE":
+    case "HANDSHAKE_FAILED":
+      return ExitCode.HOST_UNREACHABLE;
+    case "AUTH_FAILED":
+    case "TOKEN_EXPIRED":
+      return ExitCode.AUTH_FAILED;
+    case "CONTRACT_VERSION_MISMATCH":
+    case "CONTRACT_SCHEMA_MISMATCH":
+      return ExitCode.CONTRACT_ERROR;
+    case "PROBE_OUTPUT_TOO_LARGE":
+      return ExitCode.WAIT_NON_SUCCESS;
+    case "NOT_IMPLEMENTED":
+      return ExitCode.CONTRACT_ERROR;
+    default:
+      return ExitCode.ARG_ERROR;
+  }
+}
+function errorEnvelope(code, message, details) {
+  return details === void 0 ? { ok: false, code, message } : { ok: false, code, message, details };
+}
+
+// src/download/probe.ts
+var DEFAULT_STDOUT_MAX = 32 * 1024 * 1024;
+var DEFAULT_STDERR_TAIL = 64 * 1024;
+async function runProbe(opts) {
+  const binary = opts.ytDlpPath ?? resolveYtDlpBinary();
+  const stdoutMax = opts.stdoutMaxBytes ?? DEFAULT_STDOUT_MAX;
+  const stderrTail = opts.stderrTailBytes ?? DEFAULT_STDERR_TAIL;
+  const spawner = opts.spawner ?? defaultSpawner;
+  let handle;
+  try {
+    handle = spawner(binary, opts.argv);
+  } catch (err) {
+    return {
+      kind: "error",
+      envelope: errorEnvelope(
+        "NOT_IMPLEMENTED",
+        `failed to spawn yt-dlp at ${binary}: ${err instanceof Error ? err.message : err}`
+      )
+    };
+  }
+  let stdoutBytes = 0;
+  let stdoutOverflow = false;
+  const stdoutChunks = [];
+  const stderrTailBuf = createTailBuffer(stderrTail);
+  handle.stdout.on("data", (chunk) => {
+    if (stdoutOverflow) return;
+    if (stdoutBytes + chunk.byteLength > stdoutMax) {
+      stdoutOverflow = true;
+      handle.kill("SIGTERM");
+      return;
+    }
+    stdoutBytes += chunk.byteLength;
+    stdoutChunks.push(chunk);
+  });
+  handle.stderr.on("data", (chunk) => {
+    stderrTailBuf.push(chunk);
+  });
+  return new Promise((resolve2) => {
+    let settled = false;
+    handle.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      resolve2({
+        kind: "error",
+        envelope: errorEnvelope(
+          "NOT_IMPLEMENTED",
+          `yt-dlp spawn error: ${err.message}`
+        )
+      });
+    });
+    handle.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      if (stdoutOverflow) {
+        resolve2({
+          kind: "error",
+          envelope: errorEnvelope(
+            "PROBE_OUTPUT_TOO_LARGE",
+            `probe stdout exceeded ${stdoutMax} bytes`
+          )
+        });
+        return;
+      }
+      const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
+      resolve2({
+        kind: "success",
+        stdout,
+        stderr: stderrTailBuf.read().toString("utf-8"),
+        exitCode: code ?? -1,
+        binary
+      });
+    });
+  });
+}
+function resolveYtDlpBinary() {
+  const env = process.env.YTDLP_PATH?.trim();
+  return env && env.length > 0 ? env : "yt-dlp";
+}
+function defaultSpawner(binary, args) {
+  const child = spawn(binary, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+  return {
+    stdout: child.stdout,
+    stderr: child.stderr,
+    on: (ev, l) => {
+      child.on(ev, l);
+    },
+    kill: (signal) => {
+      try {
+        child.kill(signal);
+      } catch {
+      }
+    }
+  };
+}
+function createTailBuffer(maxBytes) {
+  let buf = Buffer.alloc(0);
+  return {
+    push(chunk) {
+      const merged = Buffer.concat([buf, chunk]);
+      buf = merged.byteLength > maxBytes ? merged.subarray(merged.byteLength - maxBytes) : merged;
+    },
+    read: () => buf
+  };
+}
+
+// src/local-info/version.ts
+import { readFileSync as readFileSync2 } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+var FALLBACK_VERSION = "0.0.0-dev";
+function readCliVersion(candidatePaths = defaultCandidatePaths()) {
+  for (const p of candidatePaths) {
+    try {
+      const pkg = JSON.parse(readFileSync2(p, "utf-8"));
+      if (pkg.name === "@vidbee/cli" && typeof pkg.version === "string") {
+        return {
+          cli: pkg.version,
+          contract: pkg.version,
+          changelog: "https://github.com/nexmoe/vidbee/blob/main/apps/cli/CHANGELOG.md"
+        };
+      }
+    } catch {
+    }
+  }
+  return {
+    cli: FALLBACK_VERSION,
+    contract: FALLBACK_VERSION,
+    changelog: "https://github.com/nexmoe/vidbee/blob/main/apps/cli/CHANGELOG.md"
+  };
+}
+function defaultCandidatePaths() {
+  let here;
+  try {
+    here = fileURLToPath(import.meta.url);
+  } catch {
+    return [];
+  }
+  const dir = dirname(here);
+  return [
+    resolve(dir, "..", "package.json"),
+    resolve(dir, "..", "..", "package.json"),
+    resolve(dir, "..", "..", "..", "package.json")
+  ];
+}
+
+// src/local-info/upgrade.ts
+import { mkdirSync, readFileSync as readFileSync3, writeFileSync } from "node:fs";
+import { homedir, platform } from "node:os";
+import { dirname as dirname2, join } from "node:path";
+var CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
+var REGISTRY_URL = "https://registry.npmjs.org/@vidbee/cli/latest";
+var FETCH_TIMEOUT_MS = 5e3;
+async function checkUpgrade(input) {
+  const now = input.now ?? Date.now;
+  const cachePath = input.cachePath ?? defaultCachePath();
+  const fetcher = input.fetchLatest ?? defaultFetchLatest;
+  let cachedAt = null;
+  let latest = null;
+  if (!input.force) {
+    const cached2 = readCache(cachePath);
+    if (cached2 && now() - cached2.fetchedAt < CACHE_TTL_MS) {
+      latest = cached2.version;
+      cachedAt = cached2.fetchedAt;
+    }
+  }
+  let cachedFlag = latest !== null;
+  if (latest === null) {
+    const fetched = await fetcher();
+    latest = fetched.version;
+    cachedAt = fetched.fetchedAt;
+    cachedFlag = false;
+    writeCache(cachePath, { version: latest, fetchedAt: cachedAt });
+  }
+  const upToDate = compareSemver(input.current, latest) >= 0;
+  return {
+    current: input.current,
+    latest,
+    upToDate,
+    cached: cachedFlag,
+    cachedAt: cachedAt === null ? null : new Date(cachedAt).toISOString(),
+    registryUrl: REGISTRY_URL,
+    installCommands: {
+      npm: "npm install -g @vidbee/cli",
+      pnpm: "pnpm add -g @vidbee/cli",
+      bun: "bun install -g @vidbee/cli",
+      brew: "brew upgrade vidbee/tap/vidbee"
+    }
+  };
+}
+async function defaultFetchLatest() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(REGISTRY_URL, {
+      headers: { accept: "application/json" },
+      signal: ctrl.signal
+    });
+    if (!res.ok) {
+      throw new Error(`registry responded ${res.status}`);
+    }
+    const body = await res.json();
+    if (typeof body.version !== "string") {
+      throw new Error("registry response missing `version`");
+    }
+    return { version: body.version, fetchedAt: Date.now() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function readCache(path5) {
+  try {
+    const raw = readFileSync3(path5, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.version === "string" && typeof parsed.fetchedAt === "number") {
+      return { version: parsed.version, fetchedAt: parsed.fetchedAt };
+    }
+  } catch {
+  }
+  return null;
+}
+function writeCache(path5, payload) {
+  try {
+    mkdirSync(dirname2(path5), { recursive: true });
+    writeFileSync(path5, JSON.stringify(payload), "utf-8");
+  } catch {
+  }
+}
+function defaultCachePath() {
+  const home = homedir();
+  if (platform() === "win32") {
+    const localAppData = process.env.LOCALAPPDATA ?? join(home, "AppData", "Local");
+    return join(localAppData, "VidBee", "cli-upgrade-check.json");
+  }
+  if (platform() === "darwin") {
+    return join(home, "Library", "Caches", "VidBee", "cli-upgrade-check.json");
+  }
+  const xdg = process.env.XDG_CACHE_HOME ?? join(home, ".cache");
+  return join(xdg, "vidbee", "cli-upgrade-check.json");
+}
+function compareSemver(a, b) {
+  const [aMain = "", aPre = ""] = a.split("-", 2);
+  const [bMain = "", bPre = ""] = b.split("-", 2);
+  const aParts = aMain.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  const bParts = bMain.split(".").map((p) => Number.parseInt(p, 10) || 0);
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    const av = aParts[i] ?? 0;
+    const bv = bParts[i] ?? 0;
+    if (av !== bv) return av - bv;
+  }
+  if (aPre === bPre) return 0;
+  if (aPre === "") return 1;
+  if (bPre === "") return -1;
+  return aPre < bPre ? -1 : 1;
+}
 
 // src/parser/probe-flags.ts
 var EXACT_FLAGS = /* @__PURE__ */ new Set([
@@ -25706,19 +30818,19 @@ function consumeReserved(flags, def, argv, i, inlineValue) {
     applySwitch(flags, def.name);
     return 0;
   }
-  let value2;
+  let value;
   let consumed = 0;
   if (inlineValue !== null) {
-    value2 = inlineValue;
+    value = inlineValue;
   } else {
     const next = argv[i + 1];
     if (next === void 0) {
       throw new ParseError("MISSING_VALUE", `${def.name} requires a value`);
     }
-    value2 = next;
+    value = next;
     consumed = 1;
   }
-  applyValue(flags, def.name, value2);
+  applyValue(flags, def.name, value);
   return consumed;
 }
 function applySwitch(flags, name) {
@@ -25752,35 +30864,35 @@ function applySwitch(flags, name) {
       );
   }
 }
-function applyValue(flags, name, value2) {
+function applyValue(flags, name, value) {
   switch (name) {
     case "--vidbee-api":
-      flags.api = value2;
+      flags.api = value;
       break;
     case "--vidbee-target":
-      if (!TARGET_VALUES.has(value2)) {
+      if (!TARGET_VALUES.has(value)) {
         throw new ParseError(
           "INVALID_TARGET",
-          `--vidbee-target must be one of desktop|api|local; got ${value2}`
+          `--vidbee-target must be one of desktop|api|local; got ${value}`
         );
       }
-      flags.target = value2;
+      flags.target = value;
       break;
     case "--vidbee-priority":
-      if (!PRIORITY_VALUES.has(value2)) {
+      if (!PRIORITY_VALUES.has(value)) {
         throw new ParseError(
           "INVALID_PRIORITY",
-          `--vidbee-priority must be user|subscription|background; got ${value2}`
+          `--vidbee-priority must be user|subscription|background; got ${value}`
         );
       }
-      flags.priority = value2;
+      flags.priority = value;
       break;
     case "--vidbee-max-attempts": {
-      const n = Number.parseInt(value2, 10);
-      if (!Number.isFinite(n) || n < 0 || `${n}` !== value2) {
+      const n = Number.parseInt(value, 10);
+      if (!Number.isFinite(n) || n < 0 || `${n}` !== value) {
         throw new ParseError(
           "INVALID_MAX_ATTEMPTS",
-          `--vidbee-max-attempts must be a non-negative integer; got ${value2}`
+          `--vidbee-max-attempts must be a non-negative integer; got ${value}`
         );
       }
       flags.maxAttempts = n;
@@ -25788,21 +30900,21 @@ function applyValue(flags, name, value2) {
       break;
     }
     case "--vidbee-group-key":
-      flags.groupKey = value2;
+      flags.groupKey = value;
       break;
     case "--vidbee-timeout": {
-      const n = Number.parseInt(value2, 10);
+      const n = Number.parseInt(value, 10);
       if (!Number.isFinite(n) || n <= 0) {
         throw new ParseError(
           "INVALID_TIMEOUT",
-          `--vidbee-timeout must be a positive integer (ms); got ${value2}`
+          `--vidbee-timeout must be a positive integer (ms); got ${value}`
         );
       }
       flags.timeoutMs = n;
       break;
     }
     case "--vidbee-token":
-      flags.token = value2;
+      flags.token = value;
       break;
     default:
       throw new ParseError(
@@ -25823,58 +30935,16 @@ function hasStdoutOutput(argv) {
   return false;
 }
 
-// src/envelope/index.ts
-var ExitCode = {
-  /** probe success | detached download enqueue success | wait-mode success */
-  OK: 0,
-  /** wait-mode terminated non-success (failed | retry-scheduled) */
-  WAIT_NON_SUCCESS: 1,
-  /** argv parse error (incl. unknown --vidbee-*) */
-  ARG_ERROR: 2,
-  /** desktop / api unreachable: descriptor missing, conn refused, handshake failed */
-  HOST_UNREACHABLE: 3,
-  /** auth failure */
-  AUTH_FAILED: 4,
-  /** internal contract error (schema mismatch, version mismatch) */
-  CONTRACT_ERROR: 5
-};
-function renderEnvelope(env, opts = {}) {
-  return opts.pretty ? JSON.stringify(env, null, 2) : JSON.stringify(env);
-}
-function exitCodeForError(code) {
-  switch (code) {
-    case "DESKTOP_NOT_READY":
-    case "API_UNREACHABLE":
-    case "HANDSHAKE_FAILED":
-      return ExitCode.HOST_UNREACHABLE;
-    case "AUTH_FAILED":
-    case "TOKEN_EXPIRED":
-      return ExitCode.AUTH_FAILED;
-    case "CONTRACT_VERSION_MISMATCH":
-    case "CONTRACT_SCHEMA_MISMATCH":
-      return ExitCode.CONTRACT_ERROR;
-    case "PROBE_OUTPUT_TOO_LARGE":
-      return ExitCode.WAIT_NON_SUCCESS;
-    case "NOT_IMPLEMENTED":
-      return ExitCode.CONTRACT_ERROR;
-    default:
-      return ExitCode.ARG_ERROR;
-  }
-}
-function errorEnvelope(code, message, details) {
-  return details === void 0 ? { ok: false, code, message } : { ok: false, code, message, details };
-}
-
 // src/subcommands/index.ts
 async function dispatchSubcommand(subcommand, args, ctx) {
-  const path3 = subcommand.split("/").filter(Boolean);
-  switch (path3[0]) {
+  const path5 = subcommand.split("/").filter(Boolean);
+  switch (path5[0]) {
     case "status":
       return ok(await ctx.client.stats());
     case "download":
-      return await handleDownload(path3.slice(1), args, ctx);
+      return await handleDownload(path5.slice(1), args, ctx);
     case "history":
-      return await handleHistory(path3.slice(1), args, ctx);
+      return await handleHistory(path5.slice(1), args, ctx);
     case "rss":
       return notImplemented("rss", "NEX-132 owns :rss subcommands");
     default:
@@ -26047,8 +31117,8 @@ function parseListArgs(args) {
   }
   return input;
 }
-function ok(value2) {
-  return { kind: "value", value: value2 };
+function ok(value) {
+  return { kind: "value", value };
 }
 function notImplemented(what, why) {
   return {
@@ -26277,7 +31347,7 @@ var AutomationClient = class {
     }
     return res.json;
   }
-  async rawFetch(method, path3, body) {
+  async rawFetch(method, path5, body) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.requestTimeoutMs);
     try {
@@ -26292,7 +31362,7 @@ var AutomationClient = class {
         signal: ctrl.signal
       };
       if (method === "POST") init.body = JSON.stringify(body ?? {});
-      const res = await this.fetchImpl(`${this.baseUrl}${path3}`, init);
+      const res = await this.fetchImpl(`${this.baseUrl}${path5}`, init);
       const text2 = await res.text();
       let json2 = null;
       if (text2.length > 0) {
@@ -26349,12 +31419,12 @@ function httpErrorOf(res, op) {
 }
 
 // src/transport/autostart.ts
-import { spawn } from "node:child_process";
+import { spawn as spawn2 } from "node:child_process";
 
 // src/transport/descriptor.ts
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { existsSync as existsSync3, readFileSync as readFileSync4 } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
 var DIRNAME = "VidBee";
 var DESCRIPTOR_FILE = "automation.json";
 function resolveDescriptorPath(opts = {}) {
@@ -26363,45 +31433,45 @@ function resolveDescriptorPath(opts = {}) {
   const envOverride = opts.envOverride !== void 0 ? opts.envOverride : env.VIDBEE_AUTOMATION_DESCRIPTOR?.trim();
   if (envOverride && envOverride.length > 0) return envOverride;
   const platform2 = opts.platform ?? process.platform;
-  const home = (opts.homedir ?? homedir)();
+  const home = (opts.homedir ?? homedir2)();
   if (platform2 === "darwin") {
-    return join(home, "Library", "Application Support", DIRNAME, DESCRIPTOR_FILE);
+    return join2(home, "Library", "Application Support", DIRNAME, DESCRIPTOR_FILE);
   }
   if (platform2 === "win32") {
     const appdata = env.APPDATA?.trim();
-    const base2 = appdata && appdata.length > 0 ? appdata : join(home, "AppData", "Roaming");
-    return join(base2, DIRNAME, DESCRIPTOR_FILE);
+    const base2 = appdata && appdata.length > 0 ? appdata : join2(home, "AppData", "Roaming");
+    return join2(base2, DIRNAME, DESCRIPTOR_FILE);
   }
   const xdg = env.XDG_CONFIG_HOME?.trim();
-  const base = xdg && xdg.length > 0 ? xdg : join(home, ".config");
-  return join(base, DIRNAME, DESCRIPTOR_FILE);
+  const base = xdg && xdg.length > 0 ? xdg : join2(home, ".config");
+  return join2(base, DIRNAME, DESCRIPTOR_FILE);
 }
 function readDescriptor(opts = {}) {
-  const path3 = resolveDescriptorPath(opts);
-  const exists2 = opts.exists ?? existsSync;
-  const read = opts.readFile ?? ((p) => readFileSync(p, "utf-8"));
-  if (!exists2(path3)) {
+  const path5 = resolveDescriptorPath(opts);
+  const exists2 = opts.exists ?? existsSync3;
+  const read = opts.readFile ?? ((p) => readFileSync4(p, "utf-8"));
+  if (!exists2(path5)) {
     return {
       ok: false,
-      path: path3,
+      path: path5,
       envelope: errorEnvelope(
         "DESKTOP_NOT_READY",
-        `automation descriptor not found at ${path3}`,
-        { path: path3 }
+        `automation descriptor not found at ${path5}`,
+        { path: path5 }
       )
     };
   }
   let parsed;
   try {
-    parsed = JSON.parse(read(path3));
+    parsed = JSON.parse(read(path5));
   } catch (err) {
     return {
       ok: false,
-      path: path3,
+      path: path5,
       envelope: errorEnvelope(
         "DESKTOP_NOT_READY",
         `automation descriptor is malformed: ${err instanceof Error ? err.message : err}`,
-        { path: path3 }
+        { path: path5 }
       )
     };
   }
@@ -26409,17 +31479,17 @@ function readDescriptor(opts = {}) {
   if (!v.ok) {
     return {
       ok: false,
-      path: path3,
-      envelope: errorEnvelope("DESKTOP_NOT_READY", v.reason, { path: path3 })
+      path: path5,
+      envelope: errorEnvelope("DESKTOP_NOT_READY", v.reason, { path: path5 })
     };
   }
-  return { ok: true, descriptor: v.value, path: path3 };
+  return { ok: true, descriptor: v.value, path: path5 };
 }
-function validateDescriptor(value2) {
-  if (typeof value2 !== "object" || value2 === null) {
+function validateDescriptor(value) {
+  if (typeof value !== "object" || value === null) {
     return { ok: false, reason: "descriptor is not a JSON object" };
   }
-  const v = value2;
+  const v = value;
   if (v.version !== 1) {
     return { ok: false, reason: `unsupported descriptor version: ${String(v.version)}` };
   }
@@ -26447,7 +31517,7 @@ function validateDescriptor(value2) {
     }
   };
 }
-function isPidAlive(pid, killProbe = (p, s) => process.kill(p, s)) {
+function isPidAlive2(pid, killProbe = (p, s) => process.kill(p, s)) {
   try {
     killProbe(pid, 0);
     return true;
@@ -26457,12 +31527,12 @@ function isPidAlive(pid, killProbe = (p, s) => process.kill(p, s)) {
 }
 
 // src/transport/autostart.ts
-var defaultDelay = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
+var defaultDelay2 = (ms) => new Promise((resolve2) => setTimeout(resolve2, ms));
 async function ensureDesktopReady(enabled, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 1e4;
   const poll = opts.pollIntervalMs ?? 200;
   const clock = opts.clock ?? Date.now;
-  const delay = opts.delay ?? defaultDelay;
+  const delay = opts.delay ?? defaultDelay2;
   const platform2 = opts.platform ?? process.platform;
   if (descriptorIsReady(opts.descriptorOptions)) return { kind: "ready" };
   if (!enabled) return { kind: "autostart-disabled" };
@@ -26472,7 +31542,7 @@ async function ensureDesktopReady(enabled, opts = {}) {
     if (opts.spawnLauncher) {
       opts.spawnLauncher(launchSpec.cmd, launchSpec.args);
     } else {
-      const child = spawn(launchSpec.cmd, [...launchSpec.args], {
+      const child = spawn2(launchSpec.cmd, [...launchSpec.args], {
         stdio: "ignore",
         detached: true,
         windowsHide: true
@@ -26495,7 +31565,7 @@ async function ensureDesktopReady(enabled, opts = {}) {
 function descriptorIsReady(descriptorOpts) {
   const r = readDescriptor(descriptorOpts ?? {});
   if (!r.ok) return false;
-  return isPidAlive(r.descriptor.pid);
+  return isPidAlive2(r.descriptor.pid);
 }
 function launcherForPlatform(platform2) {
   if (platform2 === "darwin") {
@@ -26515,22 +31585,22 @@ function launcherForPlatform(platform2) {
 
 // src/transport/local-client.ts
 import { mkdtempSync, rmSync } from "node:fs";
-import { createRequire as createRequire3 } from "node:module";
-import { tmpdir, homedir as homedir2 } from "node:os";
-import { join as join2 } from "node:path";
-var require4 = createRequire3(import.meta.url);
+import { createRequire } from "node:module";
+import { homedir as homedir3, tmpdir } from "node:os";
+import { join as join3 } from "node:path";
+var require2 = createRequire(import.meta.url);
 async function createLocalClient(opts = {}) {
   const taskQueue = await Promise.resolve().then(() => (init_src(), src_exports));
   const downloaderCore = await Promise.resolve().then(() => (init_src2(), src_exports2));
   const tqDb = await Promise.resolve().then(() => (init_task_queue(), task_queue_exports));
-  const defaultDir = opts.defaultDownloadDir ?? join2(homedir2(), "Downloads", "VidBee");
+  const defaultDir = opts.defaultDownloadDir ?? join3(homedir3(), "Downloads", "VidBee");
   let tempDir = null;
   let sqliteDb = null;
   let persistAdapter;
   if ((opts.persist ?? "memory") === "sqlite") {
-    tempDir = mkdtempSync(join2(tmpdir(), "vidbee-cli-"));
-    const dbPath = opts.sqlitePath ?? join2(tempDir, "task-queue.db");
-    const Database = require4("better-sqlite3");
+    tempDir = mkdtempSync(join3(tmpdir(), "vidbee-cli-"));
+    const dbPath = opts.sqlitePath ?? join3(tempDir, "task-queue.db");
+    const Database = require2("better-sqlite3");
     const db = new Database(dbPath, { timeout: 5e3 });
     db.exec(tqDb.TASK_QUEUE_DDL_V1);
     sqliteDb = db;
@@ -26549,13 +31619,15 @@ async function createLocalClient(opts = {}) {
     persist: persistAdapter,
     executor,
     maxConcurrency: opts.maxConcurrency ?? 4,
-    ...opts.filePresent !== void 0 ? { filePresent: opts.filePresent } : {},
-    ...opts.rng !== void 0 ? { rng: opts.rng } : {}
+    ...opts.filePresent === void 0 ? {} : { filePresent: opts.filePresent },
+    ...opts.rng === void 0 ? {} : { rng: opts.rng }
   });
   await api.start();
   let shuttingDown = false;
   const shutdown = async () => {
-    if (shuttingDown) return;
+    if (shuttingDown) {
+      return;
+    }
     shuttingDown = true;
     try {
       await api.stop();
@@ -26578,10 +31650,18 @@ async function createLocalClient(opts = {}) {
     const opts2 = {
       cursor: input.cursor ?? null
     };
-    if (input.status !== void 0) opts2.status = input.status;
-    if (input.groupKey !== void 0) opts2.groupKey = input.groupKey;
-    if (input.parentId !== void 0) opts2.parentId = input.parentId;
-    if (input.limit !== void 0) opts2.limit = input.limit;
+    if (input.status !== void 0) {
+      opts2.status = input.status;
+    }
+    if (input.groupKey !== void 0) {
+      opts2.groupKey = input.groupKey;
+    }
+    if (input.parentId !== void 0) {
+      opts2.parentId = input.parentId;
+    }
+    if (input.limit !== void 0) {
+      opts2.limit = input.limit;
+    }
     const page = api.list(opts2);
     return { items: [...page.tasks], nextCursor: page.nextCursor ?? null };
   };
@@ -26591,7 +31671,9 @@ async function createLocalClient(opts = {}) {
     list,
     get: async (id) => {
       const task = api.get(id);
-      if (!task) throw new Error(`task ${id} not found`);
+      if (!task) {
+        throw new Error(`task ${id} not found`);
+      }
       return task;
     },
     stats: async () => api.stats(),
@@ -26601,7 +31683,9 @@ async function createLocalClient(opts = {}) {
     add: async (req) => {
       const { id } = await api.add(req);
       const task = api.get(id);
-      if (!task) throw new Error(`add() did not produce a task with id ${id}`);
+      if (!task) {
+        throw new Error(`add() did not produce a task with id ${id}`);
+      }
       return { id, task };
     },
     cancel: async (id) => {
@@ -26662,7 +31746,7 @@ async function connectDesktop(opts) {
   let needsAutostart = false;
   if (!descriptor.ok) {
     needsAutostart = true;
-  } else if (!isPidAlive(descriptor.descriptor.pid)) {
+  } else if (!isPidAlive2(descriptor.descriptor.pid)) {
     needsAutostart = true;
   }
   if (needsAutostart) {
@@ -26721,564 +31805,6 @@ function defaultAutomationBuilder(baseUrl, token) {
   return new AutomationClient({ baseUrl });
 }
 
-// src/parser/redact.ts
-var REDACTED = "<redacted>";
-var VALUE_FLAGS_FULL = /* @__PURE__ */ new Set([
-  "--username",
-  "--password",
-  "--video-password",
-  "--ap-password",
-  "--twofactor",
-  "--ap-username"
-]);
-var HEADER_FLAGS = /* @__PURE__ */ new Set(["--add-headers", "--add-header"]);
-var SENSITIVE_HEADER_NAMES = /* @__PURE__ */ new Set([
-  "authorization",
-  "cookie",
-  "set-cookie",
-  "token",
-  "x-token",
-  "bearer",
-  "x-auth",
-  "x-auth-token",
-  "proxy-authorization"
-]);
-var SENSITIVE_QUERY_KEYS = /* @__PURE__ */ new Set([
-  "token",
-  "access_token",
-  "auth_token",
-  "id_token",
-  "signature",
-  "sig",
-  "policy",
-  "key",
-  "secret",
-  "apikey",
-  "api_key",
-  "password",
-  "pass",
-  "pwd"
-]);
-function redactArgs(args) {
-  const out = [];
-  let redacted = false;
-  for (let i = 0; i < args.length; i++) {
-    const tok = args[i];
-    if (tok === void 0) continue;
-    const eq2 = tok.indexOf("=");
-    const head = eq2 === -1 ? tok : tok.slice(0, eq2);
-    const inline = eq2 === -1 ? null : tok.slice(eq2 + 1);
-    if (VALUE_FLAGS_FULL.has(head)) {
-      if (inline !== null) {
-        out.push(`${head}=${REDACTED}`);
-        redacted = true;
-      } else {
-        out.push(head);
-        if (i + 1 < args.length) {
-          out.push(REDACTED);
-          redacted = true;
-          i += 1;
-        }
-      }
-      continue;
-    }
-    if (HEADER_FLAGS.has(head)) {
-      const consumed = handleHeader(head, inline, args, i, out);
-      if (consumed.redacted) redacted = true;
-      i += consumed.skip;
-      continue;
-    }
-    if (looksLikeUrl(tok)) {
-      const scrubbed = scrubUrl(tok);
-      if (scrubbed.changed) redacted = true;
-      out.push(scrubbed.value);
-      continue;
-    }
-    out.push(tok);
-  }
-  return { args: out, summary: { redacted } };
-}
-function redactText(text2) {
-  let out = text2;
-  out = out.replace(/(authorization|cookie|x-auth-token|bearer)\s*:\s*[^\n\r]+/gi, (m, name) => {
-    return `${name}: ${REDACTED}`;
-  });
-  out = out.replace(/\bhttps?:\/\/[^\s'"]+/g, (url2) => scrubUrl(url2).value);
-  return out;
-}
-function handleHeader(head, inline, args, i, out) {
-  let value2;
-  let skip = 0;
-  if (inline !== null) {
-    value2 = inline;
-  } else if (i + 1 < args.length) {
-    value2 = args[i + 1] ?? null;
-    skip = 1;
-  } else {
-    out.push(head);
-    return { skip: 0, redacted: false };
-  }
-  if (value2 === null) {
-    out.push(head);
-    return { skip: 0, redacted: false };
-  }
-  const colon = value2.indexOf(":");
-  if (colon === -1) {
-    if (inline !== null) out.push(`${head}=${value2}`);
-    else {
-      out.push(head);
-      out.push(value2);
-    }
-    return { skip, redacted: false };
-  }
-  const name = value2.slice(0, colon).trim().toLowerCase();
-  const rendered = SENSITIVE_HEADER_NAMES.has(name) ? `${value2.slice(0, colon)}: ${REDACTED}` : value2;
-  const changed = rendered !== value2;
-  if (inline !== null) out.push(`${head}=${rendered}`);
-  else {
-    out.push(head);
-    out.push(rendered);
-  }
-  return { skip, redacted: changed };
-}
-function looksLikeUrl(tok) {
-  return /^https?:\/\//i.test(tok);
-}
-function scrubUrl(raw) {
-  let url2;
-  try {
-    url2 = new URL(raw);
-  } catch {
-    return { value: raw, changed: false };
-  }
-  let changed = false;
-  for (const key of Array.from(url2.searchParams.keys())) {
-    if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
-      url2.searchParams.set(key, REDACTED);
-      changed = true;
-    }
-  }
-  return { value: changed ? url2.toString() : raw, changed };
-}
-
-// src/download/build-input.ts
-var URL_REGEX = /^https?:\/\//i;
-function buildForwardedInput(opts) {
-  const { args: sanitizedArgs, summary } = redactArgs(opts.argv);
-  const url2 = guessUrl(opts.argv) ?? "";
-  const outputHints = parseOutputHints(opts.argv);
-  const commandPreview = formatCommand(sanitizedArgs);
-  const kind = "yt-dlp-forward";
-  const input = {
-    url: url2,
-    kind,
-    rawArgs: [...opts.argv],
-    options: {
-      source: "cli",
-      sanitizedArgs,
-      commandPreview,
-      outputHints,
-      vidbee: {
-        wait: opts.flags.wait,
-        ...opts.flags.maxAttempts !== void 0 && {
-          maxAttempts: opts.flags.maxAttempts
-        },
-        ...opts.flags.priority && { priority: opts.flags.priority },
-        ...opts.flags.groupKey !== void 0 && { groupKey: opts.flags.groupKey }
-      }
-    }
-  };
-  return { input, commandPreview, redacted: summary.redacted };
-}
-function formatCommand(argv) {
-  return ["yt-dlp", ...argv].map((tok) => needsShellQuote(tok) ? quote(tok) : tok).join(" ");
-}
-function needsShellQuote(tok) {
-  return /[\s'"\\$`]/.test(tok);
-}
-function quote(tok) {
-  return `'${tok.replace(/'/g, "'\\''")}'`;
-}
-function guessUrl(argv) {
-  let last = null;
-  for (let i = 0; i < argv.length; i++) {
-    const tok = argv[i];
-    if (!tok || tok.startsWith("-")) continue;
-    const prev = argv[i - 1];
-    if (prev !== void 0 && prev.startsWith("-") && consumesValue(prev)) continue;
-    if (URL_REGEX.test(tok)) last = tok;
-  }
-  return last;
-}
-var VALUE_CONSUMING_FLAGS = /* @__PURE__ */ new Set([
-  "-f",
-  "--format",
-  "-o",
-  "--output",
-  "--cookies",
-  "--cookies-from-browser",
-  "--proxy",
-  "--user-agent",
-  "--referer",
-  "--sleep-interval",
-  "-r",
-  "--limit-rate",
-  "--retries",
-  "--fragment-retries",
-  "--retry-sleep",
-  "-N",
-  "--concurrent-fragments",
-  "--throttled-rate",
-  "--add-headers",
-  "--add-header",
-  "--config-location",
-  "--paths",
-  "-P",
-  "--ffmpeg-location",
-  "--postprocessor-args",
-  "--user-agent",
-  "--print",
-  "--username",
-  "--password",
-  "--video-password",
-  "--ap-password",
-  "--twofactor",
-  "--audio-format",
-  "--audio-quality",
-  "--merge-output-format",
-  "--remux-video",
-  "--recode-video",
-  "--container"
-]);
-function consumesValue(flag) {
-  if (flag.includes("=")) return false;
-  return VALUE_CONSUMING_FLAGS.has(flag);
-}
-function parseOutputHints(argv) {
-  let outputTemplate;
-  const paths = [];
-  let stdoutMode = false;
-  for (let i = 0; i < argv.length; i++) {
-    const tok = argv[i];
-    if (tok === void 0) continue;
-    if (tok === "-o" || tok === "--output") {
-      const v = argv[i + 1];
-      if (v === "-") stdoutMode = true;
-      else if (v) outputTemplate = v;
-      continue;
-    }
-    if (tok === "-o-" || tok === "-o=-" || tok === "--output=-") {
-      stdoutMode = true;
-      continue;
-    }
-    if (tok.startsWith("-o=")) {
-      outputTemplate = tok.slice(3);
-      continue;
-    }
-    if (tok.startsWith("--output=")) {
-      outputTemplate = tok.slice("--output=".length);
-      continue;
-    }
-    if (tok === "-P" || tok === "--paths") {
-      const v = argv[i + 1];
-      if (v) paths.push(v);
-    }
-  }
-  const out = {};
-  if (outputTemplate !== void 0) out.outputTemplate = outputTemplate;
-  if (paths.length > 0) out.paths = paths;
-  if (stdoutMode) out.stdoutMode = true;
-  return out;
-}
-
-// src/download/enqueue.ts
-init_src();
-var defaultDelay2 = (ms) => new Promise((r) => setTimeout(r, ms));
-async function enqueueDownload(opts) {
-  if (!opts.client.add) {
-    throw new Error("transport does not support add()");
-  }
-  const created = await opts.client.add(opts.request);
-  let task = created.task;
-  if (!opts.wait) return { kind: "detached", task };
-  const clock = opts.clock ?? Date.now;
-  const delay = opts.delay ?? defaultDelay2;
-  const fast = opts.pollFastMs ?? 200;
-  const slow = opts.pollSlowMs ?? 1e3;
-  const start = clock();
-  const budget = opts.waitTimeoutMs ?? null;
-  while (true) {
-    if (TERMINAL_STATUSES.has(task.status)) {
-      return task.status === "completed" ? { kind: "wait-success", task } : { kind: "wait-non-success", task, reason: task.status };
-    }
-    if (task.status === "retry-scheduled" || task.status === "paused") {
-      return { kind: "wait-non-success", task, reason: task.status };
-    }
-    if (budget !== null && clock() - start >= budget) {
-      return { kind: "wait-non-success", task, reason: "timeout" };
-    }
-    const interval = task.status === "queued" ? slow : fast;
-    await delay(interval);
-    task = await opts.client.get(task.id);
-  }
-}
-
-// src/download/probe.ts
-import { spawn as spawn2 } from "node:child_process";
-var DEFAULT_STDOUT_MAX = 32 * 1024 * 1024;
-var DEFAULT_STDERR_TAIL = 64 * 1024;
-async function runProbe(opts) {
-  const binary = opts.ytDlpPath ?? resolveYtDlpBinary();
-  const stdoutMax = opts.stdoutMaxBytes ?? DEFAULT_STDOUT_MAX;
-  const stderrTail = opts.stderrTailBytes ?? DEFAULT_STDERR_TAIL;
-  const spawner = opts.spawner ?? defaultSpawner;
-  let handle;
-  try {
-    handle = spawner(binary, opts.argv);
-  } catch (err) {
-    return {
-      kind: "error",
-      envelope: errorEnvelope(
-        "NOT_IMPLEMENTED",
-        `failed to spawn yt-dlp at ${binary}: ${err instanceof Error ? err.message : err}`
-      )
-    };
-  }
-  let stdoutBytes = 0;
-  let stdoutOverflow = false;
-  const stdoutChunks = [];
-  const stderrTailBuf = createTailBuffer2(stderrTail);
-  handle.stdout.on("data", (chunk) => {
-    if (stdoutOverflow) return;
-    if (stdoutBytes + chunk.byteLength > stdoutMax) {
-      stdoutOverflow = true;
-      handle.kill("SIGTERM");
-      return;
-    }
-    stdoutBytes += chunk.byteLength;
-    stdoutChunks.push(chunk);
-  });
-  handle.stderr.on("data", (chunk) => {
-    stderrTailBuf.push(chunk);
-  });
-  return new Promise((resolve2) => {
-    let settled = false;
-    handle.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      resolve2({
-        kind: "error",
-        envelope: errorEnvelope(
-          "NOT_IMPLEMENTED",
-          `yt-dlp spawn error: ${err.message}`
-        )
-      });
-    });
-    handle.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      if (stdoutOverflow) {
-        resolve2({
-          kind: "error",
-          envelope: errorEnvelope(
-            "PROBE_OUTPUT_TOO_LARGE",
-            `probe stdout exceeded ${stdoutMax} bytes`
-          )
-        });
-        return;
-      }
-      const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
-      resolve2({
-        kind: "success",
-        stdout,
-        stderr: stderrTailBuf.read().toString("utf-8"),
-        exitCode: code ?? -1,
-        binary
-      });
-    });
-  });
-}
-function resolveYtDlpBinary() {
-  const env = process.env.YTDLP_PATH?.trim();
-  return env && env.length > 0 ? env : "yt-dlp";
-}
-function defaultSpawner(binary, args) {
-  const child = spawn2(binary, [...args], { stdio: ["ignore", "pipe", "pipe"] });
-  return {
-    stdout: child.stdout,
-    stderr: child.stderr,
-    on: (ev, l) => {
-      child.on(ev, l);
-    },
-    kill: (signal) => {
-      try {
-        child.kill(signal);
-      } catch {
-      }
-    }
-  };
-}
-function createTailBuffer2(maxBytes) {
-  let buf = Buffer.alloc(0);
-  return {
-    push(chunk) {
-      const merged = Buffer.concat([buf, chunk]);
-      buf = merged.byteLength > maxBytes ? merged.subarray(merged.byteLength - maxBytes) : merged;
-    },
-    read: () => buf
-  };
-}
-
-// src/local-info/version.ts
-import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
-var FALLBACK_VERSION = "0.0.0-dev";
-function readCliVersion(candidatePaths = defaultCandidatePaths()) {
-  for (const p of candidatePaths) {
-    try {
-      const pkg = JSON.parse(readFileSync3(p, "utf-8"));
-      if (pkg.name === "@vidbee/cli" && typeof pkg.version === "string") {
-        return {
-          cli: pkg.version,
-          contract: pkg.version,
-          changelog: "https://github.com/nexmoe/vidbee/blob/main/apps/cli/CHANGELOG.md"
-        };
-      }
-    } catch {
-    }
-  }
-  return {
-    cli: FALLBACK_VERSION,
-    contract: FALLBACK_VERSION,
-    changelog: "https://github.com/nexmoe/vidbee/blob/main/apps/cli/CHANGELOG.md"
-  };
-}
-function defaultCandidatePaths() {
-  let here;
-  try {
-    here = fileURLToPath2(import.meta.url);
-  } catch {
-    return [];
-  }
-  const dir = dirname(here);
-  return [
-    resolve(dir, "..", "package.json"),
-    resolve(dir, "..", "..", "package.json"),
-    resolve(dir, "..", "..", "..", "package.json")
-  ];
-}
-
-// src/local-info/upgrade.ts
-import { mkdirSync, readFileSync as readFileSync4, writeFileSync } from "node:fs";
-import { homedir as homedir3, platform } from "node:os";
-import { dirname as dirname2, join as join3 } from "node:path";
-var CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
-var REGISTRY_URL = "https://registry.npmjs.org/@vidbee/cli/latest";
-var FETCH_TIMEOUT_MS = 5e3;
-async function checkUpgrade(input) {
-  const now = input.now ?? Date.now;
-  const cachePath = input.cachePath ?? defaultCachePath();
-  const fetcher = input.fetchLatest ?? defaultFetchLatest;
-  let cachedAt = null;
-  let latest = null;
-  if (!input.force) {
-    const cached2 = readCache(cachePath);
-    if (cached2 && now() - cached2.fetchedAt < CACHE_TTL_MS) {
-      latest = cached2.version;
-      cachedAt = cached2.fetchedAt;
-    }
-  }
-  let cachedFlag = latest !== null;
-  if (latest === null) {
-    const fetched = await fetcher();
-    latest = fetched.version;
-    cachedAt = fetched.fetchedAt;
-    cachedFlag = false;
-    writeCache(cachePath, { version: latest, fetchedAt: cachedAt });
-  }
-  const upToDate = compareSemver(input.current, latest) >= 0;
-  return {
-    current: input.current,
-    latest,
-    upToDate,
-    cached: cachedFlag,
-    cachedAt: cachedAt === null ? null : new Date(cachedAt).toISOString(),
-    registryUrl: REGISTRY_URL,
-    installCommands: {
-      npm: "npm install -g @vidbee/cli",
-      pnpm: "pnpm add -g @vidbee/cli",
-      bun: "bun install -g @vidbee/cli",
-      brew: "brew upgrade vidbee/tap/vidbee"
-    }
-  };
-}
-async function defaultFetchLatest() {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(REGISTRY_URL, {
-      headers: { accept: "application/json" },
-      signal: ctrl.signal
-    });
-    if (!res.ok) {
-      throw new Error(`registry responded ${res.status}`);
-    }
-    const body = await res.json();
-    if (typeof body.version !== "string") {
-      throw new Error("registry response missing `version`");
-    }
-    return { version: body.version, fetchedAt: Date.now() };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-function readCache(path3) {
-  try {
-    const raw = readFileSync4(path3, "utf-8");
-    const parsed = JSON.parse(raw);
-    if (typeof parsed.version === "string" && typeof parsed.fetchedAt === "number") {
-      return { version: parsed.version, fetchedAt: parsed.fetchedAt };
-    }
-  } catch {
-  }
-  return null;
-}
-function writeCache(path3, payload) {
-  try {
-    mkdirSync(dirname2(path3), { recursive: true });
-    writeFileSync(path3, JSON.stringify(payload), "utf-8");
-  } catch {
-  }
-}
-function defaultCachePath() {
-  const home = homedir3();
-  if (platform() === "win32") {
-    const localAppData = process.env.LOCALAPPDATA ?? join3(home, "AppData", "Local");
-    return join3(localAppData, "VidBee", "cli-upgrade-check.json");
-  }
-  if (platform() === "darwin") {
-    return join3(home, "Library", "Caches", "VidBee", "cli-upgrade-check.json");
-  }
-  const xdg = process.env.XDG_CACHE_HOME ?? join3(home, ".cache");
-  return join3(xdg, "vidbee", "cli-upgrade-check.json");
-}
-function compareSemver(a, b) {
-  const [aMain = "", aPre = ""] = a.split("-", 2);
-  const [bMain = "", bPre = ""] = b.split("-", 2);
-  const aParts = aMain.split(".").map((p) => Number.parseInt(p, 10) || 0);
-  const bParts = bMain.split(".").map((p) => Number.parseInt(p, 10) || 0);
-  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-    const av = aParts[i] ?? 0;
-    const bv = bParts[i] ?? 0;
-    if (av !== bv) return av - bv;
-  }
-  if (aPre === bPre) return 0;
-  if (aPre === "") return 1;
-  if (bPre === "") return -1;
-  return aPre < bPre ? -1 : 1;
-}
-
 // src/runtime.ts
 async function run(argv, io) {
   let parsed;
@@ -27294,7 +31820,9 @@ async function run(argv, io) {
   const pretty = parsed.flags.pretty;
   if (parsed.flags.api !== void 0) {
     const bad = validateApiUrl(parsed.flags.api);
-    if (bad) return emit(io, bad, pretty, ExitCode.HOST_UNREACHABLE);
+    if (bad) {
+      return emit(io, bad, pretty, ExitCode.HOST_UNREACHABLE);
+    }
   }
   const connectImpl = io.connect ?? connect;
   if (parsed.kind === "ytdlp") {
@@ -27324,10 +31852,7 @@ async function run(argv, io) {
     };
     return emit(io, env, pretty, ExitCode.OK);
   } catch (err) {
-    const env = errorEnvelope(
-      "UNKNOWN_ERROR",
-      err instanceof Error ? err.message : String(err)
-    );
+    const env = errorEnvelope("UNKNOWN_ERROR", err instanceof Error ? err.message : String(err));
     return emit(io, env, pretty, ExitCode.ARG_ERROR);
   } finally {
     await safeTeardown(conn);
@@ -27346,12 +31871,14 @@ async function runLocalSubcommand(subcommand, subArgs, io, pretty) {
   }
   const upgradeImpl = io.checkUpgrade ?? checkUpgrade;
   const opts = parseUpgradeArgs(subArgs);
-  if (opts.kind === "error") return emit(io, opts.envelope, pretty, ExitCode.ARG_ERROR);
+  if (opts.kind === "error") {
+    return emit(io, opts.envelope, pretty, ExitCode.ARG_ERROR);
+  }
   try {
     const result = await upgradeImpl({
       current: versionInfo.cli,
       ...opts.force ? { force: true } : {},
-      ...opts.cachePath !== void 0 ? { cachePath: opts.cachePath } : {}
+      ...opts.cachePath === void 0 ? {} : { cachePath: opts.cachePath }
     });
     const env = {
       ok: true,
@@ -27361,11 +31888,9 @@ async function runLocalSubcommand(subcommand, subArgs, io, pretty) {
     };
     return emit(io, env, pretty, ExitCode.OK);
   } catch (err) {
-    const env = errorEnvelope(
-      "API_UNREACHABLE",
-      err instanceof Error ? err.message : String(err),
-      { registry: "https://registry.npmjs.org/@vidbee/cli/latest" }
-    );
+    const env = errorEnvelope("API_UNREACHABLE", err instanceof Error ? err.message : String(err), {
+      registry: "https://registry.npmjs.org/@vidbee/cli/latest"
+    });
     return emit(io, env, pretty, ExitCode.HOST_UNREACHABLE);
   }
 }
@@ -27373,7 +31898,9 @@ function parseUpgradeArgs(subArgs) {
   const out = { kind: "ok", force: false };
   for (let i = 0; i < subArgs.length; i++) {
     const tok = subArgs[i];
-    if (tok === void 0) continue;
+    if (tok === void 0) {
+      continue;
+    }
     if (tok === "--force") {
       out.force = true;
       continue;
@@ -27405,12 +31932,7 @@ async function runProbeMode(parsed, io, pretty) {
   const probeImpl = io.probe ?? runProbe;
   const result = await probeImpl({ argv: parsed.ytArgs });
   if (result.kind === "error") {
-    return emit(
-      io,
-      result.envelope,
-      pretty,
-      exitCodeForError(result.envelope.code)
-    );
+    return emit(io, result.envelope, pretty, exitCodeForError(result.envelope.code));
   }
   const { args: sanitized } = redactArgs(parsed.ytArgs);
   const env = {
@@ -27438,8 +31960,12 @@ async function runDownloadMode(parsed, io, pretty, connectImpl) {
     if (parsed.flags.priority) {
       request.priority = priorityToCode(parsed.flags.priority);
     }
-    if (parsed.flags.groupKey !== void 0) request.groupKey = parsed.flags.groupKey;
-    if (parsed.flags.maxAttempts !== void 0) request.maxAttempts = parsed.flags.maxAttempts;
+    if (parsed.flags.groupKey !== void 0) {
+      request.groupKey = parsed.flags.groupKey;
+    }
+    if (parsed.flags.maxAttempts !== void 0) {
+      request.maxAttempts = parsed.flags.maxAttempts;
+    }
     const result = await enqueueDownload({
       client: conn.client,
       request,
@@ -27486,23 +32012,28 @@ async function runDownloadMode(parsed, io, pretty, connectImpl) {
     };
     return emit(io, env, pretty, ExitCode.WAIT_NON_SUCCESS);
   } catch (err) {
-    const env = errorEnvelope(
-      "UNKNOWN_ERROR",
-      err instanceof Error ? err.message : String(err)
-    );
+    const env = errorEnvelope("UNKNOWN_ERROR", err instanceof Error ? err.message : String(err));
     return emit(io, env, pretty, ExitCode.ARG_ERROR);
   } finally {
     await safeTeardown(conn);
   }
 }
 function priorityToCode(p) {
-  if (p === "user") return 0;
-  if (p === "subscription") return 10;
+  if (p === "user") {
+    return 0;
+  }
+  if (p === "subscription") {
+    return 10;
+  }
   return 20;
 }
 async function safeTeardown(conn) {
-  if (conn.kind !== "connected") return;
-  if (!conn.teardown) return;
+  if (conn.kind !== "connected") {
+    return;
+  }
+  if (!conn.teardown) {
+    return;
+  }
   try {
     await conn.teardown();
   } catch {
@@ -27537,12 +32068,12 @@ async function main() {
     stderr: (line) => process.stderr.write(`${line}
 `)
   });
-  process.exit(exitCode);
+  process.exitCode = exitCode;
 }
 main().catch((err) => {
   process.stderr.write(
     `${JSON.stringify({ ok: false, code: "UNKNOWN_ERROR", message: err instanceof Error ? err.message : String(err) })}
 `
   );
-  process.exit(2);
+  process.exitCode = 2;
 });

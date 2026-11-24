@@ -403,16 +403,18 @@ export class YtDlpExecutor implements Executor {
         const stdout = stdoutTail.read()
         const stderr = stderrTail.read()
         let filePath = filePathSeen ?? extractSavedFilePath(`${stdout}\n${stderr}`) ?? ''
-        if (ctx.input.options?.editorCompatible === true && filePath) {
+        const options = ctx.input.options
+        const editingMp4 = options?.editorCompatible === true || ((options?.type ?? ctx.input.kind) === 'video' && (options?.containerFormat ?? 'mp4') === 'mp4' && !ctx.input.rawArgs?.length)
+        if (editingMp4 && filePath) {
           events.onProcessing?.({ taskId: ctx.taskId, attemptId: ctx.attemptId })
           events.onStd({
             taskId: ctx.taskId,
             attemptId: ctx.attemptId,
             stream: 'stdout',
-            line: 'Converting to editing MP4: H.264, AAC, 30 fps. Original file is retained.'
+            line: 'Preparing editing MP4 with H.264 video and AAC audio.'
           })
           try {
-            filePath = await createEditorVideo(filePath, ffmpegLocation, controller.signal)
+            filePath = await createEditorVideo(filePath, ffmpegLocation, controller.signal, Number(options?.maxShortEdge) || undefined)
           } catch (error) {
             finishOnce({
               taskId: ctx.taskId,

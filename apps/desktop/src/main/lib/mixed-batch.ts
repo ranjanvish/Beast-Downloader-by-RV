@@ -55,8 +55,23 @@ export class MixedBatch {
         item.info &&
         item.options.audioTrack &&
         !audioFormats(item.info).some((f) => f.format_id === item.options.audioTrack)
-          ? { ...item.options, audioTrack: audioFormats(item.info)[0]?.format_id || '' }
-          : item.options,
+          ? {
+              ...item.options,
+              imageUrl:
+                item.options.imageUrl ||
+                item.info.thumbnail ||
+                item.info.thumbnails?.at(-1)?.url ||
+                '',
+              audioTrack: audioFormats(item.info)[0]?.format_id || ''
+            }
+          : {
+              ...item.options,
+              imageUrl:
+                item.options.imageUrl ||
+                item.info?.thumbnail ||
+                item.info?.thumbnails?.at(-1)?.url ||
+                ''
+            },
       status:
         ['fetching', 'queued', 'downloading'].includes(item.status) && !item.taskId
           ? item.info || item.image
@@ -147,6 +162,7 @@ export class MixedBatch {
     item.title = info.title
     item.options = {
       ...item.options,
+      imageUrl: info.thumbnail || info.thumbnails?.at(-1)?.url || '',
       output: force === 'audio' || !video.length ? 'audio' : 'video',
       videoFormat: bestVideoAt(info),
       audioTrack:
@@ -249,7 +265,13 @@ export class MixedBatch {
       if (!isCancelled(item)) {
         item.status = 'failed'
         item.errorStage = 'fetch'
-        item.error = error instanceof Error ? error.message : String(error)
+        const message = error instanceof Error ? error.message : String(error)
+        item.error =
+          /instagram/i.test(item.sourceUrl) && /content isn't available to everyone/i.test(message)
+            ? `Instagram restricted access to this reel. Sign in to an Instagram account that can view it, connect the browser extension or configure browser cookies in Settings, then fetch again.
+
+${message}`
+            : message
       }
     }
     this.changed()
@@ -308,6 +330,7 @@ export class MixedBatch {
       item.status = 'pending'
     }
     const options = { ...item.options, ...patch }
+    if (patch.videoFormat !== undefined) options.maxShortEdge = undefined
     if (item.info || item.image) {
       validateMixedOptions(item, options)
     }
@@ -322,6 +345,20 @@ export class MixedBatch {
         continue
       }
       const options = { ...item.options }
+      if (patch.imageWidth !== undefined) {
+        const candidates = item.image
+          ? [{ url: item.image.url, width: item.image.width }, ...item.image.variants]
+          : item.info?.thumbnails || []
+        const known = candidates
+          .filter((candidate) => candidate.width)
+          .sort((a, b) => (b.width || 0) - (a.width || 0))
+        const limit = patch.imageWidth
+        const chosen =
+          limit === 0 ? known[0] : known.find((candidate) => (candidate.width || 0) <= limit)
+        if (chosen) {
+          options.imageUrl = chosen.url
+        }
+      }
       if (patch.folder !== undefined) {
         options.folder = patch.folder
       }
@@ -333,8 +370,15 @@ export class MixedBatch {
         if (patch.output) {
           options.output = patch.output
         }
+        if (patch.saveThumbnail !== undefined) {
+          options.saveThumbnail = patch.saveThumbnail
+        }
+        if (patch.imageOutput) {
+          options.imageOutput = patch.imageOutput
+        }
         if (patch.height !== undefined && videoFormats(item.info).length) {
           options.videoFormat = bestVideoAt(item.info, patch.height)
+          options.maxShortEdge = patch.height || undefined
         }
         if (patch.audioOutput) {
           options.audioOutput = patch.audioOutput
@@ -383,6 +427,7 @@ export class MixedBatch {
       }
       if (
         item.status !== 'ready' &&
+        item.status !== 'cancelled' &&
         !(item.status === 'failed' && item.errorStage === 'download')
       ) {
         continue
@@ -428,7 +473,7 @@ export class MixedBatch {
         if (item.status === 'completed') {
           continue
         }
-        if (item.status === 'downloading' && item.kind === 'image') {
+        if (item.status === 'downloading' && item.options.output === 'image') {
           continue
         }
         if (item.taskId && active.has(item.status)) {
@@ -447,6 +492,44 @@ export class MixedBatch {
     }
     this.changed()
   }
+  createClips(id: string, value: unknown, start: boolean) {
+    const source = this.items.find((row) => row.id === id)
+    if (!(source?.info && source.kind !== 'image' && Array.isArray(value) && value.length)) {
+      throw new Error('Fetch a video or audio source and add at least one clip.')
+    }
+    const clips = value.map((range: unknown, index: number) => {
+      if (
+        !range ||
+        typeof range !== 'object' ||
+        !('start' in range) ||
+        !('end' in range) ||
+        typeof range.start !== 'string' ||
+        typeof range.end !== 'string' ||
+        !range.start.trim() ||
+        !range.end.trim()
+      ) {
+        throw new Error('Each clip needs a start and end time.')
+      }
+      const options = { ...source.options, start: range.start, end: range.end }
+      validateMixedOptions(source, options)
+      return {
+        ...structuredClone(source),
+        id: randomUUID(),
+        clipNumber: index + 1,
+        options,
+        taskId: undefined,
+        filePath: undefined,
+        status: 'ready' as const,
+        progress: 0,
+        error: undefined,
+        errorStage: undefined,
+        selected: true
+      }
+    })
+    this.items.push(...clips)
+    this.changed()
+    return start ? this.start(clips.map((clip) => clip.id)) : { created: clips.length }
+  }
   clone(id: string) {
     const item = this.items.find((row) => row.id === id)
     if (!(item && (item.info || item.image))) {
@@ -455,6 +538,7 @@ export class MixedBatch {
     this.items.push({
       ...structuredClone(item),
       id: randomUUID(),
+      clipNumber: undefined,
       taskId: undefined,
       filePath: undefined,
       status: 'ready',
@@ -467,7 +551,7 @@ export class MixedBatch {
   private async run(item: MixedEntry) {
     item.status = 'downloading'
     item.progress = 0
-    const isImage = item.kind === 'image'
+    const isImage = item.options.output === 'image'
     if (isImage) {
       this.activeImages++
     }
@@ -477,6 +561,9 @@ export class MixedBatch {
         item.status = 'completed'
         item.progress = 100
       } else {
+        if (item.options.saveThumbnail && !item.thumbnailPath) {
+          item.thumbnailPath = await this.dependencies.saveImage(structuredClone(item))
+        }
         const id = await this.dependencies.startMedia(structuredClone(item))
         item.taskId = id
         if (isCancelled(item)) {
@@ -536,7 +623,7 @@ export class MixedBatch {
       if (
         item.status !== 'queued' ||
         item.taskId ||
-        (item.kind === 'image' && this.activeImages > 0)
+        (item.options.output === 'image' && this.activeImages > 0)
       ) {
         continue
       }

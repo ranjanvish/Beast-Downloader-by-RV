@@ -39,6 +39,18 @@ export function BeastExtensions() {
       setMessage('Connection status unavailable. Restart Beast and try again.')
     }
   }
+  const copyAgentSetup = async () => {
+    try {
+      const server = await ipcServices.app.copyBeastAgentSetup()
+      setMessage(
+        `AI agent configuration copied. Connect it in your agent host; supported hosts do not automatically discover external apps. Server: ${server}`
+      )
+    } catch {
+      setMessage(
+        'AI agent configuration is unavailable. Verify your Beast installation and try again.'
+      )
+    }
+  }
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
       <h1 className="font-bold text-2xl">Extensions & Browser Integration</h1>
@@ -46,6 +58,20 @@ export function BeastExtensions() {
         Download videos, choose dubbing tracks and collect images from your browser. This page
         always stays available if you remove the extension.
       </p>
+      <section className="space-y-3 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold text-lg">AI agent connection</h2>
+        <p>
+          Copy a configuration for compatible MCP agent hosts. Each host controls its own
+          connections.
+        </p>
+        <button
+          className="rounded-lg border border-border px-4 py-2"
+          onClick={() => void copyAgentSetup()}
+          type="button"
+        >
+          Copy AI agent configuration
+        </button>
+      </section>
       <section className="space-y-4 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold text-lg">Install or reinstall Beast Browser Companion</h2>
         <label className="block">

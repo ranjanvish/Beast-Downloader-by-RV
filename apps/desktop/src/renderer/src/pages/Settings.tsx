@@ -439,7 +439,7 @@ export function Settings() {
                                 value as OneClickContainerOption
                               )
                             }
-                            value={settings.oneClickContainer ?? 'auto'}
+                            value={settings.oneClickContainer ?? 'mp4'}
                           >
                             <SelectTrigger className="w-40">
                               <SelectValue />

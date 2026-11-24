@@ -39,6 +39,7 @@ export interface VideoInfo {
   id: string
   title: string
   thumbnail?: string
+  thumbnails?: { url: string; width?: number; height?: number }[]
   duration?: number
   formats: VideoFormat[]
   extractor_key?: string
@@ -189,8 +190,10 @@ export interface DownloadOptions {
   format?: string
   audioFormat?: string
   audioBitrate?: number
+  maxShortEdge?: number
   editorCompatible?: boolean
   embedAudioCover?: boolean
+  embedVideoCover?: boolean
   audioFormatIds?: string[]
   startTime?: string
   endTime?: string
@@ -398,7 +401,7 @@ export const defaultSettings: AppSettings = {
   oneClickDownload: false,
   oneClickDownloadType: 'video',
   oneClickQuality: 'good',
-  oneClickContainer: 'auto',
+  oneClickContainer: 'mp4',
   closeToTray: true,
   hideDockIcon: false,
   launchAtLogin: false,

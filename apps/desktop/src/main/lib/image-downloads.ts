@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
@@ -345,7 +344,6 @@ export async function saveImages(options: {
                 ).data,
                 'base64'
               )
-        const identifier = createHash('sha256').update(image.url).digest('hex').slice(0, 10)
         const name =
           (image.title || path.basename(new URL(image.url).pathname) || 'image')
             .replace(/\.[a-zA-Z0-9]{2,5}$/, '')
@@ -354,10 +352,7 @@ export async function saveImages(options: {
             .slice(0, 80) || 'image'
         let savedPath = ''
         for (let suffix = 0; suffix < 1000; suffix++) {
-          const target = path.join(
-            directory,
-            `${identifier}-${name}${suffix ? `-${suffix}` : ''}.${ext}`
-          )
+          const target = path.join(directory, `${name}${suffix ? ` (${suffix})` : ''}.${ext}`)
           try {
             await writeFile(target, bytes, { flag: 'wx' })
             savedPath = target

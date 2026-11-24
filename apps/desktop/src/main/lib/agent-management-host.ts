@@ -175,7 +175,7 @@ export async function createAgentTask(
         ? buildAudioFormatPreference(settings)
         : buildVideoFormatPreference(settings)),
     containerFormat:
-      kind === 'video' ? (input.container ?? settings.oneClickContainer ?? 'auto') : undefined
+      kind === 'video' ? (input.container ?? settings.oneClickContainer ?? 'mp4') : undefined
   })
   signal?.throwIfAborted()
   const concurrent = existingTask()

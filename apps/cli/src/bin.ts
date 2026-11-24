@@ -17,12 +17,12 @@ async function main(): Promise<void> {
     stdout: (line) => process.stdout.write(`${line}\n`),
     stderr: (line) => process.stderr.write(`${line}\n`)
   })
-  process.exit(exitCode)
+  process.exitCode = exitCode
 }
 
 main().catch((err) => {
   process.stderr.write(
     `${JSON.stringify({ ok: false, code: 'UNKNOWN_ERROR', message: err instanceof Error ? err.message : String(err) })}\n`
   )
-  process.exit(2)
+  process.exitCode = 2
 })

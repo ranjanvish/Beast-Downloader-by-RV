@@ -557,7 +557,7 @@ export const buildDownloadArgs = (
   validateDownloadTimeRange(options.startTime, options.endTime)
   const args: string[] = ['--no-playlist', '--no-mtime', '--encoding', 'utf-8']
   const container: OneClickContainerOption | undefined =
-    options.type === 'video' ? (options.containerFormat ?? 'auto') : undefined
+    options.type === 'video' ? (options.containerFormat ?? 'mp4') : undefined
 
   if (options.type === 'video' && container) {
     const formatSelector = resolveVideoFormatSelector(options)
@@ -576,6 +576,10 @@ export const buildDownloadArgs = (
     // fragments on YouTube under proxies, etc.) do not abort the download.
     if (container === 'auto') {
       args.push('--merge-output-format', 'mp4/mkv')
+    } else if (container === 'mp4') {
+      // A single VP8/Vorbis source cannot be remuxed into MP4. The executor
+      // normalizes the final streams after download or lossless MKV merge.
+      args.push('--merge-output-format', 'mkv')
     } else if (container !== 'original') {
       args.push('--merge-output-format', container)
       args.push('--remux-video', container)

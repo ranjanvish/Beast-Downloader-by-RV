@@ -30,6 +30,9 @@ function chooserInfo(info: VideoInfo): VideoInfo {
     title: info.title,
     duration: info.duration,
     thumbnail: info.thumbnail,
+    thumbnails: info.thumbnails
+      ?.filter((v) => typeof v.url === 'string')
+      .map((v) => ({ url: v.url, width: v.width, height: v.height })),
     formats: (info.formats || []).map((f) => ({
       format_id: f.format_id,
       ext: f.ext,
@@ -89,12 +92,41 @@ export function getMixedBatch(): MixedBatch {
       playlist: fetchPlaylistInfo,
       images: scanImages,
       saveImage: async (item) => {
-        const result = await saveImages({
+        let result = await saveImages({
           images: [{ url: item.options.imageUrl, title: item.title }],
           pageUrl: item.pageUrl,
           output: item.options.imageOutput,
           directory: item.options.folder || undefined
         })
+        if (!result.saved[0] && item.info && /HTTP 404/.test(result.failed[0]?.error || '')) {
+          const info = await fetchVideoInfo(item.sourceUrl)
+          const source = new URL(item.sourceUrl)
+          const youtubeId = /(^|\.)youtube\.com$/.test(source.hostname)
+            ? source.searchParams.get('v')
+            : null
+          const youtubeFallback =
+            youtubeId && /^[a-zA-Z0-9_-]{11}$/.test(youtubeId)
+              ? [
+                  { url: `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg`, width: 1280 },
+                  { url: `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`, width: 480 }
+                ]
+              : []
+          const candidates = [...youtubeFallback, ...(info.thumbnails || [])]
+            .filter((thumb) => thumb.url && thumb.url !== item.options.imageUrl)
+            .sort((a, b) => (b.width || 0) - (a.width || 0))
+            .slice(0, 10)
+          for (const candidate of candidates) {
+            result = await saveImages({
+              images: [{ url: candidate.url, title: item.title }],
+              pageUrl: item.pageUrl,
+              output: item.options.imageOutput,
+              directory: item.options.folder || undefined
+            })
+            if (result.saved[0] || !/HTTP 404/.test(result.failed[0]?.error || '')) {
+              break
+            }
+          }
+        }
         if (!result.saved[0]) {
           throw new Error(result.failed[0]?.error || 'The image download failed.')
         }
@@ -207,6 +239,8 @@ export async function executeMixedBatch(
           : ids || []
       )
       return { removed: true }
+    case 'createClips':
+      return batch.createClips(String(body.id || ''), body.ranges, body.start === true)
     case 'clone':
       batch.clone(String(body.id))
       return { duplicated: true }

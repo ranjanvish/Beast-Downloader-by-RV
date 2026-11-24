@@ -27,6 +27,7 @@ export function beastFilenameVariant(options: {
   type: 'video' | 'audio'
   format: string
   videoId?: string
+  clipNumber?: number
   audioFormat?: string
   language?: string
   bitrate?: number
@@ -44,13 +45,13 @@ export function beastFilenameVariant(options: {
   if (options.startTime || options.endTime) {
     tags.push(`clip-${safe(options.startTime || '0')}-${safe(options.endTime || 'end')}`)
   }
-  // Windows output is truncated to 50 characters. Put a compact identity first
-  // so even long titles and ranges differing only at the end remain distinct.
   const identity = JSON.stringify([options.videoId, options.audioFormat, ...tags])
   let hash = 0xcbf29ce484222325n
   for (let index = 0; index < identity.length; index += 1) {
     // biome-ignore lint/suspicious/noBitwiseOperators: FNV-1a uses XOR for the filename identity.
     hash = BigInt.asUintN(64, (hash ^ BigInt(identity.charCodeAt(index))) * 0x100000001b3n)
   }
-  return `[${options.type}-${hash.toString(16).padStart(16, '0')}] %(title).80B.%(ext)s`
+  const suffix = hash.toString(16).padStart(16, '0')
+  const number = options.clipNumber ? ` - ${options.clipNumber}` : ''
+  return `%(title).8B ${suffix.slice(0, 8)}${number}.%(ext)s`
 }
